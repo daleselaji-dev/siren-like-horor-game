@@ -69,9 +69,10 @@ const enemyDefs = [
     cloth: 'grey', fov: 90, sightRange: 17, hearRange: 15,
   },
   {
+    // 祭师对玩家全盲全聋——他的眼睛只看得见他没做完的祭（安全的视奸对象）
     id: 'priest', label: '祭师 闫守潮', kind: 'worker',
     workPos: P.priestWork, workMode: 'work_pray', workYaw: Math.PI / 2,
-    cloth: 'grey', fov: 70, sightRange: 12, hearRange: 11,
+    cloth: 'grey', fov: 1, sightRange: 0, hearRange: 0,
   },
   {
     id: 'singer', label: '唱歌的人', kind: 'singer',

@@ -165,7 +165,7 @@ export class Enemy {
     } else {
       this.moveBlocked = Math.max(0, this.moveBlocked - dt);
     }
-    this.pos.y = this.world.heightAt(this.pos.x, this.pos.z);
+    this.pos.y = this.world.heightAt(this.pos.x, this.pos.z, this.pos.y);
     return dist - step;
   }
 
@@ -431,7 +431,7 @@ export class Dog {
         this.phase += dt * 9;
       }
     }
-    this.pos.y = this.world.heightAt(this.pos.x, this.pos.z);
+    this.pos.y = this.world.heightAt(this.pos.x, this.pos.z, this.pos.y);
     // 腿部小跑动画
     for (let i = 0; i < 4; i++) {
       this.legs[i].rotation.x = Math.sin(this.phase + (i % 2) * Math.PI) * 0.5 * Math.min(1, this.phase % 1 + 0.5);

@@ -45,18 +45,19 @@ const patches = [];
 function addPatch(cx, cz, angle, len, wid, h0, h1) {
   patches.push({ cx, cz, cos: Math.cos(angle), sin: Math.sin(angle), len, wid, h0, h1 });
 }
-function patchHeight(x, z) {
-  let h = -Infinity;
+function patchHeights(x, z, out) {
+  out.length = 0;
   for (const p of patches) {
     const lx = (x - p.cx) * p.cos + (z - p.cz) * p.sin;   // 沿长度
     const lz = -(x - p.cx) * p.sin + (z - p.cz) * p.cos;  // 沿宽度
     if (Math.abs(lx) <= p.len / 2 && Math.abs(lz) <= p.wid / 2) {
       const t = (lx + p.len / 2) / p.len;
-      h = Math.max(h, p.h0 + (p.h1 - p.h0) * t);
+      out.push(p.h0 + (p.h1 - p.h0) * t);
     }
   }
-  return h;
+  return out;
 }
+const _ph = [];
 
 function terrainHeight(x, z) {
   let h = 0;
@@ -86,8 +87,29 @@ function terrainHeight(x, z) {
   return h;
 }
 
-export function heightAt(x, z) {
-  return Math.max(terrainHeight(x, z), patchHeight(x, z));
+/**
+ * 多层高度解析：
+ * - 不带 refY：返回最高面（用于初始摆放）
+ * - 带 refY：在“可站立面”里选身位最合理的一层——
+ *   可爬升面(≤refY+1.0)取最高；若无（悬空于所有面之下不可能），取最低面
+ */
+export function heightAt(x, z, refY) {
+  const t = terrainHeight(x, z);
+  patchHeights(x, z, _ph);
+  if (_ph.length === 0) return t;
+  if (refY === undefined) {
+    let m = t;
+    for (const h of _ph) if (h > m) m = h;
+    return m;
+  }
+  let best = -Infinity;
+  let lowest = t;
+  if (t <= refY + 1.0 && t > best) best = t;
+  for (const h of _ph) {
+    if (h < lowest) lowest = h;
+    if (h <= refY + 1.0 && h > best) best = h;
+  }
+  return best === -Infinity ? lowest : best;
 }
 
 // ---------------- 世界构建 ----------------
@@ -700,12 +722,30 @@ export function buildVillage(scene, M) {
     // 塔身腰线
     B.add(GEO.cyl, M.plaster, lx, lb + 3.4, lz, 0, 4.9, 0.35, 4.9);
     B.add(GEO.cyl, M.plaster, lx, lb + 6.6, lz, 0, 4.4, 0.35, 4.4);
-    circle(lx, lz, 2.5, lb + towerH);
     // 门(朝西北,面向来路)
     const doorAng = Math.atan2(-95 - lz, 60 - lx);
-    const dx = lx + Math.cos(doorAng) * 2.45, dz = lz + Math.sin(doorAng) * 2.45;
-    B.add(GEO.box, M.woodDark, dx, lb + 1.1, dz, -doorAng + Math.PI / 2, 1.3, 2.2, 0.3);
+    // 塔身碰撞：环形箱段，门向留缺口（玩家能从门进塔）
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      let da = Math.abs(a - ((doorAng % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2));
+      if (da > Math.PI) da = Math.PI * 2 - da;
+      if (da < 0.5) continue; // 门洞
+      aabb(lx + Math.cos(a) * 2.25, lz + Math.sin(a) * 2.25, 1.3, 1.3, lb + towerH);
+    }
+    // 门洞打穿塔壁（视觉）：深色内衬 + 门框
+    const dx = lx + Math.cos(doorAng) * 2.35, dz = lz + Math.sin(doorAng) * 2.35;
+    const doorRy = -doorAng + Math.PI / 2;
+    const innerDark = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 1 });
+    B.add(GEO.box, innerDark, dx, lb + 1.25, dz, doorRy, 1.35, 2.5, 1.1);
+    B.add(GEO.box, M.woodDark, dx + Math.cos(doorAng + Math.PI / 2) * 0.8, lb + 1.25, dz + Math.sin(doorAng + Math.PI / 2) * 0.8, doorRy, 0.22, 2.6, 0.6);
+    B.add(GEO.box, M.woodDark, dx - Math.cos(doorAng + Math.PI / 2) * 0.8, lb + 1.25, dz - Math.sin(doorAng + Math.PI / 2) * 0.8, doorRy, 0.22, 2.6, 0.6);
+    B.add(GEO.box, M.woodDark, dx, lb + 2.6, dz, doorRy, 1.8, 0.25, 0.6);
     locations.lighthouseDoor = new THREE.Vector3(dx, lb + 1.2, dz);
+    // 塔内一点微光（油灯余烬）
+    const towerLight = new THREE.PointLight(0xff9a55, 4, 8, 2);
+    towerLight.position.set(lx, lb + 1.6, lz + 0.8);
+    scene.add(towerLight);
+    lights.push(towerLight);
     // 顶部平台 + 围栏
     const topY = lb + towerH;
     addPatch(lx, lz, 0, 6.4, 6.4, topY, topY);

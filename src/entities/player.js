@@ -29,8 +29,8 @@ export class Player {
     this.inWaterDepth = 0;
   }
 
-  setPosition(x, z, yaw = 0) {
-    this.pos.set(x, this.world.heightAt(x, z), z);
+  setPosition(x, z, yaw = 0, yHint) {
+    this.pos.set(x, this.world.heightAt(x, z, yHint), z);
     this.yaw = yaw;
     this.pitch = 0;
     this.syncCamera(0);
@@ -62,7 +62,7 @@ export class Player {
     let speed = this.crouching ? CROUCH_SPEED : WALK_SPEED;
 
     // 水深减速
-    const waterD = Math.max(0, this.world.waterLevel() - this.world.heightAt(this.pos.x, this.pos.z));
+    const waterD = Math.max(0, this.world.waterLevel() - this.world.heightAt(this.pos.x, this.pos.z, this.pos.y));
     this.inWaterDepth = waterD;
     if (waterD > 0.25) speed *= Math.max(0.45, 1 - waterD * 0.5);
 
@@ -89,8 +89,8 @@ export class Player {
       this.bobPhase *= 0.9;
     }
 
-    // 贴地
-    const gy = this.world.heightAt(this.pos.x, this.pos.z);
+    // 贴地（多层高度：以当前高度为参考选层）
+    const gy = this.world.heightAt(this.pos.x, this.pos.z, this.pos.y);
     this.pos.y += (gy - this.pos.y) * Math.min(1, dt * 12);
 
     this.syncCamera(dt);

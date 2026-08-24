@@ -275,7 +275,7 @@ export class Story {
 
     // 堤门
     add({
-      id: 'gate', pos: L.gate, r: 2.6, prompt: '推门',
+      id: 'gate', pos: L.gate, r: 3.4, prompt: '推门',
       cond: () => !F.gateOpen,
       act: () => {
         if (F.hasKey) {
@@ -380,8 +380,8 @@ export class Story {
       r: 1.5, prompt: '爬下灯塔',
       cond: () => this.flags.atTop && !this.flags.ended,
       act: () => {
-        const p = L.lighthouseDoor;
-        this.teleport(p.x + 0.8, p.z + 0.8, 2.4, () => { this.flags.atTop = false; });
+        // 落点在塔顶补丁范围之外，避免多层高度歧义
+        this.teleport(72.6, -115.4, 2.4, () => { this.flags.atTop = false; });
       },
     });
 
@@ -612,13 +612,14 @@ export class Story {
     this.checkpoint = {
       name,
       x: x ?? p.pos.x, z: z ?? p.pos.z, yaw: p.yaw,
+      y: x !== undefined ? undefined : p.pos.y, // 自定义坐标时按最高面解析
     };
   }
 
   respawn() {
     const g = this.g;
     const c = this.checkpoint;
-    g.player.setPosition(c.x, c.z, c.yaw);
+    g.player.setPosition(c.x, c.z, c.yaw, c.y);
     g.player.dead = false;
     g.player.frozen = false;
     // 敌人复位（保留 permAlertBonus——永不忘记）
@@ -761,6 +762,19 @@ export class Story {
     const s = this.endSeq;
     s.t += dt;
 
+    // 潮母上升贯穿阶段1~2（仅阶段1不够升到位）
+    if (s.stage >= 1 && s.stage <= 2) {
+      this.tideMother.position.y = Math.min(-6, this.tideMother.position.y + dt * 7);
+    }
+    // 塔灯光束被"她"攫住：缓缓转向潮母并停住（避免光锥乱扫穿插剪影）
+    if (s.stage >= 1) {
+      const b = g.world.dynamic.lighthouseBeam;
+      const dx = this.tideMother.position.x - b.position.x;
+      const dz = this.tideMother.position.z - b.position.z;
+      const target = Math.atan2(-dz, dx);
+      b.rotation.y += (((target - b.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 0.8);
+    }
+
     switch (s.stage) {
       case 0:
         if (s.t > 3) {
@@ -772,8 +786,6 @@ export class Story {
         }
         break;
       case 1: {
-        // 潮母从海里抬起
-        this.tideMother.position.y = Math.min(-6, this.tideMother.position.y + dt * 7);
         // 玩家视线被拽向它
         const p = g.player;
         const dx = this.tideMother.position.x - p.pos.x;
