@@ -42,10 +42,14 @@ try {
   page.on('console', (msg) => {
     if (msg.type() === 'error') consoleErrors.push(msg.text());
   });
-  page.on('pageerror', (err) => consoleErrors.push('PAGEERROR: ' + err.message));
+  page.on('pageerror', (err) => {
+    if (!consoleErrors.some((e) => e.startsWith('PAGEERROR: ' + err.message)))
+      consoleErrors.push('PAGEERROR: ' + err.message + '\n' + (err.stack ?? '').split('\n').slice(0, 5).join('\n'));
+  });
 
   console.log('[verify] loading page...');
-  await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'networkidle0', timeout: 60000 });
+  const query = process.env.FULLSPEC ? '' : '?lowspec=1';
+  await page.goto(`http://127.0.0.1:${PORT}/${query}`, { waitUntil: 'networkidle0', timeout: 60000 });
   await page.waitForFunction(() => window.__game !== undefined, { timeout: 30000 });
 
   const stepFile = process.argv[2] || 'smoke';

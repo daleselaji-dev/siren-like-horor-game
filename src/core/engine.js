@@ -69,15 +69,16 @@ const FinalShader = {
 };
 
 export class Engine {
-  constructor(container) {
+  constructor(container, { lowspec = false } = {}) {
     this.container = container;
+    this.lowspec = lowspec;
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: !lowspec,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(lowspec ? 0.6 : Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = !lowspec;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -91,13 +92,15 @@ export class Engine {
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
 
-    this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.42,  // strength：只让灯火与眼点溢光
-      0.55,  // radius
-      0.82   // threshold
-    );
-    this.composer.addPass(this.bloomPass);
+    if (!lowspec) {
+      this.bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.42,  // strength：只让灯火与眼点溢光
+        0.55,  // radius
+        0.82   // threshold
+      );
+      this.composer.addPass(this.bloomPass);
+    }
 
     // OutputPass：色调映射(ACES) + sRGB 输出（新版 three 组合链必需）
     this.composer.addPass(new OutputPass());
