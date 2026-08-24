@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SHIBITO — a SIREN-like horror game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <h1>SHIBITO</h1>
+        <p class="tagline">A SIREN-like stealth horror. Stay in the dark. Don't get seen.</p>
+      </header>
+      <main class="stage">
+        <canvas id="game" width="960" height="640" aria-label="game canvas"></canvas>
+        <aside class="side">
+          <section class="hud" id="hud"></section>
+          <section class="controls">
+            <h2>Controls</h2>
+            <ul>
+              <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows — move</li>
+              <li><kbd>Shift</kbd> — sneak (quieter, slower)</li>
+              <li><kbd>R</kbd> — restart</li>
+            </ul>
+            <p class="hint">
+              Find the <span class="key">key</span>, then reach the
+              <span class="exit">exit</span>. The Shibito hunts by sight — break
+              its line of vision behind walls.
+            </p>
+          </section>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
