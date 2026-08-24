@@ -1,0 +1,17 @@
+{
+  "name": "siren-like-horror-game",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A browser-based, SIREN-inspired top-down stealth horror game built with TypeScript and HTML5 Canvas.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}

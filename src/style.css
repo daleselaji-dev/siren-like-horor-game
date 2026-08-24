@@ -1,0 +1,178 @@
+:root {
+  --bg: #07080c;
+  --panel: #10131c;
+  --panel-border: #232838;
+  --text: #d7dae4;
+  --muted: #7b8194;
+  --accent: #c8402f;
+  --key: #f2c14e;
+  --exit: #4ea3f2;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: radial-gradient(circle at 50% 0%, #12151f 0%, var(--bg) 60%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#app {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 42px;
+  letter-spacing: 10px;
+  font-weight: 800;
+  color: #f4f5f8;
+  text-shadow: 0 0 18px rgba(200, 64, 47, 0.55);
+}
+
+.topbar .tagline {
+  margin: 4px 0 20px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+
+.stage {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+canvas#game {
+  background: #000;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  image-rendering: pixelated;
+  max-width: 100%;
+}
+
+.side {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hud,
+.controls {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 16px 18px;
+}
+
+.hud {
+  min-height: 96px;
+}
+
+.hud h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hud .status {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.hud .status.safe {
+  color: #6bce7b;
+}
+.hud .status.hunted {
+  color: var(--accent);
+  animation: pulse 0.6s infinite alternate;
+}
+.hud .status.dead {
+  color: var(--accent);
+}
+.hud .status.won {
+  color: var(--exit);
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.hud .objective {
+  margin-top: 10px;
+  color: var(--text);
+}
+
+.hud .meter {
+  margin-top: 12px;
+  height: 8px;
+  border-radius: 4px;
+  background: #2a2030;
+  overflow: hidden;
+}
+.hud .meter > span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #f2c14e, var(--accent));
+  transition: width 0.1s linear;
+}
+
+.controls h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+
+.controls ul {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 2;
+}
+
+kbd {
+  background: #1c2130;
+  border: 1px solid #333a4d;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-right: 3px;
+  font-family: inherit;
+  font-size: 12px;
+  color: #e6e8ef;
+}
+
+.controls .hint {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.key {
+  color: var(--key);
+  font-weight: 600;
+}
+.exit {
+  color: var(--exit);
+  font-weight: 600;
+}
