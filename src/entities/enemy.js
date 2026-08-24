@@ -91,9 +91,12 @@ export class Enemy {
     this.syncBody(0);
   }
 
-  /** 视奸信道接口 */
+  /** 视奸信道接口（向面朝方向前移，避免看到自己的头模型） */
   viewPos(out) {
-    return this.body.headWorldPos(out);
+    const v = this.body.headWorldPos(out);
+    v.x += Math.sin(this.yaw) * 0.22;
+    v.z += Math.cos(this.yaw) * 0.22;
+    return v;
   }
   viewYawPitch() {
     // 头部朝向 = 身体朝向 + 颈部俯仰

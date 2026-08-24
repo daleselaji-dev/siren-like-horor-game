@@ -52,10 +52,10 @@ export class Sky {
     scene.add(this.dome);
 
     // ---- 光照 ----
-    this.hemi = new THREE.HemisphereLight(0x8fa0a8, 0x2c3438, 0.75);
+    this.hemi = new THREE.HemisphereLight(0x9db0b8, 0x39424a, 1.0);
     scene.add(this.hemi);
 
-    this.sun = new THREE.DirectionalLight(0xb9c4c6, 1.35);
+    this.sun = new THREE.DirectionalLight(0xc3ccce, 1.7);
     this.sun.position.set(-60, 80, -90);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
@@ -110,9 +110,9 @@ export class Sky {
       0.463 - this.blood * 0.25,
       0.482 - this.blood * 0.27
     );
-    this.hemi.intensity = 0.75 - this.blood * 0.3;
-    this.hemi.color.setRGB(0.56 - this.blood * 0.15, 0.63 - this.blood * 0.34, 0.66 - this.blood * 0.36);
-    this.sun.intensity = 1.35 - this.blood * 0.75;
+    this.hemi.intensity = 1.0 - this.blood * 0.42;
+    this.hemi.color.setRGB(0.62 - this.blood * 0.18, 0.69 - this.blood * 0.38, 0.72 - this.blood * 0.4);
+    this.sun.intensity = 1.7 - this.blood * 0.95;
     this.sun.color.setRGB(0.73 + this.blood * 0.1, 0.77 - this.blood * 0.42, 0.78 - this.blood * 0.45);
     this.motes.material.opacity = 0.4 + this.blood * 0.25;
 

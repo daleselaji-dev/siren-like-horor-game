@@ -182,14 +182,14 @@ export function stoneTexture(seed = 21, size = 512) {
 export function plasterTexture(seed = 33, size = 512) {
   const fbm = makeFbm(seed, 5);
   const hFn = (u, v) => {
-    const peel = clamp01((fbm(u * 2, v * 2) - 0.52) * 5);
-    return clamp01(0.7 - peel * 0.5 + fbm(u * 6, v * 6) * 0.12);
+    const peel = clamp01((fbm(u * 1.2, v * 1.2) - 0.58) * 4);
+    return clamp01(0.7 - peel * 0.35 + fbm(u * 6, v * 6) * 0.12);
   };
   const canvas = fillPixels(size, (u, v) => {
-    const f = fbm(u * 2, v * 2);
-    const peel = clamp01((f - 0.52) * 5); // 剥落程度
+    const f = fbm(u * 1.2, v * 1.2);
+    const peel = clamp01((f - 0.58) * 4); // 剥落程度（收敛，避免读成砖墙）
     // 白灰 → 露出夯土
-    let r = 168 - peel * 70, g = 170 - peel * 84, b = 162 - peel * 92;
+    let r = 176 - peel * 44, g = 176 - peel * 52, b = 168 - peel * 58;
     const stain = clamp01((fbm(u * 1.2 + 8, v * 0.5 + 3) - 0.4) * 1.6) * v;
     r *= 1 - stain * 0.24; g *= 1 - stain * 0.26; b *= 1 - stain * 0.2;
     // 底部盐霜带（v→1 是墙根）
@@ -296,8 +296,8 @@ export function rockTexture(seed = 88, size = 512) {
   const hFn = (u, v) => fbm(u * 3, v * 3);
   const canvas = fillPixels(size, (u, v) => {
     const f = fbm(u * 3, v * 3);
-    const crack = clamp01((Math.abs(fbm(u * 6, v * 6) - 0.5) - 0.02) * 8);
-    let r = 42 + f * 40, g = 46 + f * 42, b = 48 + f * 42;
+    const crack = 0.55 + 0.45 * clamp01((Math.abs(fbm(u * 6, v * 6) - 0.5) - 0.02) * 8);
+    let r = 66 + f * 46, g = 70 + f * 48, b = 72 + f * 48;
     const salt = clamp01((fbm(u * 5 + 2, v * 5 + 2) - 0.72) * 8);
     r += salt * 120; g += salt * 118; b += salt * 105;
     return [r * crack, g * crack, b * crack];

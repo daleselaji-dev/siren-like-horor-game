@@ -123,10 +123,10 @@ export function buildVillage(scene, M) {
       pos.setY(i, h);
       // 顶点色：低处湿沙深 → 中部灰绿 → 高处灰岩
       let r, gg, b;
-      if (h < 1.1) { const t = smoothstep(-0.5, 1.1, h); r = 0.42 + t * 0.2; gg = 0.4 + t * 0.18; b = 0.34 + t * 0.14; }
-      else if (h < 2.8) { const t = smoothstep(1.1, 2.8, h); r = 0.62 - t * 0.1; gg = 0.58 - t * 0.02; b = 0.48 + t * 0.02; }
-      else { const t = smoothstep(2.8, 5.5, h); r = 0.52 - t * 0.06; gg = 0.56 - t * 0.04; b = 0.5 + t * 0.0; }
-      const n = noiseB(x * 0.03, z * 0.03) * 0.2;
+      if (h < 1.1) { const t = smoothstep(-0.5, 1.1, h); r = 0.52 + t * 0.22; gg = 0.5 + t * 0.2; b = 0.42 + t * 0.16; }
+      else if (h < 2.8) { const t = smoothstep(1.1, 2.8, h); r = 0.74 - t * 0.1; gg = 0.7 - t * 0.02; b = 0.58 + t * 0.02; }
+      else { const t = smoothstep(2.8, 5.5, h); r = 0.64 - t * 0.05; gg = 0.68 - t * 0.03; b = 0.6 + t * 0.0; }
+      const n = noiseB(x * 0.03, z * 0.03) * 0.18;
       colors[i * 3] = r - n; colors[i * 3 + 1] = gg - n; colors[i * 3 + 2] = b - n;
     }
     geo.computeVertexNormals();
@@ -150,7 +150,7 @@ export function buildVillage(scene, M) {
         const t = i / Math.max(1, n);
         const x = ax + (bx - ax) * t + (rand() - 0.5) * 0.4;
         const z = az + (bz - az) * t + (rand() - 0.5) * 0.4;
-        B.add(GEO.box, M.slab, x, g(x, z) + 0.03, z, rand() * Math.PI, 0.62 * width, 0.07, 0.5 * width);
+        B.add(GEO.box, M.slab, x, g(x, z) - 0.005, z, rand() * Math.PI, 0.62 * width, 0.06, 0.5 * width);
       }
     }
   };
@@ -306,13 +306,17 @@ export function buildVillage(scene, M) {
     if (s > 1.2) circle(x, z, s * 0.42, base + s * 0.5);
   }
 
-  // 树（滨海乔木剪影）
+  // 树（滨海风剪乔木：歪脖 + 层叠团冠）
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x39443a, roughness: 0.95 });
   function tree(x, z, s = 1) {
     const base = g(x, z);
-    B.add(GEO.cyl, M.woodDark, x, base + 1.4 * s, z, 0, 0.22 * s, 2.8 * s, 0.22 * s);
-    const leaf = new THREE.MeshStandardMaterial({ color: 0x243029, roughness: 0.95 });
-    B.add(GEO.cone, leaf, x + 0.2 * s, base + 3.3 * s, z, rand() * 3, 2.4 * s, 2.2 * s, 2.4 * s);
-    B.add(GEO.cone, leaf, x - 0.3 * s, base + 4.4 * s, z + 0.2 * s, rand() * 3, 1.7 * s, 1.8 * s, 1.7 * s);
+    const lean = (rand() - 0.5) * 0.35;
+    B.add(GEO.cyl, M.woodDark, x, base + 1.5 * s, z, 0, 0.2 * s, 3.0 * s, 0.2 * s, 0, lean);
+    const tx2 = x + lean * 2.4 * s;
+    // 层叠压扁球体做冠，风剪向一侧
+    B.add(GEO.sphere, leafMat, tx2 + 0.5 * s, base + 3.1 * s, z, rand() * 3, 2.6 * s, 1.2 * s, 2.2 * s);
+    B.add(GEO.sphere, leafMat, tx2 - 0.4 * s, base + 3.7 * s, z + 0.3 * s, rand() * 3, 1.9 * s, 0.95 * s, 1.7 * s);
+    B.add(GEO.sphere, leafMat, tx2 + 0.9 * s, base + 4.1 * s, z - 0.2 * s, rand() * 3, 1.3 * s, 0.7 * s, 1.2 * s);
     circle(x, z, 0.3 * s, base + 2.8 * s, { noSightBlock: true });
   }
 
@@ -328,12 +332,21 @@ export function buildVillage(scene, M) {
 
   // ================= ① 礁滩·搁浅点 =================
   {
-    // 搁浅的渡船（半沉、倾斜）
+    // 搁浅的渡船（船底埋进滩涂，微倾）：分层船壳 + 舷缘 + 矮舱室 + 歪烟囱
     const fx = 92, fz = 122;
-    const base = terrainHeight(fx, fz);
-    B.add(GEO.box, M.woodDark, fx, base + 1.6, fz, 0.6, 4.2, 3.0, 13, 0, 0.16);
-    B.add(GEO.box, M.wood, fx, base + 3.4, fz, 0.6, 3.4, 1.6, 5.5, 0, 0.16);
-    B.add(GEO.cyl, M.ironDark, fx + 1.2, base + 4.6, fz - 1.5, 0, 0.5, 1.8, 0.5, 0, 0.2);
+    const base = terrainHeight(fx, fz) - 0.9; // 埋入
+    const ry = 0.6, tilt = 0.09;
+    B.add(GEO.box, M.woodDark, fx, base + 1.0, fz, ry, 4.0, 2.0, 12.5, 0, tilt);        // 主船壳
+    B.add(GEO.box, M.woodDark, fx, base + 2.0, fz, ry, 4.5, 0.5, 13.2, 0, tilt);        // 上层外扩
+    B.add(GEO.box, M.wood, fx, base + 2.35, fz, ry, 4.7, 0.22, 13.5, 0, tilt);          // 舷缘
+    // 船头收尖（旋转的楔形）
+    B.add(GEO.box, M.woodDark, fx + Math.sin(ry) * 7.2, base + 1.4, fz + Math.cos(ry) * 7.2, ry + 0.5, 2.6, 1.8, 2.6, 0, tilt);
+    // 舱室与烟囱
+    B.add(GEO.box, M.plaster, fx - Math.sin(ry) * 2, base + 3.1, fz - Math.cos(ry) * 2, ry, 3.0, 1.5, 4.5, 0, tilt);
+    B.add(GEO.box, M.woodDark, fx - Math.sin(ry) * 2, base + 3.95, fz - Math.cos(ry) * 2, ry, 3.3, 0.18, 4.8, 0, tilt);
+    B.add(GEO.cyl, M.ironDark, fx - Math.sin(ry) * 3.5, base + 4.6, fz - Math.cos(ry) * 3.5, 0, 0.55, 1.9, 0.55, 0, 0.24);
+    // 断裂的桅杆斜插在滩上
+    B.add(GEO.cyl, M.woodDark, fx - 5, terrainHeight(fx - 5, fz + 3) + 1.2, fz + 3, 0, 0.14, 4.4, 0.14, 0.5, 0.9);
     aabb(fx, fz, 5.5, 13.5, base + 4);
     // 礁岩群
     const reefs = [[70, 128, 2.2], [60, 118, 1.6], [82, 100, 1.9], [66, 104, 1.2], [94, 108, 2.6], [55, 130, 1.8], [75, 92, 1.0], [88, 90, 1.4]];
@@ -547,11 +560,17 @@ export function buildVillage(scene, M) {
       B.add(GEO.cyl, M.woodDark, tx + hallW / 2 + 1.6, hb + 1.7, cz2, 0, 0.36, 3.4, 0.36);
       circle(tx + hallW / 2 + 1.6, cz2, 0.25, hb + 3.4, { noSightBlock: true });
     }
-    // 大屋顶(双坡,脊沿南北) + 燕尾脊
+    // 大屋顶(双坡,脊沿南北) + 山墙封口 + 燕尾脊
     const roofY = hb + wallH;
     B.add(GEO.box, M.roof, tx - 2.2, roofY + 1.05, tz, 0, 6.6, 0.2, hallD + 2.4, 0, 0, 0.42);
     B.add(GEO.box, M.roof, tx + 2.9, roofY + 0.82, tz, 0, 8.0, 0.2, hallD + 2.4, 0, 0, -0.34);
-    B.add(GEO.box, M.stone, tx - 0.4, roofY + 2.1, tz, 0, 0.5, 0.4, hallD + 2.6);
+    B.add(GEO.box, M.stone, tx - 0.4, roofY + 2.1, tz, 0, 0.6, 0.45, hallD + 2.6);
+    // 山墙封口（阶梯三角，堵住屋顶与墙之间的漏缝）
+    for (const zEnd of [tz - hallD / 2 + t / 2, tz + hallD / 2 - t / 2]) {
+      B.add(GEO.box, wallM, tx - 0.2, roofY + 0.45, zEnd, 0, 7.0, 0.95, t);
+      B.add(GEO.box, wallM, tx - 0.3, roofY + 1.25, zEnd, 0, 4.4, 0.85, t);
+      B.add(GEO.box, wallM, tx - 0.4, roofY + 1.9, zEnd, 0, 2.0, 0.6, t);
+    }
     // 燕尾脊翘角
     B.add(GEO.box, M.stone, tx - 0.4, roofY + 2.5, tz - hallD / 2 - 1.4, 0, 0.4, 1.1, 0.35, -0.55, 0);
     B.add(GEO.box, M.stone, tx - 0.4, roofY + 2.5, tz + hallD / 2 + 1.4, 0, 0.4, 1.1, 0.35, 0.55, 0);
@@ -670,9 +689,17 @@ export function buildVillage(scene, M) {
     const lx = 76, lz = -120;
     const lb = terrainHeight(lx, lz);
     const towerH = 10;
-    // 塔身(略收分)
+    // 塔身(略收分)：UV 按世界尺度缩放，避免条石纹被拉成巨块
     const towerGeo = new THREE.CylinderGeometry(1.9, 2.6, towerH, 14);
+    {
+      const uv = towerGeo.attributes.uv;
+      const circum = Math.PI * 2 * 2.25 / 2.4, hRep = towerH / 2.4;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * circum, uv.getY(i) * hRep);
+    }
     B.add(towerGeo, M.stone, lx, lb + towerH / 2, lz, 0, 1, 1, 1);
+    // 塔身腰线
+    B.add(GEO.cyl, M.plaster, lx, lb + 3.4, lz, 0, 4.9, 0.35, 4.9);
+    B.add(GEO.cyl, M.plaster, lx, lb + 6.6, lz, 0, 4.4, 0.35, 4.4);
     circle(lx, lz, 2.5, lb + towerH);
     // 门(朝西北,面向来路)
     const doorAng = Math.atan2(-95 - lz, 60 - lx);
@@ -745,21 +772,38 @@ export function buildVillage(scene, M) {
     locations.stele = new THREE.Vector3(stx, g(stx, stz) + 1.2, stz);
   }
 
-  // ================= 芦苇/杂物点缀 =================
+  // ================= 芦苇丛（成簇，避开出生路径） =================
   {
-    const reedMat = new THREE.MeshStandardMaterial({ color: 0x3c4436, roughness: 0.95 });
-    const reedGeo = new THREE.ConeGeometry(0.09, 1.2, 4);
-    const inst = new THREE.InstancedMesh(reedGeo, reedMat, 400);
+    const reedMat = new THREE.MeshStandardMaterial({ color: 0x59614a, roughness: 0.95 });
+    const reedGeo = new THREE.ConeGeometry(0.075, 1.35, 4);
+    const inst = new THREE.InstancedMesh(reedGeo, reedMat, 420);
     const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const s3 = new THREE.Vector3();
     let placed = 0;
+    // 找合法簇心
+    const centers = [];
     let guard = 0;
-    while (placed < 400 && guard++ < 6000) {
+    while (centers.length < 14 && guard++ < 4000) {
       const x = (rand() - 0.5) * 260, z = (rand() - 0.5) * 280;
       const h = terrainHeight(x, z);
-      if (h < 0.55 || h > 1.7) continue;
-      m4.makeRotationY(rand() * 6.28);
-      m4.setPosition(x, h + 0.7, z);
-      inst.setMatrixAt(placed++, m4);
+      if (h < 0.6 || h > 1.6) continue;
+      if (Math.hypot(x - 80, z - 111) < 15) continue; // 避开出生礁滩
+      centers.push([x, z]);
+    }
+    for (const [cx, cz] of centers) {
+      const n = 18 + Math.floor(rand() * 12);
+      for (let i = 0; i < n && placed < 420; i++) {
+        const x = cx + (rand() - 0.5) * 6, z = cz + (rand() - 0.5) * 6;
+        const h = terrainHeight(x, z);
+        if (h < 0.4 || h > 1.9) continue;
+        e.set((rand() - 0.5) * 0.22, rand() * 6.28, (rand() - 0.5) * 0.22);
+        q.setFromEuler(e);
+        s3.set(1, 0.7 + rand() * 0.7, 1);
+        m4.compose(new THREE.Vector3(x, h + 0.6, z), q, s3);
+        inst.setMatrixAt(placed++, m4);
+      }
     }
     inst.count = placed;
     inst.instanceMatrix.needsUpdate = true;
