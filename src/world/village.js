@@ -132,6 +132,54 @@ export function buildVillage(scene, M) {
   };
   const g = (x, z) => heightAt(x, z); // 地面高
 
+  // —— 香烟烟柱（上升+摆散的 Points；set(false) 熄灭） ——
+  // 软圆点贴图：径向渐变，避免 Points 默认的硬边方块
+  const smokeTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const cx = c.getContext('2d');
+    const grad = cx.createRadialGradient(32, 32, 2, 32, 32, 30);
+    grad.addColorStop(0, 'rgba(255,255,255,0.85)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.3)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    cx.fillStyle = grad; cx.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+  const smokes = [];
+  function makeSmoke(x, y, z, { count = 22, rise = 2.4, spread = 0.14, size = 0.2, opacity = 0.3, on = true } = {}) {
+    const geo = new THREE.BufferGeometry();
+    const arr = new Float32Array(count * 3);
+    const seed = new Float32Array(count);
+    for (let i = 0; i < count; i++) seed[i] = Math.random();
+    geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: 0xaab4b6, size, map: smokeTex, transparent: true, opacity,
+      depthWrite: false, sizeAttenuation: true,
+    }));
+    pts.position.set(x, y, z);
+    pts.visible = on;
+    scene.add(pts);
+    const sm = {
+      on,
+      set(v) { this.on = v; pts.visible = v; },
+      update(time) {
+        if (!this.on) return;
+        const a = geo.attributes.position;
+        for (let i = 0; i < count; i++) {
+          // 各粒子按自身相位循环一段"升起—飘散"的生命周期
+          const t = (time * (0.09 + seed[i] * 0.06) + seed[i]) % 1;
+          const sway = spread * (0.3 + t * 2.6);
+          a.setXYZ(i,
+            Math.sin(time * 0.7 + seed[i] * 31.4) * sway,
+            t * rise,
+            Math.cos(time * 0.55 + seed[i] * 17.7) * sway);
+        }
+        a.needsUpdate = true;
+      },
+    };
+    smokes.push(sm);
+    return sm;
+  }
+
   // ---- 地形网格 ----
   {
     const W = 300, D = 320, SX = 170, SZ = 180;
@@ -627,7 +675,8 @@ export function buildVillage(scene, M) {
       }
       flameG.visible = false;
       scene.add(flameG);
-      dynamic.censers.push({ pos: new THREE.Vector3(censerX, hb + 0.8, cz2), flames: flameG, idx: i });
+      const smoke = makeSmoke(censerX, hb + 1.32, cz2, { count: 16, rise: 1.9, spread: 0.1, size: 0.16, on: false });
+      dynamic.censers.push({ pos: new THREE.Vector3(censerX, hb + 0.8, cz2), flames: flameG, smoke, idx: i });
       circle(censerX, cz2, 0.45, hb + 0.9, { noSightBlock: true });
     });
     locations.altar = new THREE.Vector3(tx - hallW / 2 + 1.9, hb + 1.25, tz);
@@ -672,6 +721,8 @@ export function buildVillage(scene, M) {
     // 院前大香炉 + 幡 + 灯笼(真实光)
     B.add(GEO.cyl, M.ironDark, tx + 8, plat + 0.8, tz - 3, 0, 1.0, 1.6, 1.0);
     circle(tx + 8, tz - 3, 0.6, plat + 1.6);
+    // 大香炉三年不灭——常燃的烟
+    makeSmoke(tx + 8, plat + 1.7, tz - 3, { count: 34, rise: 3.6, spread: 0.22, size: 0.26, opacity: 0.32 });
     banner(tx + 7.5, tz + 3.5, 0.8);
     banner(tx + 9, tz + 5, -0.5);
     lanternPole(tx + 6, tz, true, 'ji');
@@ -880,5 +931,7 @@ export function buildVillage(scene, M) {
     colliders, bounds, heightAt, locations, patrols, dynamic, zones, lights,
     waterLevelRef: { value: 0 },
     waterLevel() { return this.waterLevelRef.value; },
+    /** 每帧特效更新（烟柱等） */
+    updateFx(time) { for (const s of smokes) s.update(time); },
   };
 }

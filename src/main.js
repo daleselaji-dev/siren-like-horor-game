@@ -242,6 +242,7 @@ function loop() {
     // 世界
     ocean.update(dt);
     sky.update(dt, player.pos);
+    world.updateFx(elapsed);
 
     // 音频
     audio.update(dt, {

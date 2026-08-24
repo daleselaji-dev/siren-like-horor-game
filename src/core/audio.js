@@ -439,6 +439,48 @@ export class AudioEngine {
     src.start(t); src.stop(t + 0.32);
   }
 
+  /** 远处船螺（缓起缓落的低鸣，隔海传来） */
+  hornDistant() {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const mk = (freq, det) => {
+      const o = ctx.createOscillator();
+      o.type = 'sine'; o.frequency.value = freq + det;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.linearRampToValueAtTime(0.055, t + 0.9);
+      g.gain.setValueAtTime(0.055, t + 2.2);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 3.4);
+      const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420;
+      o.connect(f).connect(g).connect(this.sfxGroup);
+      o.start(t); o.stop(t + 3.6);
+    };
+    mk(86, 0); mk(86, 1.7); mk(129, 0.8); // 微失谐 → 船螺的"哑"
+  }
+
+  /** 远处海鸥（两三声下滑的尖叫，很轻） */
+  gullDistant() {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const n = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < n; i++) {
+      const t = ctx.currentTime + i * (0.35 + Math.random() * 0.2);
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      const f0 = 1450 + Math.random() * 500;
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.62, t + 0.22);
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2100; f.Q.value = 4;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.linearRampToValueAtTime(0.022, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+      o.connect(f).connect(g).connect(this.sfxGroup);
+      o.start(t); o.stop(t + 0.3);
+    }
+  }
+
   /** 点香 */
   incense() { this.blip(2400, 0.04, 0.3); this.paper(); }
   /** 谜题错误 */

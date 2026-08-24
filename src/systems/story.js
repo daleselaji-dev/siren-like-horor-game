@@ -206,6 +206,21 @@ export class Story {
     this.buildTideMother();
     this.setupGhostFlames();
 
+    // —— 环境氛围调度：脚本化一次性拍(填充20分钟节奏) + 低频随机远景声 ——
+    this.ambient = {
+      next: 40,
+      idx: 0,
+      pool: ['horn', 'gull', 'creak', 'buoy'],
+      beats: [
+        { at: 60, act: () => { this.g.audio.hornDistant(); this.g.hud.subtitle('远处有船螺。三年了，没有一条船靠过这座港。', 5); } },
+        { at: 170, cond: () => !this.flags.gateOpen, act: () => this.g.hud.subtitle('海鸟只在高处盘，不落下来。', 4) },
+        { at: 300, cond: () => this.flags.gateOpen && !this.flags.bloodTide, act: () => this.g.hud.subtitle('谁家的灶还温着。碗筷摆了三副，齐齐整整。', 5) },
+        { at: 460, cond: () => !this.flags.puzzleSolved, act: () => this.g.hud.subtitle('香灰积得很厚。有人每夜都来续，从没断过。', 5) },
+        { at: 620, cond: () => this.flags.bloodTide, act: () => this.g.hud.subtitle('咸味重得像含着一口海。', 4, 'song') },
+        { at: 760, cond: () => this.flags.bloodTide && !this.flags.breakerOn, act: () => this.g.hud.subtitle('歌声换了一段。像在点名。', 4.5, 'song') },
+      ],
+    };
+
     // 海的视角（终局强制视奸载体）
     const lp = this.g.world.locations.bellTop;
     this.seaViewer = {
@@ -455,6 +470,8 @@ export class Story {
   }
 
   setFlameVisual(c) {
+    // 烟只跟随真实点燃状态（鬼火是残象，无烟）
+    c.smoke?.set(!!c.lit);
     // lit: 主相机+视奸都可见; ghost: 仅视奸(layer1); off: 隐藏
     if (c.lit) {
       c.flames.traverse((o) => o.layers.enableAll());
@@ -744,6 +761,30 @@ export class Story {
     this.tideMother = grp;
   }
 
+  // ---------- 环境氛围 ----------
+  updateAmbient() {
+    const g = this.g;
+    const a = this.ambient;
+    // 脚本化一次性拍：时间到 且 条件满足才触发（条件不满足则继续等；窗口过期的条件永不满足，等待无害）
+    for (const b of a.beats) {
+      if (b.done || this.time < b.at) continue;
+      if (b.cond && !b.cond()) continue;
+      b.done = true;
+      b.act();
+    }
+    // 低频随机远景声（紧张时不投放，避免污染听觉信息）
+    if (this.time >= a.next) {
+      a.next = this.time + 45 + Math.random() * 30;
+      if (g.stealth.danger < 0.25 && !g.sightjack.active) {
+        const kind = a.pool[a.idx++ % a.pool.length];
+        if (kind === 'horn') g.audio.hornDistant();
+        else if (kind === 'gull') g.audio.gullDistant();
+        else if (kind === 'creak') g.audio.doorCreak();
+        else g.audio.bell(820, 2.4, 0.055); // 远处浮标铃
+      }
+    }
+  }
+
   // ---------- 终局 ----------
   beginEnding() {
     const g = this.g;
@@ -766,13 +807,12 @@ export class Story {
     if (s.stage >= 1 && s.stage <= 2) {
       this.tideMother.position.y = Math.min(-6, this.tideMother.position.y + dt * 7);
     }
-    // 塔灯光束被"她"攫住：缓缓转向潮母并停住（避免光锥乱扫穿插剪影）
+    // 塔灯的光在她面前一寸寸矮下去——被海吞掉（也避免光锥糊住剪影）
     if (s.stage >= 1) {
-      const b = g.world.dynamic.lighthouseBeam;
-      const dx = this.tideMother.position.x - b.position.x;
-      const dz = this.tideMother.position.z - b.position.z;
-      const target = Math.atan2(-dz, dx);
-      b.rotation.y += (((target - b.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 0.8);
+      const beamMat = g.world.dynamic.lighthouseBeam.children[0].material;
+      beamMat.opacity = Math.max(0, beamMat.opacity - dt * 0.05);
+      const lamp = g.world.dynamic.lighthouseLamp;
+      lamp.material.emissiveIntensity = Math.max(0.5, lamp.material.emissiveIntensity - dt * 0.6);
     }
 
     switch (s.stage) {
@@ -847,6 +887,7 @@ export class Story {
     this.updateRitual(dt);
     this.updateKeySpy();
     this.updateResonance();
+    this.updateAmbient();
 
     // 触发区
     const p = g.player.pos;
