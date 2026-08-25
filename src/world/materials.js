@@ -43,12 +43,12 @@ export function buildMaterials(lowspec = false) {
   M.clothVest = std(T.clothVest, { envInt: 0.35 });
   M.clothWork = std(T.clothWork, { envInt: 0.35 });
   M.clothBrown = std(T.clothBrown, { envInt: 0.35 });
-  M.satin = std(T.satin, { normalScale: 0.6, envInt: 1.4, roughness: 0.85 }); // 枣红缎袄
+  M.satin = std(T.satin, { normalScale: 0.6, envInt: 0.7, roughness: 1.0 }); // 枣红缎袄
   M.driftwood = std(T.driftwood, { normalScale: 1.6, envInt: 0.8 }); // 侍应浮木颈臂
   M.sediment = std(T.sediment, { normalScale: 1.3, envInt: 0.9 }); // 沉积覆层
   M.poreplate = new THREE.MeshStandardMaterial({
     map: T.poreplate, roughness: 0.5, metalness: 0.15,
-    emissive: 0x2a3438, emissiveIntensity: 0.5,
+    emissive: 0x1a2224, emissiveIntensity: 0.25,
   }); // 全福婆第三眼矿物孔板
 
   // ===== 蚀湾 · 南方大酒店 =====

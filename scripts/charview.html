@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>角色查看器</title>
+<style>html,body{margin:0;background:#111}canvas{display:block}</style>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { buildMaterials } from '/src/world/materials.js';
+import { Humanoid, bakeFigure, poseAs } from '/src/entities/humanoid.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1714);
+const cam = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 100);
+
+// 酒店式灯光：暖钨丝主光 + 荧光顶光 + 弱冷补（跟随取景移动）
+scene.add(new THREE.HemisphereLight(0x9a948a, 0x2a241e, 0.55));
+const key = new THREE.SpotLight(0xffd9a0, 80, 30, 0.75, 0.5);
+key.position.set(3, 4, 4); key.castShadow = true;
+scene.add(key, key.target);
+const fill = new THREE.PointLight(0xcfe0d8, 10, 20);
+fill.position.set(-4, 2.5, 2);
+scene.add(fill);
+
+const M = buildMaterials(false);
+M.terrazzo.map.repeat.set(10, 10); M.terrazzo.normalMap.repeat.set(10, 10); M.terrazzo.roughnessMap.repeat.set(10, 10);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), M.terrazzo);
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+scene.add(floor);
+
+const roles = [
+  ['emcee', { role: 'emcee', seed: 11 }, 'mc'],
+  ['waiter', { role: 'waiter', seed: 22 }, 'serve'],
+  ['matron', { role: 'matron', seed: 33 }, 'backstep'],
+  ['guest_m', { role: 'guest_m', seed: 44 }, 'float'],
+  ['guest_f', { role: 'guest_f', seed: 55 }, 'float'],
+  ['townsman', { role: 'townsman', seed: 66 }, 'walk'],
+  ['fisher', { role: 'fisher', seed: 77, hat: true, tool: 'rake' }, 'work_rake'],
+  ['gaze', { role: 'guest_m2', seed: 88, ghost: true }, 'watch'],
+  ['bride', { role: 'bride', seed: 99 }, 'sing'],
+  ['sit_baked', null, null],
+];
+const figures = [];
+for (let i = 0; i < roles.length; i++) {
+  const [name, opts, mode] = roles[i];
+  if (name === 'sit_baked') {
+    const g = bakeFigure(M, { role: 'guest_m', seed: 123 }, poseAs('sit'));
+    g.position.set(i * 2.2, 0, 0);
+    scene.add(g);
+    figures.push({ name, group: g, h: null, mode: null });
+    continue;
+  }
+  const h = new Humanoid(M, opts);
+  h.group.position.set(i * 2.2, 0, 0);
+  scene.add(h.group);
+  figures.push({ name, group: h.group, h, mode });
+}
+
+let t = 0;
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = 1 / 60; t += dt;
+  for (const f of figures) if (f.h) f.h.animate(f.mode, dt, 1);
+  renderer.render(scene, cam);
+}
+tick();
+
+window.__names = figures.map((f) => f.name);
+const moveLights = (x) => {
+  key.position.set(x + 2.5, 3.5, 3.5);
+  key.target.position.set(x, 1.2, 0);
+  fill.position.set(x - 3, 2.5, 2);
+};
+window.__lookAt = (i, dist = 2.6, height = 1.4) => {
+  const f = figures[i];
+  moveLights(f.group.position.x);
+  cam.position.set(f.group.position.x + dist * 0.3, height, dist);
+  cam.lookAt(f.group.position.x, 1.05, 0);
+};
+window.__face = (i) => {
+  const f = figures[i];
+  moveLights(f.group.position.x);
+  cam.position.set(f.group.position.x + 0.32, 1.84, 0.95);
+  cam.lookAt(f.group.position.x, 1.7, 0);
+};
+window.__lookAt(0);
+window.__ready = true;
+</script>
+</body>
+</html>

@@ -615,23 +615,23 @@ export function terrazzoTexture(seed = 301, size = 1024) {
     const f = fbm(u * 3, v * 3);
     let r = 128 + f * 18, g = 132 + f * 17, b = 126 + f * 16, h = 0.55, ro = 0.34;
     const c1 = chipN(u, v), c2 = chipN2(u, v);
-    const chip = c1 > 0.67 ? 1 : c2 > 0.73 ? 2 : 0;
+    const chip = c1 > 0.78 ? 1 : c2 > 0.8 ? 2 : 0;
     if (chip) {
       const tone = toneN(u * 2 + chip, v * 2);
-      if (tone < 0.3) { r = 60 + tone * 40; g = 62 + tone * 40; b = 64 + tone * 38; }
-      else if (tone < 0.62) { r = 198; g = 194; b = 184; }
-      else if (tone < 0.82) { r = 150; g = 92; b = 72; }
-      else { r = 116; g = 126; b = 114; }
-      if (chip === 2) { r = r * 0.82 + 34; g = g * 0.82 + 34; b = b * 0.82 + 32; }
-      h += 0.06; ro -= 0.06;
+      if (tone < 0.3) { r = 88 + tone * 40; g = 90 + tone * 40; b = 92 + tone * 38; }
+      else if (tone < 0.62) { r = 172; g = 168; b = 158; }
+      else if (tone < 0.82) { r = 148; g = 106; b = 90; }
+      else { r = 120; g = 128; b = 118; }
+      if (chip === 2) { r = r * 0.86 + 20; g = g * 0.86 + 20; b = b * 0.86 + 18; }
+      h += 0.05; ro -= 0.05;
     }
     // 分格铜条
     const gu = (u * tiles) % 1, gv = (v * tiles) % 1;
     const eg = Math.min(gu, 1 - gu, gv, 1 - gv) * tiles;
     if (eg < 0.01) { r = 164; g = 134; b = 80; h = 0.6; ro = 0.4; }
     // 磨旧渍
-    const stain = clamp01((fbm(u * 1.4 + 9, v * 1.4 + 9) - 0.56) * 3);
-    r *= 1 - stain * 0.18; g *= 1 - stain * 0.2; b *= 1 - stain * 0.2;
+    const stain = clamp01((fbm(u * 1.4 + 9, v * 1.4 + 9) - 0.6) * 2.2);
+    r *= 1 - stain * 0.09; g *= 1 - stain * 0.1; b *= 1 - stain * 0.1;
     out[0] = r; out[1] = g; out[2] = b;
     out[3] = clamp01(h + f * 0.1);
     out[4] = clamp01(ro + stain * 0.25);
@@ -754,13 +754,13 @@ export function satinTexture(seed = 391, size = 256) {
   const fbm = makeFbm(seed, 3);
   return buildMaps(size, (u, v, out) => {
     const sheen = Math.sin((u * 3 + v * 5 + fbm(u * 2, v * 2)) * Math.PI * 2) * 0.5 + 0.5;
-    let r = 102 + sheen * 66, g = 16 + sheen * 18, b = 20 + sheen * 16;
+    let r = 74 + sheen * 34, g = 14 + sheen * 10, b = 18 + sheen * 8;
     const px = (u * 8) % 1 - 0.5, py = (v * 8) % 1 - 0.5;
     const d = Math.hypot(px, py);
-    if (Math.abs(Math.sin(d * 40)) < 0.3 && d < 0.32) { r += 20; g += 6; b += 5; }
+    if (Math.abs(Math.sin(d * 40)) < 0.3 && d < 0.32) { r += 12; g += 4; b += 3; }
     out[0] = r; out[1] = g; out[2] = b;
-    out[3] = clamp01(0.5 + sheen * 0.2);
-    out[4] = clamp01(0.4 - sheen * 0.12);
+    out[3] = clamp01(0.5 + sheen * 0.12);
+    out[4] = clamp01(0.55 - sheen * 0.14);
   }, 0.8);
 }
 
