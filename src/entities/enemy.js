@@ -1,6 +1,7 @@
-// 潮尸 AI：劳作型 / 巡游型 / 歌唱者 + 村犬 + 海鸟群（视奸载体）
+// 蚀湾实体 AI：宴席工位（司仪/侍应/全福婆）+ 镇民/渔民 + 镇犬 + 海鸟群（视奸载体）
 // 状态机：WORK/PATROL → SUSPECT → ALERT(追踪) → SEARCH → RETURN
-// 设计要点（死魂曲精神）：不冲刺跳脸；维持生前劳作；被惊动后执着、永不忘记（警戒范围永久上调）
+// 设计要点（死魂曲精神）：不冲刺跳脸；维持职守；被惊动后执着、永不忘记（警戒范围永久上调）
+// 特殊实体：浮客(非敌对漂浮宾客)、回眸客(非敌对指针)、上宾(房间尺度前肢，感知振动)
 import * as THREE from 'three';
 import { Humanoid } from './humanoid.js';
 import { slideMove, hasLineOfSight } from '../world/collision.js';
@@ -29,14 +30,16 @@ export class Enemy {
     this.id = def.id;
     this.label = def.label;
     this.kind = def.kind;
+    this.fxKind = def.fxKind;  // 视奸滤镜风格（waiter 等）
     this.enabled = def.enabled !== false;
 
     this.body = new Humanoid(M, {
-      cloth: def.cloth, hat: def.hat, lantern: def.lantern, tool: def.tool,
+      role: def.role, cloth: def.cloth, hat: def.hat, lantern: def.lantern, tool: def.tool,
       light: def.lanternLight, seed: (def.id ?? '').split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0,
     });
     scene.add(this.body.group);
     this.body.group.visible = this.enabled;
+    this.floorY = def.floorY; // 多层建筑内的所在楼层（高度解析参照）
 
     // 歌唱者：歌声可视化——从她喉咙里荡出去的涟漪
     if (def.kind === 'singer') {
@@ -62,7 +65,9 @@ export class Enemy {
     this.pos = new THREE.Vector3();
     if (def.workPos) this.pos.set(def.workPos[0], 0, def.workPos[1]);
     else if (def.waypoints) this.pos.set(def.waypoints[0][0], 0, def.waypoints[0][1]);
-    this.pos.y = world.heightAt(this.pos.x, this.pos.z);
+    this.pos.y = this.floorY !== undefined
+      ? world.heightAt(this.pos.x, this.pos.z, this.floorY + 0.5)
+      : world.heightAt(this.pos.x, this.pos.z);
     this.yaw = def.yaw ?? 0;
 
     this.state = def.kind === 'patrol' ? 'PATROL' : def.kind === 'singer' ? 'SING' : 'WORK';
@@ -105,7 +110,9 @@ export class Enemy {
     const def = this.def;
     if (def.workPos && this.kind !== 'patrol') this.pos.set(def.workPos[0], 0, def.workPos[1]);
     else if (def.waypoints) this.pos.set(def.waypoints[0][0], 0, def.waypoints[0][1]);
-    this.pos.y = this.world.heightAt(this.pos.x, this.pos.z);
+    this.pos.y = this.floorY !== undefined
+      ? this.world.heightAt(this.pos.x, this.pos.z, this.floorY + 0.5)
+      : this.world.heightAt(this.pos.x, this.pos.z);
     this.state = this.kind === 'patrol' ? 'PATROL' : this.kind === 'singer' ? 'SING' : 'WORK';
     this.wpIndex = 0;
     this.stateTimer = 0;
@@ -161,7 +168,10 @@ export class Enemy {
 
   senseHearing(player) {
     if (player.dead || player.noiseLevel <= 0) return false;
-    const dist = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
+    // 楼层间衰减：隔一层楼板，声音要翻好几倍距离才传得到
+    const dy = Math.abs(player.pos.y - this.pos.y);
+    const dist = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z)
+      + (dy > 1.8 ? dy * 4 : 0);
     return dist < Math.min(player.noiseLevel, this.hearRange + this.permAlertBonus);
   }
 
@@ -302,14 +312,16 @@ export class Enemy {
           this.loseTimer += dt;
         }
         this.moveToward(this.lastSeenPos.x, this.lastSeenPos.z, this.chaseSpeed, dt);
-        // 追击喉音：灌满水的喉咙一路"咕咚"着追上来
-        this.gurgleT -= dt;
-        if (this.gurgleT <= 0) {
-          this.gurgleT = 1.8 + Math.random() * 1.6;
-          audio?.chaseGurgle?.(distToPlayer);
+        // 追击声：侍应无声（只有托盘沉积面的细响），镇民是喘着追
+        if (!this.def.mute) {
+          this.gurgleT -= dt;
+          if (this.gurgleT <= 0) {
+            this.gurgleT = 1.8 + Math.random() * 1.6;
+            audio?.chaseGurgle?.(distToPlayer);
+          }
         }
-        // 抓住玩家
-        if (distToPlayer < 1.15 && !player.dead) ctx.onCaught(this);
+        // 抓住玩家（须在同一层）
+        if (distToPlayer < 1.15 && Math.abs(player.pos.y - this.pos.y) < 1.7 && !player.dead) ctx.onCaught(this);
         // 丢失目标
         if (this.loseTimer > 5.5) {
           this.state = 'SEARCH'; this.stateTimer = 0;
@@ -556,14 +568,274 @@ export class Watcher {
 
   update(ctx) {
     const { dt } = ctx;
-    // 血潮之夜：一夜之间换了姿势
-    if (ctx.bloodTide && !this._turned) {
+    // 敬酒（返潮点火）之后：一夜之间换了姿势
+    if (ctx.leaked && !this._turned) {
       this._turned = true;
       this.targetYaw = this.yaw + Math.PI;
     }
     this.yaw += angleWrap(this.targetYaw - this.yaw) * Math.min(1, dt * 0.5);
     this.body.animate('watch', dt, 1);
     this.body.group.rotation.y = this.yaw;
+  }
+}
+
+// ---------------- 浮客（脚尖离地半寸的宾客·非敌对·视奸载体） ----------------
+// 他们真心来吃喜酒。只是脚忘了落地。
+export class Floater {
+  constructor(scene, world, M, def) {
+    this.world = world;
+    this.id = def.id;
+    this.label = def.label ?? '宾客';
+    this.kind = 'floater';
+    this.enabled = def.enabled !== false;
+    this.visibilityOfPlayer = 0;
+    this.body = new Humanoid(M, { role: def.role ?? 'guest_m', seed: def.seed });
+    scene.add(this.body.group);
+    this.body.group.visible = this.enabled;
+    this.spots = def.spots; // [Vector3...] 漂移锚点
+    this.spotIdx = def.startIdx ?? 0;
+    this.pos = new THREE.Vector3().copy(this.spots[this.spotIdx]);
+    this.floorY = def.floorY ?? this.pos.y;
+    this.pos.y = world.heightAt(this.pos.x, this.pos.z, this.floorY + 0.5);
+    this.yaw = Math.random() * Math.PI * 2;
+    this.t = Math.random() * 10;
+    this.waitT = Math.random() * 6;
+  }
+
+  setEnabled(on) { this.enabled = on; this.body.group.visible = on; }
+
+  viewPos(out) {
+    const v = this.body.headWorldPos(out);
+    v.x += Math.sin(this.yaw) * 0.22;
+    v.z += Math.cos(this.yaw) * 0.22;
+    return v;
+  }
+  viewYawPitch() { return { yaw: this.yaw + Math.PI, pitch: -0.06 }; }
+
+  update(ctx) {
+    if (!this.enabled) return;
+    const { dt } = ctx;
+    this.t += dt;
+    if (this.waitT > 0) {
+      this.waitT -= dt;
+    } else {
+      const target = this.spots[this.spotIdx];
+      const dx = target.x - this.pos.x, dz = target.z - this.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 0.3) {
+        this.spotIdx = (this.spotIdx + 1) % this.spots.length;
+        this.waitT = 4 + Math.random() * 7;
+      } else {
+        // 匀速滑移——不是走，是被端着挪
+        const sp = 0.3;
+        this.pos.x += (dx / dist) * sp * dt;
+        this.pos.z += (dz / dist) * sp * dt;
+        const targetYaw = Math.atan2(dx, dz);
+        this.yaw += angleWrap(targetYaw - this.yaw) * Math.min(1, dt * 1.5);
+      }
+    }
+    const ground = this.world.heightAt(this.pos.x, this.pos.z, this.floorY + 0.5);
+    this.pos.y = ground; // Humanoid float 动画自带离地半寸
+    this.body.animate('float', dt, 1);
+    this.body.group.position.copy(this.pos);
+    this.body.group.rotation.y = this.yaw;
+  }
+}
+
+// ---------------- 回眸客（半透明多重曝光·非敌对指针） ----------------
+// 一位不断回头看向某处的宾客残影。他看哪里，哪里就是你该去/该躲开的地方。
+export class Gaze {
+  constructor(scene, world, M, def) {
+    this.world = world;
+    this.id = def.id;
+    this.label = def.label ?? '回眸的人';
+    this.kind = 'gaze';
+    this.enabled = false;
+    this.visibilityOfPlayer = 0;
+    this.group = new THREE.Group();
+    this.echoes = [];
+    for (let i = 0; i < 3; i++) {
+      const h = new Humanoid(M, { role: 'guest_f', seed: (def.seed ?? 77) + i * 13, ghost: true });
+      h.group.position.set(i * 0.06, 0, -i * 0.09);
+      this.group.add(h.group);
+      this.echoes.push(h);
+    }
+    this.group.visible = false;
+    scene.add(this.group);
+    this.pos = new THREE.Vector3();
+    this.yaw = 0;
+    this.lookTarget = new THREE.Vector3();
+    this.t = 0;
+  }
+
+  setEnabled(on) { this.enabled = on; this.group.visible = on; }
+
+  /** 摆到一个位置，回眸指向 target */
+  appearAt(x, z, target, floorY) {
+    this.pos.set(x, this.world.heightAt(x, z, (floorY ?? 0) + 0.5), z);
+    this.lookTarget.copy(target);
+    this.group.position.copy(this.pos);
+    this.setEnabled(true);
+  }
+
+  viewPos(out) {
+    const v = this.echoes[0].headWorldPos(out);
+    return v;
+  }
+  viewYawPitch() {
+    const yaw = Math.atan2(this.lookTarget.x - this.pos.x, this.lookTarget.z - this.pos.z) + Math.PI;
+    return { yaw, pitch: -0.04 };
+  }
+
+  update(ctx) {
+    if (!this.enabled) return;
+    const { dt } = ctx;
+    this.t += dt;
+    // 身体背对目标，头部回眸——三重残影相位错开
+    const toward = Math.atan2(this.lookTarget.x - this.pos.x, this.lookTarget.z - this.pos.z);
+    this.yaw = toward + Math.PI; // 身体背向
+    this.group.rotation.y = this.yaw;
+    for (let i = 0; i < this.echoes.length; i++) {
+      const h = this.echoes[i];
+      h.animate('watch', dt, 1);
+      // 回眸：脖子拧向目标（超过常人角度一点点）
+      const phase = Math.sin(this.t * 0.6 - i * 0.5);
+      h.neck.rotation.y = 2.35 + phase * 0.12 + i * 0.1;
+      h.torso.rotation.y = 0.5 + i * 0.06;
+    }
+  }
+}
+
+// ---------------- 上宾（房间尺度外板重组的前肢·板间无肉） ----------------
+// 空间自己长出来的手：衣柜门板、床板、门框板在挑空里连成一条前肢，
+// 板与板之间没有任何东西，却一起动。它没有眼睛——它听楼板的振动。
+export class HonoredGuest {
+  constructor(scene, world, M, def) {
+    this.world = world;
+    this.id = def.id;
+    this.label = def.label ?? '上宾';
+    this.kind = 'guest';
+    this.enabled = false;
+    this.visibilityOfPlayer = 0;
+    this.state = null; // 不参与常规威胁度
+    this.area = def.area;               // {minX,maxX,minZ,maxZ} 可及范围（大堂）
+    this.shoulder = new THREE.Vector3(def.shoulder[0], def.shoulder[1], def.shoulder[2]);
+    this.anchors = def.anchors.map((a) => new THREE.Vector3(a[0], a[1], a[2]));
+    this.anchorIdx = 0;
+    this.hand = new THREE.Vector3().copy(this.anchors[0]);
+    this.handTarget = new THREE.Vector3().copy(this.anchors[0]);
+    this.creakT = 0;
+    this.nameT = 0; // 被点名进度（贴近玩家时上涨）
+
+    this.group = new THREE.Group();
+    const mats = [M.veneerRed, M.woodDark, M.driftwood, M.veneer];
+    // 臂：8 节板，沿肩→手贝塞尔摆放
+    this.armPanels = [];
+    for (let i = 0; i < 8; i++) {
+      const w = 1.7 - i * 0.12, h = 0.09, d = 0.8 - i * 0.05;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats[i % mats.length]);
+      m.castShadow = true;
+      this.group.add(m);
+      this.armPanels.push(m);
+    }
+    // 手：4 指，每指 2 板
+    this.fingers = [];
+    for (let f = 0; f < 4; f++) {
+      const seg1 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.42), mats[(f + 1) % mats.length]);
+      const seg2 = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.42, 0.34), mats[(f + 2) % mats.length]);
+      seg1.castShadow = seg2.castShadow = true;
+      this.group.add(seg1, seg2);
+      this.fingers.push({ seg1, seg2, ang: (f / 3 - 0.5) * 1.5 });
+    }
+    this.group.visible = false;
+    scene.add(this.group);
+    this.pos = this.hand; // 供距离判断
+  }
+
+  setEnabled(on) {
+    this.enabled = on;
+    this.group.visible = on;
+  }
+
+  reset() {
+    this.hand.copy(this.anchors[0]);
+    this.handTarget.copy(this.anchors[0]);
+    this.nameT = 0;
+  }
+
+  update(ctx) {
+    if (!this.enabled) return;
+    const { dt, player, audio } = ctx;
+    const vib = ctx.vibration ?? 0;
+
+    // 目标：振动大 → 循声压向玩家；否则沿锚点缓慢巡摸
+    const inArea = player.pos.x >= this.area.minX && player.pos.x <= this.area.maxX
+      && player.pos.z >= this.area.minZ && player.pos.z <= this.area.maxZ
+      && Math.abs(player.pos.y - this.hand.y) < 2.5;
+    if (vib > 0.5 && inArea && !player.dead) {
+      this.handTarget.set(
+        Math.max(this.area.minX, Math.min(this.area.maxX, player.pos.x)),
+        player.pos.y,
+        Math.max(this.area.minZ, Math.min(this.area.maxZ, player.pos.z)));
+    } else {
+      const a = this.anchors[this.anchorIdx];
+      if (this.hand.distanceTo(a) < 0.5) this.anchorIdx = (this.anchorIdx + 1) % this.anchors.length;
+      this.handTarget.copy(this.anchors[this.anchorIdx]);
+    }
+    const speed = vib > 0.5 ? 1.9 : 0.75;
+    const d = this.handTarget.clone().sub(this.hand);
+    const dist = d.length();
+    if (dist > 0.05) {
+      d.multiplyScalar(Math.min(1, (speed * dt) / dist));
+      this.hand.add(d);
+      this.creakT -= dt;
+      if (this.creakT <= 0) {
+        this.creakT = 0.9 + Math.random() * 1.3;
+        audio?.woodStrain?.(this.hand.distanceTo(player.pos));
+      }
+    }
+
+    // 点名：手贴近玩家 → 数拍子；或振动满格直接点名
+    const dp = Math.hypot(player.pos.x - this.hand.x, player.pos.z - this.hand.z);
+    if (!player.dead && inArea && (dp < 1.35 || vib >= 0.98)) {
+      this.nameT += dt;
+      if (this.nameT > 0.4) ctx.onCaught?.(this);
+    } else {
+      this.nameT = Math.max(0, this.nameT - dt);
+    }
+
+    // ---- 摆件：肩→手 贝塞尔，板间留缝 ----
+    const s = this.shoulder, hnd = this.hand;
+    const ctrl = _v1.set((s.x + hnd.x) / 2, Math.max(s.y, hnd.y + 2.6), (s.z + hnd.z) / 2);
+    for (let i = 0; i < this.armPanels.length; i++) {
+      const t = (i + 0.5) / this.armPanels.length;
+      const it = 1 - t;
+      // 二次贝塞尔
+      const px = it * it * s.x + 2 * it * t * ctrl.x + t * t * hnd.x;
+      const py = it * it * s.y + 2 * it * t * ctrl.y + t * t * hnd.y;
+      const pz = it * it * s.z + 2 * it * t * ctrl.z + t * t * hnd.z;
+      const p = this.armPanels[i];
+      p.position.set(px, py, pz);
+      // 板面朝向沿切线，微微各自错开（板间无肉——没有统一的骨）
+      const tx = 2 * it * (ctrl.x - s.x) + 2 * t * (hnd.x - ctrl.x);
+      const ty = 2 * it * (ctrl.y - s.y) + 2 * t * (hnd.y - ctrl.y);
+      const tz = 2 * it * (ctrl.z - s.z) + 2 * t * (hnd.z - ctrl.z);
+      p.rotation.set(
+        Math.atan2(-ty, Math.hypot(tx, tz)) + Math.sin(i * 2.7) * 0.1,
+        Math.atan2(tx, tz) + Math.sin(i * 1.3) * 0.14,
+        Math.sin(i * 3.9 + t * 4) * 0.12
+      );
+    }
+    // 手指扒地
+    const gy = this.world.heightAt(hnd.x, hnd.z, hnd.y + 0.5);
+    for (const f of this.fingers) {
+      const fx = hnd.x + Math.sin(f.ang) * 0.72;
+      const fz = hnd.z + Math.cos(f.ang) * 0.72;
+      f.seg1.position.set(hnd.x + Math.sin(f.ang) * 0.35, gy + 0.62, hnd.z + Math.cos(f.ang) * 0.35);
+      f.seg1.rotation.set(0.5, f.ang, 0);
+      f.seg2.position.set(fx, gy + 0.2, fz);
+      f.seg2.rotation.set(1.15, f.ang, 0);
+    }
   }
 }
 

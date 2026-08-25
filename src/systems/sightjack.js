@@ -6,11 +6,13 @@ const RANGE = 55; // 可感知信道的半径
 
 // 每种载体的眼睛看到的世界不一样：视场角 / 色偏 / 去饱和 / 呼吸频率
 const CARRIER_FX = {
-  default: { fov: 74, tint: [0.85, 1.0, 0.94], desat: 0.34, breath: 1.15 },  // 潮尸：泡绿的浑浊
+  default: { fov: 74, tint: [0.85, 1.0, 0.94], desat: 0.34, breath: 1.15 },  // 履职的人：泡绿的浑浊
   dog: { fov: 88, tint: [1.0, 0.95, 0.74], desat: 0.55, breath: 3.4 },       // 犬：色盲的暖黄，喘得急
   birds: { fov: 96, tint: [0.86, 0.94, 1.08], desat: 0.18, breath: 0 },      // 鸟：高冷通透的广角
-  singer: { fov: 64, tint: [1.14, 0.76, 0.8], desat: 0.08, breath: 0.8 },    // 歌唱者：泛红的窄视野
-  watcher: { fov: 70, tint: [0.8, 0.92, 1.0], desat: 0.42, breath: 0.6 },    // 望海者：褪色的凝视
+  watcher: { fov: 70, tint: [0.8, 0.92, 1.0], desat: 0.42, breath: 0.6 },    // 望潮者：褪色的凝视
+  floater: { fov: 66, tint: [1.02, 0.9, 0.82], desat: 0.3, breath: 0.35 },   // 浮客：醉了半分的暖
+  gaze: { fov: 60, tint: [0.9, 0.86, 1.05], desat: 0.15, breath: 0.2 },      // 回眸客：过曝的残影
+  waiter: { fov: 72, tint: [0.82, 0.96, 0.98], desat: 0.4, breath: 0 },      // 侍应：不呼吸的匀速
   sea: { fov: 58, tint: [0.78, 0.94, 1.06], desat: 0.28, breath: 0.5 },      // 海：它的眼睛
 };
 
@@ -110,7 +112,7 @@ export class SightjackSystem {
     this.camera.rotateY(yaw);
     this.camera.rotateX(pitch);
     // 借体滤镜：不同的眼睛有不同的视场与色觉
-    const fx = CARRIER_FX[this.current.kind] ?? CARRIER_FX.default;
+    const fx = CARRIER_FX[this.current.fxKind ?? this.current.kind] ?? CARRIER_FX.default;
     this._fx = fx;
     this.camera.fov = fx.fov;
     this.camera.aspect = this.engine.camera.aspect;

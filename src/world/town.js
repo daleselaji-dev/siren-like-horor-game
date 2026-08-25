@@ -1,9 +1,11 @@
-// 盐门村大地图：地形 + 五区（礁滩/石堤渔寮/村中心/潮母宫/灯塔沉船）
+// 蚀湾大地图：地形 + 六区（滩涂搁浅点/石堤渔寮/镇中心市场/旧海祀/灯塔沉船湾/南方大酒店）
+// 2001 年秋，沿海县镇。填湾造地上建了南方大酒店与蚀湾海洋馆。今晚全镇办喜事。
 // 输出：场景网格、碰撞体、heightAt、互动点位 locations、巡逻路点 patrols、动态对象 dynamic
 import * as THREE from 'three';
 import { Batcher, GEO } from './batcher.js';
 import { mulberry32 } from './textures.js';
 import { makeLightCone } from './materials.js';
+import { buildHotel } from './hotel.js';
 
 // ---------------- 地形 ----------------
 
@@ -66,11 +68,11 @@ function terrainHeight(x, z) {
   h += 2.3 * discFall(x, z, -10, -10, 100, 55);
   h += 2.3 * discFall(x, z, 62, -100, 42, 38);
   h = Math.max(h, 2.2 * capsuleFall(x, z, 20, -40, 62, -95, 15, 22));
-  // 礁滩（低平台，血潮后被淹）
+  // 滩涂（低平台，返潮线以下）
   h = Math.max(h, 0.95 * discFall(x, z, 80, 112, 30, 22));
-  // 礁滩→石堤 的走廊
+  // 滩涂→石堤 的走廊
   h = Math.max(h, 1.5 * capsuleFall(x, z, 70, 100, 54, 80, 8, 12));
-  // 晒盐场压低（血潮后被淹）
+  // 晒盐场压低
   h -= 1.15 * discFall(x, z, -42, 6, 18, 10);
   // 沉船湾谷地
   h -= 1.35 * capsuleFall(x, z, 28, -60, 46, -84, 10, 10);
@@ -83,6 +85,8 @@ function terrainHeight(x, z) {
   // 自然噪声
   h += (noiseA(x * 0.006 + 0.31, z * 0.006 + 0.7) - 0.5) * 0.9;
   h += (noiseB(x * 0.02 + 0.11, z * 0.02 + 0.23) - 0.5) * 0.3;
+  // 填湾平台（1998 年推平的古海床——南方大酒店与海洋馆地块）
+  h = Math.max(h, 2.6 * capsuleFall(x, z, -14, -56, 26, -53, 16, 9));
   // 岛外海床下沉
   h = Math.max(h, -2.5);
   return h;
@@ -115,7 +119,7 @@ export function heightAt(x, z, refY) {
 
 // ---------------- 世界构建 ----------------
 
-export function buildVillage(scene, M) {
+export function buildTown(scene, M) {
   const B = new Batcher();
   const colliders = [];
   const bounds = { minX: -145, maxX: 145, minZ: -165, maxZ: 138 };
@@ -339,14 +343,14 @@ export function buildVillage(scene, M) {
     circle(x, z, 0.35, base + 2.1, { noSightBlock: true });
   }
 
-  // 灯笼杆（optLight: 挂真实点光）
+  // 灯笼杆（optLight: 挂真实点光）——喜事之夜，全镇挂囍
   function lanternPole(x, z, optLight = false, char = 'chao') {
     const base = g(x, z);
     B.add(GEO.cyl, M.woodDark, x, base + 1.6, z, 0, 0.14, 3.2, 0.14);
     B.add(GEO.box, M.woodDark, x + 0.35, base + 3.05, z, 0, 0.9, 0.08, 0.08);
     const lan = new THREE.Mesh(
       new THREE.CylinderGeometry(0.26, 0.26, 0.5, 10),
-      char === 'ji' ? M.lanternPaperJi : M.lanternPaper
+      char === 'ji' ? M.lanternPaperJi : char === 'xi' ? M.lanternPaperXi : M.lanternPaper
     );
     lan.position.set(x + 0.7, base + 2.75, z);
     scene.add(lan);
@@ -405,7 +409,7 @@ export function buildVillage(scene, M) {
     scene.add(b);
   }
 
-  // ================= ① 礁滩·搁浅点 =================
+  // ================= ① 滩涂·搁浅点 =================
   {
     // 搁浅的渡船（船底埋进滩涂，微倾）：分层船壳 + 舷缘 + 矮舱室 + 歪烟囱
     const fx = 92, fz = 122;
@@ -469,7 +473,7 @@ export function buildVillage(scene, M) {
     laySlabPath([[46, 72], [20, 62], [4, 56]]);
   }
 
-  // ================= 村墙与堤门 =================
+  // ================= 镇墙与堤门 =================
   {
     const wz = 38; // 村墙线
     const gx = 16; // 门洞中心
@@ -507,7 +511,7 @@ export function buildVillage(scene, M) {
     laySlabPath([[16, 60], [16, 40]]);
   }
 
-  // ================= ③ 村中心 =================
+  // ================= ③ 镇中心 · 市场 · 广播站 =================
   {
     // 民居
     house(-14, 14, 1, 5.4, 4.4, { plaster: true });
@@ -562,18 +566,60 @@ export function buildVillage(scene, M) {
       scene.add(pl);
       lights.push(pl);
     }
-    // 村口广场灯笼(真实光×2) + 幡
-    lanternPole(-2, 8, true);
-    lanternPole(14, -10, true);
-    lanternPole(-16, -20, false);
+    // —— 市场（喜宴前收摊了一半的摊位）——
+    {
+      const stall = (x, z, ry, wares) => {
+        const base = g(x, z);
+        // 摊架
+        B.add(GEO.box, M.wood, x, base + 0.75, z, ry, 2.2, 0.08, 1.1);
+        for (const [ox, oz] of [[-1.0, -0.45], [1.0, -0.45], [-1.0, 0.45], [1.0, 0.45]]) {
+          const wx = x + Math.cos(ry) * ox - Math.sin(ry) * oz;
+          const wz = z + Math.sin(ry) * ox + Math.cos(ry) * oz;
+          B.add(GEO.cyl, M.woodDark, wx, base + 0.4, wz, 0, 0.07, 0.8, 0.07);
+        }
+        // 顶棚布
+        B.add(GEO.box, M.clothRed, x, base + 1.95, z, ry, 2.5, 0.05, 1.5, 0, 0.1);
+        B.add(GEO.cyl, M.woodDark, x + Math.cos(ry) * 1.1, base + 1.4, z + Math.sin(ry) * 1.1, 0, 0.06, 2.8, 0.06);
+        B.add(GEO.cyl, M.woodDark, x - Math.cos(ry) * 1.1, base + 1.4, z - Math.sin(ry) * 1.1, 0, 0.06, 2.8, 0.06);
+        aabb(x, z, 2.3, 1.2, base + 0.85, { noSightBlock: true });
+        // 货品
+        if (wares === 'fish') {
+          for (let i = 0; i < 4; i++) B.add(GEO.sphere, M.steel, x + (i - 1.5) * 0.4, base + 0.83, z, 0.4, 0.22, 0.05, 0.09);
+        } else if (wares === 'salt') {
+          B.add(GEO.cone, M.salt, x - 0.5, base + 0.95, z, 0, 0.4, 0.32, 0.4);
+          B.add(GEO.cone, M.salt, x + 0.4, base + 0.9, z + 0.1, 0, 0.32, 0.24, 0.32);
+        } else {
+          for (let i = 0; i < 3; i++) B.add(GEO.box, M.clothRed, x + (i - 1) * 0.55, base + 0.86, z, i, 0.4, 0.14, 0.3);
+        }
+      };
+      stall(6, -12, 0.3, 'fish');
+      stall(10, -16, 0.25, 'salt');
+      stall(2, -16, -0.2, 'red');
+      // 公告栏（婚宴通知——文书②）
+      const nb = g(12, -8);
+      B.add(GEO.cyl, M.woodDark, 11.2, nb + 1.1, -8, 0, 0.09, 2.2, 0.09);
+      B.add(GEO.cyl, M.woodDark, 12.8, nb + 1.1, -8, 0, 0.09, 2.2, 0.09);
+      B.add(GEO.box, M.wood, 12, nb + 1.5, -8, 0, 1.9, 1.1, 0.08);
+      const notice = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.82), M.notice);
+      notice.position.set(12, nb + 1.52, -7.94);
+      scene.add(notice);
+      circle(12, -8, 0.35, nb + 2.2, { noSightBlock: true });
+      locations.noticeBoard = new THREE.Vector3(12, nb + 1.4, -7.9);
+    }
+    // 镇口广场灯笼(真实光×2) + 幡 ——今晚全镇挂囍
+    lanternPole(-2, 8, true, 'xi');
+    lanternPole(14, -10, true, 'xi');
+    lanternPole(-16, -20, false, 'xi');
     banner(-6, 16, 0.7); banner(18, 8, -0.9);
-    tree(-30, 10, 1.3); tree(30, 12, 1.0); tree(-2, -40, 1.2);
+    tree(-30, 10, 1.3); tree(30, 12, 1.0); tree(14, -36, 1.2);
     // 石板路网
     laySlabPath([[16, 36], [12, 20], [2, 6]]);
     laySlabPath([[2, 6], [-14, 8]]);
     laySlabPath([[2, 6], [8, -14], [28, -18]]);
     laySlabPath([[2, 2], [-14, -18], [-34, -40], [-52, -60]]);
     laySlabPath([[8, -20], [24, -44]]);
+    // 通往南方大酒店的正街（红毯没铺到的部分）
+    laySlabPath([[6, -14], [-2, -28], [-4, -40]], 1.9);
   }
 
   // ================= 晒盐场 =================
@@ -601,7 +647,7 @@ export function buildVillage(scene, M) {
     B.add(GEO.box, M.woodDark, cx - 2.5, terrainHeight(cx - 2, cz) + 0.15, cz, 0, 0.7, 0.08, 0.15);
   }
 
-  // ================= ④ 潮母宫 =================
+  // ================= ④ 旧海祀·潮母宫 =================
   {
     const tx = -64, tz = -74;
     const plat = terrainHeight(tx, tz) + 0.9;
@@ -890,7 +936,7 @@ export function buildVillage(scene, M) {
       const x = (rand() - 0.5) * 260, z = (rand() - 0.5) * 280;
       const h = terrainHeight(x, z);
       if (h < 0.6 || h > 1.6) continue;
-      if (Math.hypot(x - 80, z - 111) < 15) continue; // 避开出生礁滩
+      if (Math.hypot(x - 80, z - 111) < 15) continue; // 避开出生滩涂
       centers.push([x, z]);
     }
     for (const [cx, cz] of centers) {
@@ -911,6 +957,12 @@ export function buildVillage(scene, M) {
     scene.add(inst);
   }
 
+  // ================= ⑥ 南方大酒店 + 蚀湾海洋馆 =================
+  buildHotel({
+    B, M, scene, colliders, addPatch, locations, patrols, dynamic, lights,
+    heightGround: (x, z) => terrainHeight(x, z),
+  });
+
   // ---- 提交静态合批 ----
   B.flush(scene);
 
@@ -919,12 +971,13 @@ export function buildVillage(scene, M) {
   patrols.village1 = [[-2, 10], [12, 12], [16, -6], [2, -14], [-12, -6], [-8, 8]];
   patrols.village2 = [[26, -12], [34, -24], [18, -26], [12, -16]];
   patrols.templeGuard = [[-52, -70], [-58, -80], [-68, -84], [-72, -68], [-60, -64]];
-  patrols.singer = [[-6, -4], [10, -22], [24, -46], [34, -62], [24, -46], [-8, -32], [-20, -16]];
   patrols.wardenPost = [[56, -92], [66, -104], [74, -112], [64, -98]];
   patrols.netMenderWork = [12, 46.8];    // 补网人工位
   patrols.saltWorkerWork = [-44, 4];     // 晒盐工工位
-  patrols.priestWork = [-64.4, -74];     // 祭师(殿内)
+  patrols.priestWork = [-64.4, -74];     // 守祀人(殿内)
   patrols.dogWander = [[6, 6], [-8, 0], [2, -10], [14, 2]];
+  // 镇街→酒店正门一线（喜宴当值的镇民）
+  patrols.townStreet = [[6, -14], [-2, -28], [-4, -38], [2, -30], [10, -18]];
 
   // ================= 区域(叙事触发) =================
   const zones = {
@@ -933,8 +986,13 @@ export function buildVillage(scene, M) {
     villageCenter: { minX: -30, maxX: 40, minZ: -36, maxZ: 38 },
     saltField: { minX: -58, maxX: -26, minZ: -8, maxZ: 18 },
     temple: { minX: -78, maxX: -50, minZ: -88, maxZ: -60 },
-    wreckBay: { minX: 22, maxX: 54, minZ: -90, maxZ: -56 },
+    wreckBay: { minX: 22, maxX: 54, minZ: -90, maxZ: -62 },
     lighthouse: { minX: 62, maxX: 92, minZ: -134, maxZ: -106 },
+    hotelFront: { minX: -14, maxX: 6, minZ: -46, maxZ: -38 },
+    hotelLobby: { minX: -12, maxX: 4, minZ: -56, maxZ: -45 },
+    banquet: { minX: -21, maxX: -12, minZ: -67, maxZ: -45 },
+    serviceCorridor: { minX: -12, maxX: 4, minZ: -67, maxZ: -63.5 },
+    annex: { minX: 14, maxX: 36, minZ: -60, maxZ: -44 },
   };
 
   return {

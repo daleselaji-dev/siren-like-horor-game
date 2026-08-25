@@ -198,11 +198,11 @@ export function buildHotel(ctx) {
   dynamic.hotelLights = hotelLights;
 
   // ================= 台基与外壳 =================
-  // 台基（视觉底座；行走 patch 覆盖楼体+门廊，不含台阶区）
-  box(M.terrazzo, 0, -0.45, 0, 38, 0.95, 26);
+  // 台基（视觉底座，下探入填湾平台；行走 patch 覆盖楼体+门廊，不含台阶区）
+  box(M.terrazzo, 0, -0.65, 0, 38, 1.35, 26);
   addPatch(hx, hz + 0.4, 0, 38, 23.6, hb, hb);
   // 海洋馆翼台基
-  box(M.terrazzo, 28, -0.45, 4, 22.4, 0.95, 15);
+  box(M.terrazzo, 28, -0.65, 4, 22.4, 1.35, 15);
   // 正门台阶（北）：从镇地面升上台基门廊
   {
     const gFront = ctx.heightGround(hx, hz + 15.5);
