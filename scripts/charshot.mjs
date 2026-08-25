@@ -35,6 +35,7 @@ try {
     console.log('shot', names[i]);
   }
 } finally {
-  await browser?.close();
-  server.kill();
+  await Promise.race([browser?.close(), new Promise((r) => setTimeout(r, 5000))]);
+  server.kill('SIGKILL');
+  process.exit(0);
 }

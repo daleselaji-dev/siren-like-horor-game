@@ -587,21 +587,57 @@ export function clothTexture(seed = 122, baseRGB = [38, 46, 62], size = 256) {
 
 // ================= 蚀湾 · 南方大酒店 / 人物 材质组 =================
 
-/** 活人皮肤：2001 年还晒得到太阳的脸（低饱和暖调 + 微血色 + 毛孔） */
-export function skinTexture(seed = 211, size = 512) {
+/** 活人皮肤：2001 年还晒得到太阳的脸（低饱和暖调 + 微血色 + 毛孔）
+ *  age: 0 青壮 → 1 老年（皱纹沟 + 老年斑 + 松弛暗沉），wrinkles 走法线图，近景可读 */
+export function skinTexture(seed = 211, size = 512, age = 0) {
   const fbm = makeFbm(seed, 4);
+  const ridge = makeRidged(seed + 31, 4);
   return buildMaps(size, (u, v, out) => {
     const f = fbm(u * 4, v * 4);
     let r = 186 + f * 26, g = 152 + f * 22, b = 128 + f * 18;
     const flush = clamp01((fbm(u * 1.8 + 7, v * 1.8 + 7) - 0.52) * 2.6);
-    r += flush * 16; g -= flush * 2; b -= flush * 5;
+    r += flush * 16 * (1 - age * 0.6); g -= flush * 2; b -= flush * 5;
     const shade = clamp01((fbm(u * 2.6 + 13, v * 2.6 + 13) - 0.58) * 3);
     r -= shade * 24; g -= shade * 22; b -= shade * 16;
+    let h = 0.5 + f * 0.3, ro = 0.6 - flush * 0.05 + f * 0.1;
+    if (age > 0) {
+      // 皱纹沟：横向为主的脊线噪声（细而浅——皱纹是沟不是树皮）
+      const wr1 = clamp01((ridge(u * 2.2, v * 7 + fbm(u * 2, v * 2) * 0.8) - 0.8) * 4) * age;
+      const wr2 = clamp01((ridge(u * 5 + 3, v * 16 + 5) - 0.87) * 6) * age * 0.5;
+      const wr = Math.min(1, wr1 + wr2);
+      r -= wr * 18; g -= wr * 17; b -= wr * 14;
+      h -= wr * 0.14;
+      // 老年斑：稀疏浅褐点斑
+      const spot = clamp01((fbm(u * 9 + 21, v * 9 + 21) - 0.76) * 8) * age;
+      r = r * (1 - spot * 0.28) + spot * 42;
+      g = g * (1 - spot * 0.3) + spot * 32;
+      b = b * (1 - spot * 0.32) + spot * 24;
+      // 整体暗沉失血
+      r -= age * 10; g -= age * 6; b -= age * 3;
+      ro += wr * 0.1;
+    }
     const pore = (fbm(u * 26, v * 26) - 0.5) * 9;
     out[0] = r + pore; out[1] = g + pore; out[2] = b + pore * 0.8;
-    out[3] = clamp01(0.5 + f * 0.3);
-    out[4] = clamp01(0.6 - flush * 0.05 + f * 0.1);
-  }, 1.0);
+    out[3] = clamp01(h);
+    out[4] = clamp01(ro);
+  }, 1.0 + age * 0.5);
+}
+
+/** 胶皮（理骨员围裙/长手套/胶靴）：哑光微皱 + 磨亮棱线 + 骨粉扑痕 */
+export function rubberTexture(seed = 415, size = 256) {
+  const fbm = makeFbm(seed, 4);
+  const ridge = makeRidged(seed + 5, 3);
+  return buildMaps(size, (u, v, out) => {
+    const f = fbm(u * 3, v * 3);
+    const crease = clamp01((ridge(u * 2, v * 4) - 0.76) * 4); // 折痕棱线（磨得发亮）
+    let r = 42 + f * 8 + crease * 12, g = 48 + f * 8 + crease * 13, b = 50 + f * 9 + crease * 13;
+    // 骨粉扑痕：淡淡的干白雾（理骨员的职业证据，不是迷彩）
+    const dust = clamp01((fbm(u * 3.4 + 8, v * 3.4 + 8) - 0.62) * 2.2);
+    r += dust * 26; g += dust * 25; b += dust * 23;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.5 + f * 0.2 - crease * 0.16);
+    out[4] = clamp01(0.46 - crease * 0.22 + dust * 0.3);
+  }, 1.2);
 }
 
 /** 水磨石地面：青灰浆 + 黑白红青石屑 + 铜条分格 + 抛光走道 */
@@ -1067,6 +1103,9 @@ export function buildTextureSet(lowspec = false) {
     clothRed: clothTexture(124, [110, 22, 18], small),
     // —— 蚀湾 · 人物与酒店 ——
     skin: skinTexture(211, mid),
+    skinB: skinTexture(217, mid),            // 第二张底皮（斑驳分布不同）
+    skinOld: skinTexture(213, mid, 1),       // 老年皮（皱纹沟+老年斑）
+    rubber: rubberTexture(415, small),
     terrazzo: terrazzoTexture(301, hero),
     carpet: carpetTexture(311, [98, 18, 16], mid),
     marble: marbleTexture(321, mid),
@@ -1083,6 +1122,8 @@ export function buildTextureSet(lowspec = false) {
     clothVest: plainClothTexture(403, [26, 26, 30], small),
     clothWork: plainClothTexture(404, [56, 66, 90], small),
     clothBrown: plainClothTexture(405, [96, 78, 58], small),
+    clothUniform: plainClothTexture(406, [34, 48, 56], small), // 岗亭员藏青制服
+    clothDress: plainClothTexture(407, [84, 52, 60], small),   // 2001 连衣裙暗紫红
   };
   const aniso = lowspec ? 2 : 8;
   for (const [k, v] of Object.entries(defs)) {

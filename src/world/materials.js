@@ -38,6 +38,31 @@ export function buildMaterials(lowspec = false) {
   // ===== 蚀湾 · 人物 =====
   M.skin = std(T.skin, { normalScale: 0.7, envInt: 0.6 });
   M.skinPale = std(T.skin, { color: 0xd8dee0, normalScale: 0.7, envInt: 0.9 }); // 深压下失血的脸
+  // 肤色池：2 张底皮 × 色调乘子——人群不再共享同一张皮
+  M.skinTones = [
+    M.skin,
+    std(T.skinB, { normalScale: 0.7, envInt: 0.6 }),
+    std(T.skin, { color: 0xe8d4c2, normalScale: 0.7, envInt: 0.6 }),   // 偏黄气色
+    std(T.skinB, { color: 0xd9b9a2, normalScale: 0.75, envInt: 0.65 }),// 海边晒褐
+    std(T.skin, { color: 0xf2dfd6, normalScale: 0.65, envInt: 0.6 }),  // 白净
+  ];
+  // 老年皮池（皱纹沟+老年斑烘进贴图）
+  M.skinOlds = [
+    std(T.skinOld, { normalScale: 1.0, envInt: 0.55 }),
+    std(T.skinOld, { color: 0xdcc2ac, normalScale: 1.05, envInt: 0.6 }), // 晒褐的老年
+    std(T.skinOld, { color: 0xe4dcc6, normalScale: 0.95, envInt: 0.55 }),// 蜡黄的老年
+  ];
+  // 失血皮池（酒店员工：司仪/侍应/岗亭员）
+  M.skinPales = [
+    M.skinPale,
+    std(T.skinB, { color: 0xd2dce2, normalScale: 0.7, envInt: 0.95 }),
+    std(T.skinOld, { color: 0xd8dcd4, normalScale: 0.9, envInt: 0.9 }),
+  ];
+  // 骨粉白垩皮（理骨员：干、白、粗糙——像常年裹着一层粉）
+  M.skinChalk = std(T.skinOld, { color: 0xe2e4da, normalScale: 1.1, envInt: 0.4 });
+  M.rubber = std(T.rubber, { normalScale: 1.2, envInt: 1.3, extra: { side: THREE.DoubleSide } }); // 胶皮围裙/手套/胶靴（围裙为开放壳，双面）
+  M.clothUniform = std(T.clothUniform, { envInt: 0.4 });       // 岗亭员藏青制服
+  M.clothDress = std(T.clothDress, { envInt: 0.4 });
   M.clothSuit = std(T.clothSuit, { envInt: 0.35 });
   M.clothShirt = std(T.clothShirt, { envInt: 0.4 });
   M.clothVest = std(T.clothVest, { envInt: 0.35 });
@@ -120,8 +145,14 @@ export function buildMaterials(lowspec = false) {
     color: 0xd8ccaa, roughness: 0.9, side: THREE.DoubleSide,
     emissive: 0xa8945e, emissiveIntensity: 0.35,
   });
-  // 湿发（贴头皮的乱发）
+  // 湿发（贴头皮的乱发）+ 发色池（纯黑/深棕/褐、2001 年偶见的酒红染发）
   M.hair = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.55, envMapIntensity: 0.8 });
+  M.hairTones = [
+    M.hair,
+    new THREE.MeshStandardMaterial({ color: 0x1e1712, roughness: 0.6, envMapIntensity: 0.7 }),
+    new THREE.MeshStandardMaterial({ color: 0x2a1e14, roughness: 0.62, envMapIntensity: 0.7 }),
+    new THREE.MeshStandardMaterial({ color: 0x30181a, roughness: 0.58, envMapIntensity: 0.75 }),
+  ];
 
   M.textures = T;
   return M;
