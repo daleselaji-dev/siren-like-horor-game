@@ -180,6 +180,7 @@ for (const e of enemies) byId[e.id] = e;
 const sightjack = new SightjackSystem(engine, player, audio);
 const stealth = new StealthSystem(world, player);
 const crt = new CRTSystem(engine, world);
+crt.gainLight = sky.hemi; // 监控头自动增益用
 
 const game = {
   scene: engine.scene, engine, world, player, hud, audio,

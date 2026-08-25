@@ -164,6 +164,12 @@ export class CRTSystem {
     this.cam.position.copy(u.viewPos);
     this.cam.lookAt(u.viewLook);
 
+    // 摄像机自动增益：监控头在暗处会拉高增益——半球光临时抬升（仅改 uniform，
+    // 不触发着色器重编译）。没有这一步，夜里对着暗走廊的屏幕读成整块黑玻璃
+    const gl = this.gainLight;
+    const oldGain = gl ? gl.intensity : 0;
+    if (gl) gl.intensity = Math.max(oldGain * 3.2, 1.6);
+
     // 预现态：显示预现层 / 隐藏现态层 / 隐藏所有屏幕（防反馈回路）
     this.foretold.visible = true;
     const hiddenStates = [];
@@ -178,6 +184,7 @@ export class CRTSystem {
     if (oldFogColor !== undefined) engine.scene.fog.color.setHex(oldFogColor);
 
     // 复位
+    if (gl) gl.intensity = oldGain;
     this.foretold.visible = false;
     this.hideInCrt.forEach((o, i) => { o.visible = hiddenStates[i]; });
     this.units.forEach((s, i) => { s.screen.visible = screenStates[i]; });

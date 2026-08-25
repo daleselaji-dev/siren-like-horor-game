@@ -37,6 +37,18 @@ export async function run(page, h) {
       if (g.game.state !== 'PLAY' && g.game.state !== 'ENDED') break; // 演出弹出文书等
     }
   }, sec);
+  // 按 E 直到指定 flag 置位：1fps 下两次 E 会合并进同一帧、被关文书等上一个
+  // 消费者吃掉边沿——关键交互全部改为「确认结果否则重按」
+  const interactUntil = async (flag, msg) => {
+    for (let i = 0; i < 6; i++) {
+      const v = await page.evaluate((n) => window.__game.story.flags[n], flag);
+      if (v) return;
+      await h.tapKey('KeyE');
+      await h.sleep(600);
+    }
+    const v = await page.evaluate((n) => window.__game.story.flags[n], flag);
+    assert(v, msg);
+  };
   // 确认文书已拾取；低帧率下 100ms 的 E 键可能没被任何一帧采样到——没拾到就重按
   const pickNote = async (id) => {
     for (let i = 0; i < 5; i++) {
@@ -119,14 +131,10 @@ export async function run(page, h) {
   });
   await tp(vat.x, vat.z + 0.6, Math.PI);
   await h.sleep(300);
-  await interact();
-  f = await flags();
-  assert(f.hasKey, 'key not taken');
+  await interactUntil('hasKey', 'key not taken');
   await tp(gate.x, gate.z + 2.4, Math.PI);
   await h.sleep(300);
-  await interact();
-  f = await flags();
-  assert(f.gateOpen, 'gate not opened');
+  await interactUntil('gateOpen', 'gate not opened');
   await h.sleep(1500);
   await h.shot('p05-gate-open');
 
@@ -211,7 +219,7 @@ export async function run(page, h) {
   const dresser = await loc('dresser807');
   await tp(dresser.x + 1.4, dresser.z + 1.6, -2.4, 10.3);
   await h.sleep(400);
-  await interact(); // 上头教学（演出 13.5s 游戏时间，快进消化）
+  await interactUntil('metBride', 'bride scene not started'); // 上头教学（演出 13.5s 游戏时间，快进消化）
   await h.shot('p10-bride-scene');
   let gotMirror = false;
   for (let i = 0; i < 40 && !gotMirror; i++) {
@@ -226,9 +234,8 @@ export async function run(page, h) {
   const crtc = await loc('crtCorridor');
   await tp(crtc.x - 0.3, crtc.z + 1.6, Math.PI, 3.5);
   await h.sleep(400);
-  await interact();
+  await interactUntil('crtTip', 'crt tutorial missed');
   f = await flags();
-  assert(f.crtTip, 'crt tutorial missed');
   await h.shot('p12-crt-foretell');
   // 进宴会厅触发敬酒（议程收声 2.4s 后 applyStage → 渗漏）——收声用快进消化
   await tp(-14, -56, 0.6, 3.5);
@@ -259,9 +266,8 @@ export async function run(page, h) {
   const kc = await loc('keyCabinet');
   await tp(kc.x, kc.z + 1.3, Math.PI, 6.9);
   await h.sleep(300);
-  await interact(); // 钥匙柜 → 点名
+  await interactUntil('hasAquaKey', 'aqua key not taken'); // 钥匙柜 → 点名
   f = await flags();
-  assert(f.hasAquaKey, 'aqua key not taken');
   assert(f.namedByCrt, 'not named by CRT');
   await h.sleep(1500);
   await h.shot('p14-named-by-crt');
@@ -269,9 +275,8 @@ export async function run(page, h) {
   const brk = await loc('mainBreaker');
   await tp(brk.x - 1.2, brk.z, 1.57, 3.5);
   await h.sleep(300);
-  await interact();
+  await interactUntil('imageBroken', 'image not broken');
   f = await flags();
-  assert(f.imageBroken, 'image not broken');
   await h.shot('p15-image-broken');
   const crtBroken = await page.evaluate(() => window.__game.crt.broken > 0);
   console.log('[verify] crt static:', crtBroken);
@@ -307,7 +312,7 @@ export async function run(page, h) {
   const tv = await loc('tv807');
   await tp(tv.x + 1.4, tv.z + 1.0, -2.2, 10.3);
   await h.sleep(400);
-  await interact(); // 播带
+  await interactUntil('tapeSeen', 'tape playback not started'); // 播带
   await h.sleep(1000);
   await h.shot('p18-tape-play');
   // 等 note8 打开（演出 stage1 → 8.5s 游戏时间，低帧率下快进消化）
@@ -345,9 +350,8 @@ export async function run(page, h) {
   const mic = await loc('stageMic');
   await tp(mic.x, mic.z + 0.4, Math.PI, 4.0); // 台上（舞台抬高 0.45，交互点在麦后 1.6m 半径 3）
   await h.sleep(400);
-  await interact(); // 扯囍匾
+  await interactUntil('finaleBroken', 'finale break failed'); // 扯囍匾
   f = await flags();
-  assert(f.finaleBroken, 'finale break failed');
   assert(f.agenda >= 5, 'agenda not at 送入洞房');
   await h.sleep(1500);
   await h.shot('p21-finale-break');
