@@ -557,6 +557,25 @@ export function buildTown(scene, M) {
     layRoad([[12, -8], [24, -20], [36, -32], [43, -41]], 3.2); // 岔路→海洋馆正门
     laySlabPath([[-14, 8], [-26, 16], [-35, 21]]);   // 岔路→家属区
 
+    // —— 雨夜积水：路面镜洼（车灯/街灯在里面拉出倒影条）——
+    {
+      const puddleM = new THREE.MeshStandardMaterial({
+        color: 0x11171a, roughness: 0.04, metalness: 0.92, envMapIntensity: 1.8,
+      });
+      const puddleG = new THREE.CircleGeometry(1, 18);
+      for (const [px, pz, s, sq] of [
+        [60.5, 0.8, 1.3, 0.55], [55, 1.7, 0.9, 0.5], [50.5, 0.9, 1.5, 0.45],
+        [46.6, -0.7, 0.8, 0.6], [44.4, 2.1, 1.1, 0.5], [43.6, -2.4, 0.9, 0.55],
+        [38, -1.2, 1.5, 0.5], [31, -2.6, 1.0, 0.55], [24, -4.6, 1.2, 0.5], [17, -6.4, 0.9, 0.55],
+      ]) {
+        const p = new THREE.Mesh(puddleG, puddleM);
+        p.rotation.x = -Math.PI / 2;
+        p.scale.set(s, s * sq, 1);
+        p.position.set(px, g(px, pz) + 0.056, pz);
+        scene.add(p);
+      }
+    }
+
     // —— 长途车站 ——
     {
       const bx = 58, bz = 4.6, base = g(bx, bz);
@@ -596,6 +615,20 @@ export function buildTown(scene, M) {
       // 垃圾桶 + 压扁的纸杯
       B.add(GEO.cyl, M.ironDark, bx + 3.2, base + 0.42, bz + 0.8, 0, 0.32, 0.85, 0.32);
       circle(bx + 3.2, bz + 0.8, 0.3, base + 0.9, { noSightBlock: true });
+      // 雨棚檐口水线：棚上汇的雨顺檐口淌成几条断线（雨夜第一眼的「湿」）
+      const dripM = new THREE.MeshBasicMaterial({ color: 0xaebfc4, transparent: true, opacity: 0.34, depthWrite: false });
+      for (let i = 0; i < 6; i++) {
+        const dx = bx - 2.6 + i * 1.05 + (rand() - 0.5) * 0.3;
+        const dl = 0.5 + rand() * 1.7;
+        const dm = new THREE.Mesh(new THREE.BoxGeometry(0.012, dl, 0.012), dripM);
+        dm.position.set(dx, base + 2.86 - dl / 2, bz + 1.56);
+        scene.add(dm);
+      }
+      // 站台堆着没人认领的鱼货筐（两只落地一只摞上——构图密度）
+      B.add(GEO.box, M.woodDark, bx + 3.5, base + 0.17, bz - 0.7, 0.2, 0.52, 0.34, 0.4);
+      B.add(GEO.box, M.woodDark, bx + 4.0, base + 0.17, bz - 0.2, -0.4, 0.5, 0.34, 0.38);
+      B.add(GEO.box, M.woodDark, bx + 3.7, base + 0.51, bz - 0.45, 0.9, 0.48, 0.32, 0.36);
+      aabb(bx + 3.75, bz - 0.45, 1.3, 1.2, base + 0.72, { noSightBlock: true });
       // 出生点：站台上，面朝牌坊
       locations.spawn = { x: 60.5, z: 2.2, yaw: 1.44 };
     }
@@ -624,6 +657,20 @@ export function buildTown(scene, M) {
       const tl = new THREE.MeshBasicMaterial({ color: 0xff2a20 });
       mkBox(tl, -4.22, 1.0, -0.85, 0.06, 0.16, 0.3);
       mkBox(tl, -4.22, 1.0, 0.85, 0.06, 0.16, 0.3);
+      // 车灯：雨夜里两支体积光锥扎进雨丝（末班车留给你的最后一段光）
+      const hlM = new THREE.MeshBasicMaterial({ color: 0xfff2c8 });
+      mkBox(hlM, 4.19, 0.92, -0.82, 0.05, 0.16, 0.28);
+      mkBox(hlM, 4.19, 0.92, 0.82, 0.05, 0.16, 0.28);
+      for (const hz2 of [-0.82, 0.82]) {
+        const hcone = makeLightCone(0xffeec0, 0.07, 0.13, 1.8, 8);
+        hcone.position.set(4.2, 0.92, hz2);
+        hcone.rotation.z = Math.PI / 2; // 光锥指向车头
+        bus.add(hcone);
+      }
+      // 车头一盏真实点光：把湿路面和雨丝打亮
+      const hpl = new THREE.PointLight(0xffeec0, 7, 12, 2);
+      hpl.position.set(5.2, 1.0, 0);
+      bus.add(hpl);
       // 车尾线路牌
       mkBox(plateMat('蚀湾 — 县城', { w: 256, h: 64, bg: '#1e2226', fg: '#e8e0c8', font: 0.42 }), -4.21, 1.95, 0, 0.05, 0.4, 1.4);
       // 车内一盏昏黄的灯（跟着车走）
@@ -1429,6 +1476,19 @@ export function buildTown(scene, M) {
   patrols.dogWander = [[6, 6], [-8, 0], [2, -10], [14, 2]];
   // 镇街→酒店正门一线（喜宴当值的镇民）
   patrols.townStreet = [[6, -14], [-2, -28], [-4, -38], [2, -30], [10, -18]];
+
+  // ================= 雨遮蔽（棚/檐/屋顶下不出现雨丝） =================
+  dynamic.rainCovers = [
+    { minX: 55.2, maxX: 60.8, minZ: 2.9, maxZ: 6.1 },     // 车站雨棚
+    { minX: 42.9, maxX: 45.1, minZ: -4.5, maxZ: 4.5 },    // 牌坊瓦顶
+    { minX: 45.4, maxX: 48.2, minZ: 3.4, maxZ: 6.2 },     // 岗亭
+    { minX: 40.5, maxX: 42.7, minZ: 2.0, maxZ: 5.2 },     // 告示墙檐
+    { minX: 32.0, maxX: 38.0, minZ: 3.7, maxZ: 8.7 },     // 杂货铺
+    { minX: 20.0, maxX: 29.0, minZ: 0.7, maxZ: 7.7 },     // 录像厅
+    { minX: 29.8, maxX: 34.2, minZ: -19.9, maxZ: -16.1 }, // 广播站
+    { minX: 28.2, maxX: 29.8, minZ: -7.3, maxZ: -5.7 },   // 电话亭
+    { minX: -45.2, maxX: -28.8, minZ: 22.3, maxZ: 27.7 }, // 家属筒子楼
+  ];
 
   // ================= 区域(叙事触发) =================
   const zones = {

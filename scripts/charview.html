@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
+<link rel="icon" href="data:," />
 <title>角色查看器</title>
 <style>html,body{margin:0;background:#111}canvas{display:block}</style>
 </head>
@@ -9,6 +10,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { buildMaterials } from '/src/world/materials.js';
+import { bakeFaces } from '/src/world/faces.js';
 import { Humanoid, bakeFigure, poseAs } from '/src/entities/humanoid.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -33,6 +35,7 @@ fill.position.set(-4, 2.5, 2);
 scene.add(fill);
 
 const M = buildMaterials(false);
+await bakeFaces(M); // 等照片脸皮烘焙完成再截（查看器要的就是脸）
 M.terrazzo.map.repeat.set(10, 10); M.terrazzo.normalMap.repeat.set(10, 10); M.terrazzo.roughnessMap.repeat.set(10, 10);
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), M.terrazzo);
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;

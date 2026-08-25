@@ -1153,7 +1153,11 @@ export class Story {
     this.introSeq = { t: 0, dur: 10.5 };
     hud.setLetterbox(true);
     this.g.player.frozen = true;
-    hud.subtitle('二〇〇一年，秋。蚀湾。', 4);
+    // 开场一记无声闪电把雨夜整个照亮（闷雷隔几秒才从海上过来）
+    this.g.sky.flashSeq = { t: 0, strikes: [0.5, 0.72, 4.2] };
+    this.g.sky.thunderQueued = 1;
+    this.g.sky.boltMesh.visible = true;
+    hud.subtitle('二〇〇一年，秋。蚀湾。雨没有停过。', 4);
     hud.subtitle('……喜宴实况转播……南方大酒店……全镇同贺……', 5, 'radio');
     hud.subtitle('末班长途车。司机没熄火——他等的不是你，是掉头。', 5.5);
     hud.subtitle('絮絮的喜帖在行李箱里。她只求了你一件事：上头的时候，别出声。', 6);

@@ -4,7 +4,9 @@ import { Engine } from './core/engine.js';
 import { Input } from './core/input.js';
 import { AudioEngine } from './core/audio.js';
 import { buildMaterials } from './world/materials.js';
+import { bakeFaces } from './world/faces.js';
 import { buildTown } from './world/town.js';
+import { Rain } from './world/rain.js';
 import { Ocean } from './world/water.js';
 import { Sky } from './world/sky.js';
 import { Player } from './entities/player.js';
@@ -28,7 +30,9 @@ const audio = new AudioEngine();
 const hud = new HUD();
 
 const M = buildMaterials(LOWSPEC);
+bakeFaces(M).then(() => { window.__facesReady = true; }); // 照片脸皮异步烘焙（不阻塞启动）
 const world = buildTown(engine.scene, M);
+const rain = new Rain(engine.scene, { lowspec: LOWSPEC, covers: world.dynamic.rainCovers ?? [] });
 const ocean = new Ocean(engine.scene, M.textures, world);
 const sky = new Sky(engine.scene);
 world.waterLevel = () => ocean.level;
@@ -390,6 +394,7 @@ function loop() {
     ocean.update(dt);
     sky.update(dt, player.pos);
     world.updateFx(elapsed);
+    rain.update(dt, engine.renderPass.camera, world);
     updateLightBudget(dt, engine.camera.position);
 
     // 远处无声闪电 → 后处理闪光；数秒后隔海传来一声闷雷

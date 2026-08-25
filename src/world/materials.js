@@ -2,6 +2,7 @@
 // v2：接入粗糙度图（湿面真正反光）+ 环境反射强度分级
 import * as THREE from 'three';
 import { buildTextureSet } from './textures.js';
+import { buildFaceMaterials } from './faces.js';
 
 export function buildMaterials(lowspec = false) {
   const T = buildTextureSet(lowspec);
@@ -138,9 +139,9 @@ export function buildMaterials(lowspec = false) {
   M.mural = new THREE.MeshStandardMaterial({ map: T.mural, roughness: 0.85 });
   // 整幅贴图类材质：合批时保持 0..1 UV，禁止世界空间平铺（否则字/画被切成色带）
   for (const sm of [M.xiPanel, M.signSouth, M.signSouthV, M.signAqua, M.mural]) sm.userData.fullUV = true;
-  // 镇口公路沥青（2001 年的县道：补丁摞补丁）
-  M.asphalt = std(T.slab, { normalScale: 0.7, envInt: 0.6, roughness: 1.0 });
-  M.asphalt.color = new THREE.Color(0x4a4c4e);
+  // 镇口公路沥青（2001 年的县道：补丁摞补丁）——雨夜压暗压湿，灯下起油亮
+  M.asphalt = std(T.slab, { normalScale: 0.7, envInt: 1.3, roughness: 0.72 });
+  M.asphalt.color = new THREE.Color(0x3c4043);
   // 巨物残骸骨料：陈年象牙色，盐析出的干骨面
   M.bone = std(T.salt, { normalScale: 0.8, envInt: 1.1, roughness: 0.95 });
   M.bone.color = new THREE.Color(0xcfc4ac);
@@ -184,6 +185,8 @@ export function buildMaterials(lowspec = false) {
   ];
 
   M.textures = T;
+  // 生图烘焙脸皮：同步建材质（底皮），照片由 bakeFaces(M) 异步合成进 Canvas
+  buildFaceMaterials(M, T);
   return M;
 }
 

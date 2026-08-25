@@ -780,6 +780,29 @@ export function lashStrokesTexture(w = 128, h = 48) {
   return c;
 }
 
+/** 发丝卡片：透明底上从顶边垂下的一束细发（根密梢疏、微弯、亮度参差）。
+ *  画成浅灰白——由材质 color 乘出发色；贴发际线/鬓角/颈窝破「头盔感」。 */
+export function hairStrandsTexture(w = 192, h = 128, seed = 6161, sparse = false) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  const rand = mulberry32(seed);
+  const n = sparse ? 26 : 88;
+  for (let i = 0; i < n; i++) {
+    const bx = (0.04 + rand() * 0.92) * w;
+    const len = h * (0.45 + rand() * 0.5);
+    const sway = (rand() - 0.5) * w * 0.22;
+    const alpha = 0.3 + rand() * 0.6;
+    x.strokeStyle = `rgba(${200 + (rand() * 40) | 0},${195 + (rand() * 40) | 0},${190 + (rand() * 40) | 0},${alpha.toFixed(2)})`;
+    x.lineWidth = 0.7 + rand() * 1.1;
+    x.beginPath();
+    x.moveTo(bx, -1);
+    x.bezierCurveTo(bx + sway * 0.2, len * 0.35, bx + sway * 0.7, len * 0.7, bx + sway, len);
+    x.stroke();
+  }
+  return c;
+}
+
 /** 胶皮（理骨员围裙/长手套/胶靴）：哑光微皱 + 磨亮棱线 + 骨粉扑痕 */
 export function rubberTexture(seed = 415, size = 256) {
   const fbm = makeFbm(seed, 4);
@@ -1296,6 +1319,8 @@ export function buildTextureSet(lowspec = false) {
   set.skinPoreN = toTex(skinPoreNormalTexture(219, lowspec ? 128 : 320), { srgb: false, aniso, repeat: [3.5, 3.5] });
   set.brow = toTex(browStrokesTexture(), { aniso, clamp: true });
   set.lash = toTex(lashStrokesTexture(), { aniso, clamp: true });
+  set.hairStrand = toTex(hairStrandsTexture(192, 128, 6161, false), { aniso, clamp: true });
+  set.hairWisp = toTex(hairStrandsTexture(192, 128, 7273, true), { aniso, clamp: true });
   set.waterNormal = waterNormalTexture(99, lowspec ? 256 : 512);
   set.net = netTexture();
   set.lantern = lanternTexture('潮');
