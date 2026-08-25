@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { Batcher, GEO } from './batcher.js';
 import { mulberry32 } from './textures.js';
 import { makeLightCone } from './materials.js';
-import { buildHotel } from './hotel.js';
+import { buildHotel, plateMat } from './hotel.js';
 
 // ---------------- 地形 ----------------
 
@@ -87,8 +87,37 @@ function terrainHeight(x, z) {
   h += (noiseB(x * 0.02 + 0.11, z * 0.02 + 0.23) - 0.5) * 0.3;
   // 填湾平台（1998 年推平的古海床——南方大酒店与海洋馆地块）
   h = Math.max(h, 2.6 * capsuleFall(x, z, -14, -56, 26, -53, 16, 9));
+  // 公路路基：把主干道走廊的噪声压平（否则路面板浮在起伏地形上）
+  h = roadBedBlend(x, z, h);
   // 岛外海床下沉
   h = Math.max(h, -2.5);
+  return h;
+}
+
+// —— 公路路基 —— 沿走廊把地形压向路面标高（[ax,az,bx,bz,标高a,标高b]，沿线段线性插值）
+const ROAD_BEDS = [
+  [74, 2, 46, 0, 2.32, 2.32],       // 镇外来路
+  [50, 3, 63, 4.2, 2.32, 2.32],     // 车站广场（加宽）
+  [46, 0, 30, -2, 2.32, 2.32],      // 前街东段
+  [30, -2, 18, -6, 2.32, 2.32],     // 前街西段
+  [18, -6, 11, -8, 2.32, 2.32],     // 街心
+  [12, -8, 24, -20, 2.32, 2.36],    // 岔路→海洋馆 ①
+  [24, -20, 36, -32, 2.36, 2.4],    // 岔路→海洋馆 ②
+  [36, -32, 43, -41, 2.4, 2.4],     // 岔路→海洋馆 ③（正门台阶自适应衔接）
+];
+function roadBedBlend(x, z, h) {
+  for (let i = 0; i < ROAD_BEDS.length; i++) {
+    const R = ROAD_BEDS[i];
+    const dx = R[2] - R[0], dz = R[3] - R[1];
+    let t = ((x - R[0]) * dx + (z - R[1]) * dz) / (dx * dx + dz * dz);
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const d = Math.hypot(x - (R[0] + dx * t), z - (R[1] + dz * t));
+    const half = i === 1 ? 6.0 : 3.0;
+    if (d >= half + 3.5) continue;
+    let w = d <= half ? 1 : 1 - (d - half) / 3.5;
+    w = w * w * (3 - 2 * w);
+    h += (R[4] + (R[5] - R[4]) * t - h) * w;
+  }
   return h;
 }
 
@@ -430,15 +459,11 @@ export function buildTown(scene, M) {
     // 礁岩群
     const reefs = [[70, 128, 2.2], [60, 118, 1.6], [82, 100, 1.9], [66, 104, 1.2], [94, 108, 2.6], [55, 130, 1.8], [75, 92, 1.0], [88, 90, 1.4]];
     for (const [x, z, s] of reefs) reefRock(x, z, s);
-    // 行李箱（文书①）
-    locations.luggage = new THREE.Vector3(76, g(76, 108) + 0.35, 108);
-    B.add(GEO.box, M.clothGrey, 76, g(76, 108) + 0.18, 108, 0.4, 0.7, 0.35, 0.5);
     // 破渔网、木箱杂物
     netRack(70, 96, 0.5);
     sampan(62, 98, 1.2, 0.12);
     B.add(GEO.box, M.wood, 73, g(73, 100) + 0.3, 100, 0.7, 0.8, 0.6, 0.8);
-    // 出生点
-    locations.spawn = { x: 84, z: 114, yaw: 2.4 };
+    // （出生点已迁往镇口长途车站——滩涂改为后期可达区域）
   }
 
   // ================= ② 石堤 · 渔寮区 =================
@@ -455,11 +480,9 @@ export function buildTown(scene, M) {
     }
     // 渔寮三间
     const h1 = house(2, 52, 0, 4.6, 3.8);
-    const h2 = house(20, 57, 2, 5.2, 4.2);   // 门朝北(-z)…朝村,钥匙屋
-    const h3 = house(38, 51, 0, 4.4, 3.6);
-    locations.note2 = h1.local(-1.0, 0.85, -0.7);   // 渔民日记(桌上)
-    locations.keyHook = h2.local(1.9, 1.5, -1.4);   // 钥匙挂钩(内墙)
-    locations.note3 = h3.local(1.1, 0.85, 0.6);     // 盐工账本
+    const h2 = house(20, 57, 2, 5.2, 4.2);   // 门朝北(-z)…朝村
+    house(38, 51, 0, 4.4, 3.6);
+    locations.note2 = h1.local(-1.0, 0.85, -0.7);   // 渔民日记(桌上·支线文书⑩)
     dynamic.hut2 = h2;
     // 晾网架成排
     netRack(9, 47, 0.2); netRack(13.5, 46, -0.3); netRack(30, 47.5, 0.15); netRack(45, 55, 1.2);
@@ -511,16 +534,434 @@ export function buildTown(scene, M) {
     laySlabPath([[16, 60], [16, 40]]);
   }
 
+  // ================= ②' 镇口 · 长途车站 / 牌坊 / 镇前街 / 家属楼 =================
+  // 2001 年的夜班车把你放在这里。站台的灯还亮着，班次牌翻到「已发」。
+  // 玩家出生点。牌坊下的栅门夜里落闩——闩在里侧，岗亭里的人一动不动。
+  {
+    // —— 公路（补丁摞补丁的县道沥青）——
+    const layRoad = (pts, width = 4.4) => {
+      for (let s = 0; s < pts.length - 1; s++) {
+        const [ax, az] = pts[s], [bx, bz] = pts[s + 1];
+        const dist = Math.hypot(bx - ax, bz - az);
+        const ang = Math.atan2(bx - ax, bz - az);
+        const n = Math.max(1, Math.round(dist / 3.0));
+        for (let i = 0; i < n; i++) {
+          const t = (i + 0.5) / n;
+          const x = ax + (bx - ax) * t, z = az + (bz - az) * t;
+          B.add(GEO.box, M.asphalt, x, g(x, z) + 0.015, z, ang, width + (rand() - 0.5) * 0.5, 0.07, dist / n + 0.35);
+        }
+      }
+    };
+    layRoad([[74, 2], [46, 0]]);                     // 镇外来路（尽头没进雾里）
+    layRoad([[44, 0], [30, -2], [18, -6], [11, -8]]); // 镇前街
+    layRoad([[12, -8], [24, -20], [36, -32], [43, -41]], 3.2); // 岔路→海洋馆正门
+    laySlabPath([[-14, 8], [-26, 16], [-35, 21]]);   // 岔路→家属区
+
+    // —— 长途车站 ——
+    {
+      const bx = 58, bz = 4.6, base = g(bx, bz);
+      // 雨棚：两根钢柱 + 石棉瓦顶
+      for (const px of [bx - 2.1, bx + 2.1]) {
+        B.add(GEO.cyl, M.ironDark, px, base + 1.45, bz + 0.6, 0, 0.09, 2.9, 0.09);
+        circle(px, bz + 0.6, 0.15, base + 2.9, { noSightBlock: true });
+      }
+      B.add(GEO.box, M.roof, bx, base + 2.95, bz + 0.2, 0, 5.6, 0.12, 2.6, 0, 0.06);
+      // 长椅（行李箱=文书①）
+      B.add(GEO.box, M.wood, bx, base + 0.48, bz + 1.1, 0, 3.0, 0.09, 0.45);
+      for (const px of [bx - 1.3, bx + 1.3]) B.add(GEO.box, M.ironDark, px, base + 0.24, bz + 1.1, 0, 0.09, 0.48, 0.4);
+      aabb(bx, bz + 1.1, 3.0, 0.5, base + 0.55, { noSightBlock: true });
+      B.add(GEO.box, M.clothGrey, bx + 0.9, base + 0.72, bz + 1.1, 0.25, 0.66, 0.36, 0.42);
+      locations.luggage = new THREE.Vector3(bx + 0.9, base + 0.8, bz + 1.1);
+      // 站牌：蚀湾站 · 班次全部划掉
+      B.add(GEO.cyl, M.ironDark, bx - 3.6, base + 1.4, bz - 0.4, 0, 0.07, 2.8, 0.07);
+      B.add(GEO.box, plateMat('蚀湾站', { w: 192, h: 96, bg: '#1e4a8a', fg: '#f0f0e8', font: 0.44 }),
+        bx - 3.6, base + 2.5, bz - 0.4, 0, 0.9, 0.5, 0.06);
+      B.add(GEO.box, plateMat('末班 21:30 已发', { w: 288, h: 56, bg: '#d8d0bc', fg: '#5a2020', font: 0.4 }),
+        bx - 3.6, base + 2.05, bz - 0.4, 0, 0.9, 0.28, 0.05);
+      circle(bx - 3.6, bz - 0.4, 0.14, base + 2.8, { noSightBlock: true });
+      // 时刻表(玻璃框里泛黄的纸)
+      const tt = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.8), M.notice);
+      tt.position.set(bx - 2.12, base + 1.7, bz + 0.6);
+      tt.rotation.y = -Math.PI / 2;
+      scene.add(tt);
+      // 雨棚下一支荧光管（冷白，喘着气闪）——阈限车站的主光
+      B.add(GEO.box, M.fluorescent, bx, base + 2.82, bz + 0.3, 0, 1.5, 0.06, 0.14);
+      const pl = new THREE.PointLight(0xd8e4dc, 11, 13, 2);
+      pl.position.set(bx, base + 2.5, bz + 0.4);
+      scene.add(pl);
+      lights.push(pl);
+      const cone = makeLightCone(0xd8e4dc, 0.045, 0.16, 1.7, 2.4);
+      cone.position.set(bx, base + 2.7, bz + 0.4);
+      scene.add(cone);
+      // 垃圾桶 + 压扁的纸杯
+      B.add(GEO.cyl, M.ironDark, bx + 3.2, base + 0.42, bz + 0.8, 0, 0.32, 0.85, 0.32);
+      circle(bx + 3.2, bz + 0.8, 0.3, base + 0.9, { noSightBlock: true });
+      // 出生点：站台上，面朝牌坊
+      locations.spawn = { x: 60.5, z: 2.2, yaw: 1.44 };
+    }
+
+    // —— 末班车（开场演出：把你放下，然后掉头回县城）——
+    {
+      const bus = new THREE.Group();
+      const mkBox = (mat, x, y, z, sx, sy, sz) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
+        m.position.set(x, y, z);
+        bus.add(m);
+        return m;
+      };
+      mkBox(M.plaster, 0, 1.5, 0, 8.4, 1.7, 2.3);                    // 车身
+      mkBox(M.ironDark, 0, 0.55, 0, 8.4, 0.55, 2.34);                // 裙边
+      mkBox(M.clothRed, 0, 1.05, 0, 8.42, 0.22, 2.36);               // 红腰线
+      mkBox(M.crtGlass, 0, 1.95, 0, 7.2, 0.62, 2.36);                // 窗带
+      mkBox(M.crtGlass, 4.16, 1.9, 0, 0.1, 0.8, 1.9);                // 前挡
+      for (const [wx, wz] of [[-2.9, -1.05], [2.9, -1.05], [-2.9, 1.05], [2.9, 1.05]]) {
+        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.3, 12), M.ironDark);
+        w.rotation.x = Math.PI / 2;
+        w.position.set(wx, 0.44, wz);
+        bus.add(w);
+      }
+      // 尾灯（朝西——离站时你只看得见这两点红）
+      const tl = new THREE.MeshBasicMaterial({ color: 0xff2a20 });
+      mkBox(tl, -4.22, 1.0, -0.85, 0.06, 0.16, 0.3);
+      mkBox(tl, -4.22, 1.0, 0.85, 0.06, 0.16, 0.3);
+      // 车尾线路牌
+      mkBox(plateMat('蚀湾 — 县城', { w: 256, h: 64, bg: '#1e2226', fg: '#e8e0c8', font: 0.42 }), -4.21, 1.95, 0, 0.05, 0.4, 1.4);
+      // 车内一盏昏黄的灯（跟着车走）
+      const inl = new THREE.PointLight(0xffe2b0, 5, 6, 2);
+      inl.position.set(0, 2.0, 0);
+      bus.add(inl);
+      bus.position.set(64.5, g(64.5, -1.3) + 0.06, -1.3);
+      scene.add(bus);
+      dynamic.bus = bus;
+      dynamic.busCollider = { minX: 64.5 - 4.4, maxX: 64.5 + 4.4, minZ: -1.3 - 1.3, maxZ: -1.3 + 1.3, maxY: g(64.5, -1.3) + 2.8 };
+      colliders.push(dynamic.busCollider);
+    }
+
+    // —— 镇口牌坊 + 栅门 + 岗亭 ——
+    {
+      const ax = 44, base = g(ax, 0);
+      // 石柱一对 + 楣枋 + 瓦顶
+      for (const pz of [-3.4, 3.4]) {
+        B.add(GEO.box, M.stone, ax, base + 2.3, pz, 0, 0.9, 4.6, 0.9);
+        aabb(ax, pz, 0.9, 0.9, base + 4.6);
+      }
+      B.add(GEO.box, M.stone, ax, base + 4.85, 0, 0, 1.0, 0.5, 7.6);
+      B.add(GEO.box, M.roof, ax, base + 5.35, 0, 0, 1.6, 0.3, 8.6);
+      B.add(GEO.box, plateMat('蚀 湾', { w: 224, h: 112, bg: '#2e3438', fg: '#d8cfb8', font: 0.5 }), ax - 0.52, base + 4.85, 0, 0, 0.06, 0.44, 1.7);
+      // 栅门（木栅横杆，夜里落闩；动态可开）
+      const gate = new THREE.Group();
+      for (const gy of [0.55, 1.05, 1.55]) {
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 5.9), M.woodDark);
+        bar.position.set(0, gy, -2.95);
+        gate.add(bar);
+      }
+      const diag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 3.2), M.woodDark);
+      diag.position.set(0, 1.05, -1.5);
+      diag.rotation.x = 0.35;
+      gate.add(diag);
+      gate.position.set(ax, base, 2.95);
+      scene.add(gate);
+      dynamic.townGate = gate;
+      dynamic.townGateCollider = { minX: ax - 0.3, maxX: ax + 0.3, minZ: -3.0, maxZ: 3.0, maxY: base + 2.0 };
+      colliders.push(dynamic.townGateCollider);
+      locations.townGate = new THREE.Vector3(ax, base + 1.1, 0);
+      // 岗亭（检票的岗位还有人守着）
+      const kx = 46.8, kz = 4.8, kb = g(kx, kz);
+      B.add(GEO.box, M.plaster, kx, kb + 1.35, kz, 0, 2.0, 2.7, 2.0);
+      B.add(GEO.box, M.roof, kx, kb + 2.85, kz, 0, 2.5, 0.16, 2.5);
+      // 西窗（朝栅门）：暗色内衬 + 玻璃 + 小台
+      B.add(GEO.box, M.ironDark, kx - 1.01, kb + 1.65, kz, 0, 0.06, 0.9, 1.1);
+      B.add(GEO.box, M.crtGlass, kx - 1.04, kb + 1.75, kz, 0, 0.04, 0.7, 1.0);
+      B.add(GEO.box, M.wood, kx - 1.16, kb + 1.18, kz, 0, 0.3, 0.06, 1.2);
+      aabb(kx, kz, 2.0, 2.0, kb + 2.9);
+      // 亭内一盏比外头都暖的灯——暖得不太对
+      const kl = new THREE.PointLight(0xffc880, 7, 8, 2);
+      kl.position.set(kx, kb + 2.2, kz);
+      scene.add(kl);
+      lights.push(kl);
+      B.add(GEO.box, plateMat('岗亭 · 外来车辆止步', { w: 320, h: 64, bg: '#c8bfa8', fg: '#4a3428', font: 0.34 }), kx - 1.02, kb + 2.35, kz, 0, 0.04, 0.3, 1.3);
+      locations.boothWindow = new THREE.Vector3(kx - 1.3, kb + 1.3, kz);
+      patrols.boothWork = [kx, kz];
+      // 木栅围栏（把牌坊两侧封住——进镇只此一门）
+      const fence = (z0, z1) => {
+        const n = Math.round(Math.abs(z1 - z0) / 2.2);
+        for (let i = 0; i <= n; i++) {
+          const z = z0 + (z1 - z0) * (i / n);
+          B.add(GEO.cyl, M.woodDark, ax, g(ax, z) + 0.75, z, 0, 0.09, 1.5, 0.09);
+        }
+        for (const ry of [0.45, 1.05]) {
+          const mid = (z0 + z1) / 2;
+          B.add(GEO.box, M.woodDark, ax, g(ax, mid) + ry, mid, 0, 0.07, 0.09, Math.abs(z1 - z0) + 0.2);
+        }
+        aabb(ax, (z0 + z1) / 2, 0.5, Math.abs(z1 - z0), g(ax, (z0 + z1) / 2) + 1.6, { noSightBlock: true });
+      };
+      fence(4.4, 21);
+      fence(-4.4, -21);
+      reefRock(44, 24.5, 1.7); reefRock(44.5, -24, 1.9); reefRock(45, -28, 1.3);
+      tree(43, 27, 1.1); tree(44, -31, 1.0);
+    }
+
+    // —— 告示墙（进镇第一眼：文书②规则告示）——
+    {
+      const nx = 41.6, nz = 3.6, base = g(nx, nz);
+      B.add(GEO.box, M.plaster, nx, base + 1.25, nz, 0.12, 3.2, 2.1, 0.3);
+      B.add(GEO.box, M.roof, nx, base + 2.42, nz, 0.12, 3.5, 0.18, 0.7);
+      aabb(nx, nz, 3.2, 0.4, base + 2.4);
+      B.add(GEO.box, plateMat('蚀湾镇人民政府 告示', { w: 384, h: 56, bg: '#8c1616', fg: '#f0d28c', font: 0.44 }), nx - 0.1, base + 2.1, nz - 0.17, 0.12, 1.9, 0.26, 0.04);
+      // 三张告示纸（其中一张可读=文书②）
+      for (const [ox, oy, rz2] of [[-0.95, 1.35, 0.05], [0.05, 1.3, -0.03], [0.95, 1.4, 0.08]]) {
+        const p = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.8), M.notice);
+        p.position.set(nx + ox, base + oy, nz - 0.18);
+        p.rotation.y = Math.PI + 0.12;
+        p.rotation.z = rz2;
+        scene.add(p);
+      }
+      locations.ruleBoard = new THREE.Vector3(nx, base + 1.3, nz - 0.4);
+    }
+
+    // —— 街灯（水泥杆 + 搪瓷罩钠灯）——
+    const lampPost = (x, z, lit = false) => {
+      const base = g(x, z);
+      B.add(GEO.cyl, M.stone, x, base + 2.3, z, 0, 0.11, 4.6, 0.14);
+      B.add(GEO.cyl, M.ironDark, x, base + 4.62, z, 0, 0.05, 0.7, 0.05, 0, 0.9);
+      B.add(GEO.cone, M.ironDark, x + 0.32, base + 4.78, z, 0, 0.3, 0.18, 0.3);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6),
+        new THREE.MeshStandardMaterial({ color: 0x554422, emissive: 0xffb45e, emissiveIntensity: lit ? 1.6 : 0.0 }));
+      bulb.position.set(x + 0.32, base + 4.66, z);
+      scene.add(bulb);
+      circle(x, z, 0.18, base + 4.6, { noSightBlock: true });
+      if (lit) {
+        const pl = new THREE.PointLight(0xffb45e, 13, 14, 2);
+        pl.position.set(x + 0.32, base + 4.4, z);
+        scene.add(pl);
+        lights.push(pl);
+        const cone = makeLightCone(0xffb45e, 0.05, 0.5, 2.0, 4.4);
+        cone.position.set(x + 0.32, base + 4.5, z);
+        scene.add(cone);
+      }
+    };
+    lampPost(48.5, -2.8, true);
+    lampPost(38, -3.6, false);
+    lampPost(30.5, 2.2, true);
+    lampPost(21, -4.6, false);
+    lampPost(13.5, -1.5, true);
+    lampPost(30, -24, false);  // 海洋馆岔路
+    lampPost(40, -38, true);   // 海洋馆门前
+
+    // —— 杂货铺（卷帘门落了一半，里头灯亮着）——
+    {
+      const sx = 35, sz = 6.2;
+      const s = house(sx, sz, 2, 5.6, 4.6, { plaster: true, empty: true, noDoor: true });
+      // 挑出的店招
+      B.add(GEO.box, plateMat('供销杂货', { w: 288, h: 80, bg: '#1e4a3a', fg: '#e8e0c8', font: 0.46 }), sx, s.base + 2.6, sz - 2.7, 0, 2.4, 0.55, 0.1);
+      // 半落的卷帘门（门洞上半截）
+      B.add(GEO.box, M.steel, sx, s.base + 1.95, sz - 2.35, 0, 1.3, 0.9, 0.08);
+      // 货架 ×2 + 柜台 + 冰柜
+      const sh = (lx, lz) => {
+        const p = s.local(lx, 0, lz);
+        B.add(GEO.box, M.wood, p.x, s.base + 1.2, p.z, 0, 1.8, 1.8, 0.4);
+        aabb(p.x, p.z, 1.8, 0.45, s.base + 2.2);
+        for (let i = 0; i < 6; i++) {
+          B.add(GEO.box, i % 2 ? M.clothRed : M.salt, p.x - 0.6 + (i % 3) * 0.6, s.base + 0.8 + Math.floor(i / 3) * 0.55, p.z, i, 0.28, 0.3, 0.24);
+        }
+      };
+      sh(-1.5, -1.2); sh(1.5, -1.2);
+      const cp = s.local(0.8, 0, 1.2);
+      B.add(GEO.box, M.woodDark, cp.x, s.base + 0.55, cp.z, 0, 2.0, 1.0, 0.7);
+      aabb(cp.x, cp.z, 2.0, 0.7, s.base + 1.05, { noSightBlock: true });
+      const ip = s.local(-1.6, 0, 1.3);
+      B.add(GEO.box, M.steel, ip.x, s.base + 0.55, ip.z, 0, 1.3, 1.0, 0.75);
+      aabb(ip.x, ip.z, 1.3, 0.75, s.base + 1.05, { noSightBlock: true });
+      // 店里的白炽灯
+      const sl = new THREE.PointLight(0xffd9a0, 8, 9, 2);
+      const lp2 = s.local(0, 2.1, -0.4);
+      sl.position.copy(lp2);
+      scene.add(sl);
+      lights.push(sl);
+      locations.grocery = s.local(0, 0.6, 0.5);
+    }
+
+    // —— 录像厅（通宵场：里头只有雪花在放）——
+    {
+      const vx = 24.5, vz = 4.2, base = g(vx, vz);
+      const w = 9, d = 7, h = 3.2, t = 0.35;
+      B.add(GEO.box, M.stone, vx, base + 0.12, vz, 0, w + 0.7, 0.5, d + 0.7);
+      B.add(GEO.box, M.wood, vx, base + 0.4, vz, 0, w - 0.3, 0.08, d - 0.3);
+      // 四墙（南墙留门洞 1.4）
+      B.add(GEO.box, M.plaster, vx, base + h / 2 + 0.3, vz + d / 2 - t / 2, 0, w, h, t);
+      aabb(vx, vz + d / 2 - t / 2, w, t, base + h + 0.3);
+      B.add(GEO.box, M.plaster, vx - w / 2 + t / 2, base + h / 2 + 0.3, vz, 0, t, h, d);
+      aabb(vx - w / 2 + t / 2, vz, t, d, base + h + 0.3);
+      B.add(GEO.box, M.plaster, vx + w / 2 - t / 2, base + h / 2 + 0.3, vz, 0, t, h, d);
+      aabb(vx + w / 2 - t / 2, vz, t, d, base + h + 0.3);
+      const segW = (w - 1.4) / 2;
+      B.add(GEO.box, M.plaster, vx - (0.7 + segW / 2), base + h / 2 + 0.3, vz - d / 2 + t / 2, 0, segW, h, t);
+      aabb(vx - (0.7 + segW / 2), vz - d / 2 + t / 2, segW, t, base + h + 0.3);
+      B.add(GEO.box, M.plaster, vx + (0.7 + segW / 2), base + h / 2 + 0.3, vz - d / 2 + t / 2, 0, segW, h, t);
+      aabb(vx + (0.7 + segW / 2), vz - d / 2 + t / 2, segW, t, base + h + 0.3);
+      B.add(GEO.box, M.plaster, vx, base + h + 0.05, vz - d / 2 + t / 2, 0, 1.6, 0.5, t);
+      B.add(GEO.box, M.roof, vx, base + h + 0.42, vz, 0, w + 0.9, 0.18, d + 0.9, 0, 0.04);
+      // 半开的门
+      B.add(GEO.box, M.woodDark, vx - 0.4, base + 1.3, vz - d / 2 + 0.25, 1.1, 0.9, 2.0, 0.06);
+      // 门脸灯箱 + 海报
+      B.add(GEO.box, plateMat('通宵录像', { w: 288, h: 88, bg: '#3a1a4a', fg: '#f0d28c', font: 0.46, emissive: 0.55 }), vx, base + h + 0.05, vz - d / 2 - 0.12, 0, 2.6, 0.6, 0.12);
+      for (const ox of [-2.8, 2.8]) {
+        const poster = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.0), M.notice);
+        poster.position.set(vx + ox, base + 1.6, vz - d / 2 - 0.02);
+        poster.rotation.y = Math.PI;
+        scene.add(poster);
+      }
+      // 长条凳四排（观众席——空的）
+      for (let r = 0; r < 4; r++) {
+        const bzr = vz - 1.6 + r * 1.1;
+        B.add(GEO.box, M.wood, vx - 0.5, base + 0.42, bzr, 0, 5.0, 0.09, 0.35);
+        B.add(GEO.box, M.woodDark, vx - 2.6, base + 0.21, bzr, 0, 0.3, 0.42, 0.3);
+        B.add(GEO.box, M.woodDark, vx + 1.6, base + 0.21, bzr, 0, 0.3, 0.42, 0.3);
+        aabb(vx - 0.5, bzr, 5.0, 0.4, base + 0.5, { noSightBlock: true });
+      }
+      // 大屏电视墙（雪花永远在放；没人看，也没人关）
+      B.add(GEO.box, M.crtShell, vx + 3.6, base + 1.5, vz + 1.0, 0, 0.9, 1.4, 1.2);
+      const sscreen = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.75),
+        new THREE.MeshBasicMaterial({ color: 0x9aa4a8 }));
+      sscreen.position.set(vx + 3.14, base + 1.6, vz + 1.0);
+      sscreen.rotation.y = -Math.PI / 2;
+      scene.add(sscreen);
+      dynamic.staticScreens = dynamic.staticScreens ?? [];
+      dynamic.staticScreens.push(sscreen);
+      aabb(vx + 3.6, vz + 1.0, 0.95, 1.25, base + 2.3);
+      // 屏幕的灰蓝光（真实光）
+      const vl = new THREE.PointLight(0x9fb4c0, 7, 9, 2);
+      vl.position.set(vx + 2.6, base + 1.7, vz + 1.0);
+      scene.add(vl);
+      lights.push(vl);
+      locations.videoHall = new THREE.Vector3(vx, base + 0.8, vz);
+      dynamic.videoHallRect = { minX: vx - w / 2, maxX: vx + w / 2, minZ: vz - d / 2, maxZ: vz + d / 2 };
+    }
+
+    // —— 电话亭（磁卡机；路过时它会响一次）——
+    {
+      const px = 29, pz = -6.5, base = g(px, pz);
+      for (const [ox, oz] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) {
+        B.add(GEO.box, M.ironDark, px + ox, base + 1.25, pz + oz, 0, 0.09, 2.5, 0.09);
+      }
+      B.add(GEO.box, M.ironDark, px, base + 2.55, pz, 0, 1.3, 0.14, 1.3);
+      B.add(GEO.box, plateMat('磁卡电话', { w: 224, h: 56, bg: '#1e4a3a', fg: '#e8e0c8', font: 0.44 }), px, base + 2.36, pz - 0.56, 0, 1.05, 0.24, 0.05);
+      // 水泥基座 + 下裙板（铁皮）——不然远看像浮空的玻璃箱
+      B.add(GEO.box, M.slab, px, base + 0.05, pz, 0, 1.45, 0.14, 1.45);
+      B.add(GEO.box, M.ironDark, px, base + 0.55, pz + 0.56, 0, 1.05, 0.86, 0.05);
+      B.add(GEO.box, M.ironDark, px - 0.56, base + 0.55, pz, 0, 0.05, 0.86, 1.05);
+      B.add(GEO.box, M.ironDark, px + 0.56, base + 0.55, pz, 0, 0.05, 0.86, 1.05);
+      // 三面玻璃（北面开门）
+      B.add(GEO.box, M.crtGlass, px, base + 1.6, pz + 0.53, 0, 1.0, 1.7, 0.05);
+      B.add(GEO.box, M.crtGlass, px - 0.53, base + 1.6, pz, 0, 0.05, 1.7, 1.0);
+      B.add(GEO.box, M.crtGlass, px + 0.53, base + 1.6, pz, 0, 0.05, 1.7, 1.0);
+      aabb(px, pz + 0.53, 1.1, 0.15, base + 2.5, { noSightBlock: true });
+      aabb(px - 0.53, pz, 0.15, 1.1, base + 2.5, { noSightBlock: true });
+      aabb(px + 0.53, pz, 0.15, 1.1, base + 2.5, { noSightBlock: true });
+      // 话机 + 搁板
+      B.add(GEO.box, M.steel, px, base + 1.3, pz + 0.35, 0, 0.5, 0.4, 0.18);
+      B.add(GEO.box, M.ironDark, px, base + 1.42, pz + 0.32, 0, 0.3, 0.12, 0.1);
+      // 亭内顶灯
+      const pl = new THREE.PointLight(0xdfe8d8, 5, 6, 2);
+      pl.position.set(px, base + 2.3, pz);
+      scene.add(pl);
+      lights.push(pl);
+      locations.phoneBooth = new THREE.Vector3(px, base + 1.3, pz - 0.7);
+    }
+
+    // —— 十字街心路牌 ——
+    {
+      const px = 10.5, pz = -4.5, base = g(px, pz);
+      B.add(GEO.cyl, M.woodDark, px, base + 1.5, pz, 0, 0.1, 3.0, 0.1);
+      circle(px, pz, 0.16, base + 3.0, { noSightBlock: true });
+      const arrow = (txt, y, ry) => {
+        B.add(GEO.box, plateMat(txt, { w: 288, h: 56, bg: '#2e3438', fg: '#d8cfb8', font: 0.42 }), px + Math.sin(ry) * 0.5, base + y, pz + Math.cos(ry) * 0.5, ry, 1.1, 0.24, 0.05);
+      };
+      arrow('← 镇口车站', 2.7, Math.PI / 2);
+      arrow('南方大酒店 →', 2.4, 0.1);
+      arrow('海洋馆 →', 2.1, -0.7);
+      arrow('堤门 · 滩涂 →', 1.8, Math.PI);
+      arrow('家属区 →', 1.5, -Math.PI / 2);
+    }
+
+    // —— 家属楼（水产公司旧宿舍：一栋筒子楼，只有一扇窗亮）——
+    {
+      const dx = -37, dz = 25, base = g(dx, dz);
+      const W = 16, D = 5.2, FH = 2.7;
+      // 主体
+      B.add(GEO.box, M.plaster, dx, base + FH * 1.5 + 0.3, dz + 1.2, 0, W, FH * 3, D);
+      aabb(dx, dz + 1.2, W, D, base + FH * 3 + 0.3);
+      B.add(GEO.box, M.roof, dx, base + FH * 3 + 0.42, dz + 1.2, 0, W + 0.8, 0.2, D + 0.8);
+      // 南向外廊（三层）+ 栏杆
+      for (let f = 0; f < 3; f++) {
+        const fy = base + 0.3 + f * FH;
+        B.add(GEO.box, M.stone, dx, fy + (f === 0 ? -0.08 : 0.0), dz - 1.9, 0, W, 0.18, 1.6);
+        if (f === 0) addPatch(dx, dz - 1.9, 0, W, 1.6, fy + 0.1, fy + 0.1);
+        if (f > 0) {
+          for (let i = 0; i <= 16; i++) {
+            B.add(GEO.cyl, M.ironDark, dx - W / 2 + i * (W / 16), fy + 0.5, dz - 2.6, 0, 0.04, 0.9, 0.04);
+          }
+          B.add(GEO.box, M.ironDark, dx, fy + 0.95, dz - 2.6, 0, W, 0.06, 0.06);
+        }
+        // 每层五个门窗洞（暗色内衬）
+        for (let i = 0; i < 5; i++) {
+          const wx = dx - W / 2 + 1.8 + i * 3.1;
+          B.add(GEO.box, M.ironDark, wx, fy + 1.45, dz - 1.35, 0, 0.9, 1.9, 0.1);
+          B.add(GEO.box, M.woodDark, wx - 0.52, fy + 1.45, dz - 1.32, 0, 0.09, 1.95, 0.12);
+          B.add(GEO.box, M.woodDark, wx + 0.52, fy + 1.45, dz - 1.32, 0, 0.09, 1.95, 0.12);
+        }
+      }
+      // 只有 2F 中间那扇窗亮着——灯后头没有人影
+      const litW = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.1),
+        new THREE.MeshBasicMaterial({ color: 0xffd9a0 }));
+      litW.position.set(dx + 0.3, base + 0.3 + FH + 1.5, dz - 1.28);
+      litW.rotation.y = Math.PI;
+      scene.add(litW);
+      const dl = new THREE.PointLight(0xffd9a0, 8, 10, 2);
+      dl.position.set(dx + 0.3, base + 0.3 + FH + 1.4, dz - 2.4);
+      scene.add(dl);
+      lights.push(dl);
+      // 楼道口（东端）楼梯剪影
+      B.add(GEO.box, M.stone, dx + W / 2 - 0.8, base + 1.0, dz - 1.6, 0, 1.4, 1.8, 0.14, 0, 0.5);
+      // 晾衣绳 + 挂着的旧衣（夜里没人收）
+      for (const [ox, oz] of [[-4, -5.5], [2, -6.5]]) {
+        B.add(GEO.cyl, M.woodDark, dx + ox - 2.2, base + 1.25, dz + oz, 0, 0.07, 2.5, 0.07);
+        B.add(GEO.cyl, M.woodDark, dx + ox + 2.2, base + 1.25, dz + oz, 0, 0.07, 2.5, 0.07);
+        B.add(GEO.box, M.ironDark, dx + ox, base + 2.35, dz + oz, 0, 4.4, 0.03, 0.03);
+        for (let i = 0; i < 3; i++) {
+          const c = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.8), i % 2 ? M.clothGrey : M.clothShirt);
+          c.position.set(dx + ox - 1.2 + i * 1.2, base + 1.92, dz + oz);
+          scene.add(c);
+        }
+      }
+      // 公用水龙头 + 煤球堆 + 自行车两辆
+      B.add(GEO.cyl, M.stone, dx - 6, base + 0.3, dz - 5, 0, 0.5, 0.6, 0.5);
+      B.add(GEO.cyl, M.ironDark, dx - 6, base + 0.75, dz - 5, 0, 0.05, 0.4, 0.05);
+      for (let i = 0; i < 8; i++) {
+        B.add(GEO.cyl, M.ironDark, dx + 6.5 + (i % 4) * 0.28, base + 0.1 + Math.floor(i / 4) * 0.18, dz - 4.5 + (i % 2) * 0.24, 0, 0.11, 0.18, 0.11);
+      }
+      for (const ox of [3.5, 4.4]) {
+        const bx2 = dx + ox, bz2 = dz - 3.4;
+        for (const wz of [-0.5, 0.5]) {
+          const wl = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.03, 6, 14), M.ironDark);
+          wl.position.set(bx2, base + 0.34, bz2 + wz);
+          wl.rotation.y = Math.PI / 2 + 0.15;
+          scene.add(wl);
+        }
+        B.add(GEO.box, M.ironDark, bx2, base + 0.62, bz2, 0.15, 0.05, 0.06, 1.1, 0, 0.25);
+      }
+      locations.dorm = new THREE.Vector3(dx, base + 0.8, dz - 3);
+    }
+  }
+
   // ================= ③ 镇中心 · 市场 · 广播站 =================
   {
     // 民居
     house(-14, 14, 1, 5.4, 4.4, { plaster: true });
     house(10, 16, 0, 5.0, 4.2, { plaster: true });
     house(-24, -6, 1, 4.8, 4.0, { plaster: true });
-    const v4 = house(24, 0, 3, 5.2, 4.2, { plaster: true });
     house(6, -26, 2, 5.6, 4.4, { plaster: true });
     house(-10, -30, 0, 4.6, 3.8);
-    locations.note_v4 = v4.local(-1.2, 0.85, -0.8);
     // 水井
     const wb = g(2, 2);
     B.add(GEO.cyl, M.stone, 2, wb + 0.45, 2, 0, 1.7, 0.9, 1.7);
@@ -983,6 +1424,10 @@ export function buildTown(scene, M) {
   const zones = {
     beach: { minX: 52, maxX: 110, minZ: 88, maxZ: 138 },
     dikeArea: { minX: -26, maxX: 60, minZ: 40, maxZ: 86 },
+    busStation: { minX: 50, maxX: 74, minZ: -8, maxZ: 12 },
+    frontStreet: { minX: 14, maxX: 46, minZ: -10, maxZ: 10 },
+    dormArea: { minX: -48, maxX: -26, minZ: 14, maxZ: 34 },
+    aquaMain: dynamic.aquaMainRect,
     villageCenter: { minX: -30, maxX: 40, minZ: -36, maxZ: 38 },
     saltField: { minX: -58, maxX: -26, minZ: -8, maxZ: 18 },
     temple: { minX: -78, maxX: -50, minZ: -88, maxZ: -60 },
@@ -1012,9 +1457,14 @@ export function buildTown(scene, M) {
     colliders, bounds, heightAt, locations, patrols, dynamic, zones, lights, surfaceAt,
     waterLevelRef: { value: 0 },
     waterLevel() { return this.waterLevelRef.value; },
-    /** 每帧特效更新（烟柱 + 灯火呼吸 + 酒店荧光频闪） */
+    /** 每帧特效更新（烟柱 + 灯火呼吸 + 酒店荧光频闪 + 录像厅雪花屏） */
     updateFx(time) {
       for (const s of smokes) s.update(time);
+      // 雪花屏：灰度乱跳（录像厅通宵场——放的是没有信号）
+      for (const s of dynamic.staticScreens ?? []) {
+        const v = 0.45 + Math.random() * 0.45;
+        s.material.color.setRGB(v * 0.92, v, v * 1.02);
+      }
       // 灯笼/烛火不是恒亮的——火苗在风里咽气又缓过来
       for (let i = 0; i < lights.length; i++) {
         const pl = lights[i];

@@ -10,7 +10,7 @@ import { GEO } from './batcher.js';
 
 // 门牌/标牌小贴图（按文本缓存）
 const _plateCache = new Map();
-function plateMat(text, { w = 128, h = 64, bg = '#3a2c22', fg = '#d8cfb8', font = 0.5, emissive = 0 } = {}) {
+export function plateMat(text, { w = 128, h = 64, bg = '#3a2c22', fg = '#d8cfb8', font = 0.5, emissive = 0 } = {}) {
   const key = `${text}|${bg}|${fg}|${w}x${h}|${emissive}`;
   if (_plateCache.has(key)) return _plateCache.get(key);
   const c = document.createElement('canvas');
@@ -577,8 +577,16 @@ export function buildHotel(ctx) {
     // 走廊冷荧光
     for (const px of [-5, 0.5, 6]) box(M.fluorescent, px, F2 - 0.06, -9.5, 1.4, 0.05, 0.14);
     addLight(0xdfe8d8, 9, 11, 0.5, F2 - 0.9, -9.5, 0.8);
-    // 员工告示
+    // 员工告示 + 员工须知（文书⑤：空托盘规则）
     box(plateMat('今晚喜宴 全员留守', { w: 256, h: 96, bg: '#c8bfa8', fg: '#4a3428', font: 0.36 }), -1.5, 1.6, -8.16, 0.9, 0.4, 0.04);
+    {
+      const memo = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.66), M.notice);
+      memo.position.copy(world(-2.6, 1.45, -8.17));
+      memo.rotation.y = Math.PI;
+      memo.rotation.z = 0.04;
+      scene.add(memo);
+      locations.staffNotice = world(-2.6, 1.4, -8.4);
+    }
     // 经理室(西)：桌+柜+文书
     box(M.veneer, -5.5, 0.4, -4, 1.6, 0.8, 0.8);
     box(M.veneer, -7.5, 1.1, -2.5, 0.5, 2.2, 1.6);
@@ -696,7 +704,7 @@ export function buildHotel(ctx) {
       [[0.5, 1.6, -9.5], [-6, 1.2, -9.5]],// 服务走廊
       [[13.75, 1.8, 1.5], [13.75, 3.2, -0.5]], // 楼梯间
       [[22, 1.6, 9.5], [30, 1.2, 6]],     // 海洋馆连廊
-      [[-12.5, F2 + 1.6, 7], [-12.5, F2 + 1.2, 4.5]], // 布草间(坏)
+      [[48, 2.2, 9.2], [45, 2.6, 4]],     // 海洋馆主展厅(巨骸)
       [[0, 1.6, 5.5], [0, 1.4, 9.5]],     // 大堂反角
     ];
     for (let i = 0; i < 9; i++) {
@@ -879,7 +887,9 @@ export function buildHotel(ctx) {
     addPatch(hx + 33, hz + 4, 0, 11.9, 13.9, hb, hb);
     wallX(TILE, 27, 39, 11, 0, 4.6, [{ from: 31, to: 35, top: 3.2, sill: 0.8 }]);
     wallX(TILE, 27, 39, -3, 0, 4.6);
-    wallZ(TILE, -3, 11, 39, 0, 4.6);
+    // 东墙开洞——通往主展厅（巨物残骸）
+    wallZ(TILE, -3, 11, 39, 0, 4.6, [{ from: 3, to: 6, top: 2.8 }]);
+    box(plateMat('→ 主展厅', { w: 224, h: 72, bg: '#12303a', fg: '#9fd8e8', font: 0.42, emissive: 0.55 }), 38.8, 2.9, 4.5, 0.05, 0.4, 1.5);
     wallZ(TILE, -3, 8.6, 27, 0, 4.6, [{ from: 2, to: 4, top: 2.4, sill: 1.1 }]);
     slabRect(27, -3, 39, 11, 4.6, null, { walk: false });
     // 大门脸招牌
@@ -916,7 +926,6 @@ export function buildHotel(ctx) {
     box(M.veneer, 38, 1.1, -1.5, 0.6, 2.2, 1.6);
     colliders.push({ minX: hx + 37.7, maxX: hx + 38.3, minZ: hz - 2.3, maxZ: hz - 0.7, minY: hb, maxY: hb + 2.2 });
     box(M.veneer, 37, 0.4, 0.5, 1.2, 0.8, 0.7);
-    locations.tapeCabinet = world(38, 1.2, -1.2);
     locations.aquaOffice = world(37.5, 0.6, 0.2);
     crt('aqua', 37, 0.95, 0.5, Math.PI, 0.8, [33, 1.5, 6], [33, 1.1, 0]);
     addLight(0xffc880, 4, 6, 37.5, 2.2, 0, 0.4);
@@ -925,10 +934,156 @@ export function buildHotel(ctx) {
     locations.aquaHall = world(33, 0.6, 5);
   }
 
+  // ================= 海洋馆 · 主展厅（巨物残骸） =================
+  // 干燥的展厅——排水三年，主展缸的水从来没满过。缸底那具东西是 1998 年
+  // 填湾工地挖出来的：房间尺度的肋骨，空的眼眶，标本牌上只写「未定种」。
+  {
+    const H = 7;                     // 展厅比售票厅高一档
+    // 台基 + 地面
+    box(M.terrazzo, 48, -0.65, 4, 18.6, 1.35, 15);
+    addPatch(hx + 48, hz + 4, 0, 18, 14, hb, hb);
+    box(M.terrazzo, 48, 0.02, 4, 17.9, 0.05, 13.9);
+    // 外墙（北墙开公众入口 x 45..49；东墙高窗；售票厅共享墙的上带）
+    wallX(TILE, 39, 57, 11, 0, H, [{ from: 45, to: 49, top: 3.2 }]);
+    wallX(TILE, 39, 57, -3, 0, H);
+    wallZ(TILE, -3, 11, 57, 0, H, [
+      { from: 1, to: 3, top: 6.1, sill: 4.9 }, { from: 6, to: 8, top: 6.1, sill: 4.9 },
+    ]);
+    wallZ(TILE, -3, 11, 39, 4.6, H);
+    slabRect(39, -3, 57, 11, H, null, { walk: false });
+    // 公众入口：台阶 + 双开门(一扇虚掩) + 门脸招牌
+    {
+      const gN = ctx.heightGround(hx + 47, hz + 14.5);
+      stairs(47, 14.2, gN - hb, 47, 11.4, 0, 5.2, M.terrazzo);
+      box(M.veneer, 45.7, 1.25, 11.05, 1.3, 2.5, 0.08);
+      colliders.push({ minX: hx + 45.05, maxX: hx + 46.35, minZ: hz + 10.95, maxZ: hz + 11.15, minY: hb, maxY: hb + 2.5 });
+      box(M.veneer, 48.6, 1.25, 11.5, 1.3, 2.5, 0.08, 0.8); // 虚掩的一扇
+      box(M.signAqua, 47, 4.1, 11.25, 6.8, 1.2, 0.2);
+      box(plateMat('主展厅', { w: 224, h: 96, bg: '#12303a', fg: '#cfe0e0', font: 0.44, emissive: 0.4 }), 47, 2.9, 11.22, 2.0, 0.6, 0.1);
+      box(plateMat('闭馆整修 · 谢绝参观', { w: 320, h: 72, bg: '#c8bfa8', fg: '#7a2020', font: 0.32 }), 45.7, 1.7, 11.14, 1.1, 0.34, 0.03);
+    }
+    // —— 残骸台座（干涸的主展缸缸底，垫高的沉积床） ——
+    box(M.sediment, 48, 0.28, 4, 12.5, 0.52, 6.4);
+    // 围索立柱 + 索线（挡人不挡视线：侦察/绕行只能沿外圈）
+    {
+      const posts = [];
+      for (const px of [42, 45, 48, 51, 54]) { posts.push([px, 0.35]); posts.push([px, 7.65]); }
+      posts.push([41.2, 4], [54.8, 4]);
+      for (const [px, pz] of posts) {
+        cyl(M.brass, px, 0.5, pz, 0.05, 1.0, 0.05);
+        B.add(GEO.sphere, M.brass, hx + px, hb + 1.02, hz + pz, 0, 0.06, 0.06, 0.06);
+      }
+      box(M.ironDark, 48, 0.92, 0.35, 12.8, 0.03, 0.03);
+      box(M.ironDark, 48, 0.92, 7.65, 12.8, 0.03, 0.03);
+      box(M.ironDark, 41.2, 0.92, 4, 0.03, 0.03, 7.3, Math.PI / 2);
+      box(M.ironDark, 54.8, 0.92, 4, 0.03, 0.03, 7.3, Math.PI / 2);
+      colliders.push({ minX: hx + 41.2, maxX: hx + 54.8, minZ: hz + 0.25, maxZ: hz + 0.45, minY: hb, maxY: hb + 1.0, noSightBlock: true });
+      colliders.push({ minX: hx + 41.2, maxX: hx + 54.8, minZ: hz + 7.55, maxZ: hz + 7.75, minY: hb, maxY: hb + 1.0, noSightBlock: true });
+      colliders.push({ minX: hx + 41.1, maxX: hx + 41.3, minZ: hz + 0.25, maxZ: hz + 7.75, minY: hb, maxY: hb + 1.0, noSightBlock: true });
+      colliders.push({ minX: hx + 54.7, maxX: hx + 54.9, minZ: hz + 0.25, maxZ: hz + 7.75, minY: hb, maxY: hb + 1.0, noSightBlock: true });
+    }
+    // —— 脊柱（12 节椎骨，弓起 3.2m）+ 棘突 ——
+    const spineY = (t) => 1.4 + Math.sin(t * Math.PI) * 1.75;
+    for (let i = 0; i < 12; i++) {
+      const t = i / 11;
+      const lx = 42.4 + t * 11.2;
+      const y = spineY(t);
+      const r = 0.42 - Math.abs(t - 0.45) * 0.3;
+      cyl(M.bone, lx, y, 4, r * 2, 0.62, r * 2, 0, 0, Math.PI / 2);
+      box(M.bone, lx, y + r + 0.28, 4, 0.16, 0.6, 0.1, 0, 0, (t - 0.5) * 0.5);
+    }
+    // —— 肋骨（房间尺度的拱，半埋进沉积床） ——
+    const ribGeoBig = new THREE.TorusGeometry(1, 0.13, 8, 20, Math.PI);
+    for (let i = 0; i < 6; i++) {
+      const t = 0.12 + i * 0.15;
+      const lx = 42.4 + t * 11.2;
+      const s = 1.6 + Math.sin(t * Math.PI) * 1.7;
+      B.add(ribGeoBig, M.bone, hx + lx, hb + 0.5, hz + 4, Math.PI / 2, s, s, s, 0, 0);
+      // 肋骨端点埋进床里的碎骨
+      B.add(GEO.sphere, M.bone, hx + lx, hb + 0.55, hz + 4 - s, 0, 0.2, 0.14, 0.2);
+      B.add(GEO.sphere, M.bone, hx + lx, hb + 0.55, hz + 4 + s, 0, 0.2, 0.14, 0.2);
+    }
+    // —— 头骨（西端，眼眶正对售票厅来客） ——
+    {
+      const sx = 41.3, sy = 1.35, sz = 4;
+      B.add(GEO.sphere, M.bone, hx + sx, hb + sy, hz + sz, 0.15, 1.55, 1.1, 1.25, 0, 0.1);
+      // 吻部（前伸收窄）
+      box(M.bone, sx - 1.5, sy - 0.25, sz + 0.1, 1.8, 0.62, 0.8, 0.15, 0, -0.08);
+      box(M.bone, sx - 2.5, sy - 0.42, sz + 0.16, 1.2, 0.4, 0.55, 0.2);
+      // 下颌（半开，垂进沉积里）
+      box(M.bone, sx - 1.6, sy - 0.85, sz + 0.1, 2.0, 0.24, 0.6, 0.15, 0, 0.22);
+      // 空眼眶 ×2——干的，黑的
+      const socket = new THREE.MeshStandardMaterial({ color: 0x0a0b0d, roughness: 1 });
+      B.add(GEO.sphere, socket, hx + sx - 0.55, hb + sy + 0.42, hz + sz - 0.72, 0, 0.34, 0.3, 0.2);
+      B.add(GEO.sphere, socket, hx + sx - 0.5, hb + sy + 0.48, hz + sz + 0.78, 0, 0.3, 0.26, 0.18);
+      colliders.push({ x: hx + sx, z: hz + sz, r: 1.2, maxY: hb + 2.2 });
+    }
+    // 缆绳固定（从屋面垂下吊着脊柱——像怕它自己走了）
+    for (const [lx, ly] of [[44.5, spineY(0.19)], [48.4, spineY(0.54)], [52.2, spineY(0.87)]]) {
+      cyl(M.ironDark, lx, (H - 0.2 + ly) / 2, 4, 0.025, H - 0.2 - ly, 0.025, 0, 0.06, 0.04);
+    }
+    // 标本牌（缆绳挂的铁牌 + 立牌）
+    cyl(M.ironDark, 44.5, 0.7, 8.6, 0.04, 1.4, 0.04);
+    box(plateMat('未定种', { w: 192, h: 96, bg: '#20262a', fg: '#c8d4d8', font: 0.42 }), 44.5, 1.5, 8.6, 0.9, 0.5, 0.05);
+    box(plateMat('一九九八 · 填湾工地出土', { w: 384, h: 64, bg: '#20262a', fg: '#8a949a', font: 0.34 }), 44.5, 1.12, 8.6, 1.1, 0.24, 0.04);
+    locations.specimenPlate = world(44.5, 1.3, 8.6);
+    // 展柜（北墙下两座玻璃柜：碎骨、盐结核）
+    for (const [cxl, label] of [[41.5, '肋骨残段'], [52.8, '盐结核']]) {
+      box(M.veneer, cxl, 0.5, 9.6, 1.8, 1.0, 1.0);
+      box(M.aquaGlass, cxl, 1.35, 9.6, 1.7, 0.7, 0.9);
+      colliders.push({ minX: hx + cxl - 0.9, maxX: hx + cxl + 0.9, minZ: hz + 9.1, maxZ: hz + 10.1, minY: hb, maxY: hb + 1.75, noSightBlock: true });
+      B.add(GEO.sphere, M.bone, hx + cxl - 0.3, hb + 1.15, hz + 9.6, 0.4, 0.3, 0.14, 0.16);
+      B.add(GEO.box, M.bone, hx + cxl + 0.3, hb + 1.12, hz + 9.6, 0.9, 0.5, 0.1, 0.16);
+      box(plateMat(label, { w: 160, h: 56, bg: '#20262a', fg: '#8a949a', font: 0.4 }), cxl, 0.82, 10.12, 0.7, 0.22, 0.03);
+    }
+    // 南墙高柜两组（实体遮挡——绕行掩体）
+    for (const cxl of [42, 46.5]) {
+      box(M.veneer, cxl, 1.1, -2.3, 2.6, 2.2, 0.9);
+      colliders.push({ minX: hx + cxl - 1.3, maxX: hx + cxl + 1.3, minZ: hz - 2.75, maxZ: hz - 1.85, minY: hb, maxY: hb + 2.2 });
+    }
+    // 灯：两支高位惨白荧光 + 头骨旁一盏检视灯（干燥、无蓝滤）
+    for (const lxl of [43.5, 52.5]) {
+      box(M.fluorescent, lxl, H - 0.4, 4, 1.6, 0.06, 0.16);
+    }
+    addLight(0xd8e4dc, 9, 15, 43.5, H - 1.2, 4, 0.5);
+    addLight(0xd8e4dc, 8, 14, 52.5, H - 1.2, 4, 0.25);
+    box(M.tungsten, 40.3, 2.3, 6.2, 0.18, 0.5, 0.18);
+    addLight(0xffc880, 6, 8, 40.5, 2.5, 6.0, 0.1);
+    locations.aquaMainHall = world(48, 0.6, 4);
+
+    // —— 处理间（东南角）：骨要一根根刷。母带的铁柜也在这儿。 ——
+    wallX(PLA, 50, 57, 1, 0, 2.8, [{ from: 51, to: 52.2, top: 2.05 }]);
+    wallZ(PLA, -3, 1, 50, 0, 2.8);
+    slabRect(50, -3, 57, 1, 2.8, null, { walk: false });
+    box(plateMat('处理间', { w: 160, h: 64, bg: '#3a3a3a', fg: '#d8d0b8', font: 0.44 }), 51.6, 2.35, 1.08, 0.8, 0.32, 0.05);
+    // 不锈钢理骨台 + 未理完的骨
+    box(M.steel, 54.5, 0.45, -1.6, 2.6, 0.9, 1.0);
+    colliders.push({ minX: hx + 53.2, maxX: hx + 55.8, minZ: hz - 2.1, maxZ: hz - 1.1, minY: hb, maxY: hb + 0.95, noSightBlock: true });
+    for (let i = 0; i < 4; i++) B.add(GEO.box, M.bone, hx + 53.6 + i * 0.55, hb + 0.98, hz - 1.6, i * 0.8, 0.5, 0.09, 0.14);
+    // 水槽 + 皂
+    box(M.steel, 51, 0.5, -2.4, 1.2, 1.0, 0.8);
+    colliders.push({ minX: hx + 50.4, maxX: hx + 51.6, minZ: hz - 2.8, maxZ: hz - 2.0, minY: hb, maxY: hb + 1.0, noSightBlock: true });
+    // 挂钩上的胶皮围裙（空的三副）
+    for (let i = 0; i < 3; i++) {
+      box(M.ironDark, 52.4 + i * 1.1, 2.3, 0.9, 0.04, 0.3, 0.04);
+      box(M.rubber, 52.4 + i * 1.1, 1.7, 0.86, 0.5, 1.1, 0.06, 0, 0, (i - 1) * 0.05);
+    }
+    // 母带铁柜（东墙下）——挂牌「西馆·铁柜」
+    box(M.ironDark, 56.4, 1.0, -0.6, 0.9, 1.7, 0.5);
+    colliders.push({ minX: hx + 55.9, maxX: hx + 56.9, minZ: hz - 0.85, maxZ: hz - 0.35, minY: hb, maxY: hb + 1.75 });
+    box(plateMat('西馆 · 铁柜', { w: 192, h: 64, bg: '#4a4438', fg: '#d8cfb8', font: 0.4 }), 55.9, 1.5, -0.6, 0.04, 0.3, 0.7);
+    locations.tapeCabinet = world(55.8, 1.1, -0.6);
+    addLight(0xffc880, 4, 6, 53.5, 2.4, -1, 0.35);
+    locations.processing = world(53.5, 0.6, -1);
+  }
+
   // ================= 巡逻/工位 =================
   patrols.waiterBanquet = [[-14.5, -6.8], [-10.5, -6.8], [-9.2, 2.8], [-13.5, 2.8], [-15.6, -2]].map(([x, z]) => [hx + x, hz + z]);
   patrols.waiterLobby = [[3, -9.5], [-6, -9.5], [-6.5, -3], [-4.5, 1.8], [4.5, 3.5], [6.8, 8.5], [0, 9.6]].map(([x, z]) => [hx + x, hz + z]);
   patrols.waiterEast = [[9.5, 1.5], [9.5, 9.6], [22, 9.8], [30.5, 5.5], [33, 1]].map(([x, z]) => [hx + x, hz + z]);
+  // 理骨员：绕残骸台座一圈，末了在处理间门口停一拍
+  patrols.osteoHall = [[43, 8.6], [52.5, 8.6], [55.5, 3.2], [51.6, 0.4], [43.5, -0.8], [40.6, 3.4]].map(([x, z]) => [hx + x, hz + z]);
+  patrols.osteoWork = [hx + 42.6, hz + 0.6]; // 理骨工位(南柜与围索之间)
   patrols.security2F = [[12.5, -7], [9, -4.5], [-1, -8.6], [-12, -8.6], [-1, -8.6], [9, -4.5]].map(([x, z]) => [hx + x, hz + z]);
   patrols.matron3F = [[-11.5, 1.5], [7, 1.5], [1, 1.5], [-9.9, 0.8]].map(([x, z]) => [hx + x, hz + z]);
   patrols.emceeStage = [hx - 12.5, hz - 8.6];
@@ -944,8 +1099,10 @@ export function buildHotel(ctx) {
     lobbyRect: { minX: hx - 8, maxX: hx + 8, minZ: hz + 0, maxZ: hz + 11 },
     banquetRect: { minX: hx - 17, maxX: hx - 8, minZ: hz - 11, maxZ: hz + 11 },
     footprint: { minX: hx - 17.4, maxX: hx + 17.4, minZ: hz - 11.4, maxZ: hz + 11.4 },
-    annexRect: { minX: hx + 17, maxX: hx + 39.4, minZ: hz - 3.4, maxZ: hz + 11.4 },
+    annexRect: { minX: hx + 17, maxX: hx + 57.4, minZ: hz - 3.4, maxZ: hz + 11.4 },
   };
+  // 主展厅矩形（叙事触发/室内判定用）
+  dynamic.aquaMainRect = { minX: hx + 39, maxX: hx + 57, minZ: hz - 3, maxZ: hz + 11 };
   // 地面材质区（脚步声/减振）：红毯吃振动，瓷砖传远，舞台木板
   dynamic.dampRects = [
     dynamic.lobbyCarpetRect,

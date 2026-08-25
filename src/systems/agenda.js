@@ -56,6 +56,8 @@ export class Agenda {
         // 司仪广播：全镇喇叭同步
         this.g.audio.broadcast?.();
         this.g.hud.subtitle(st.line, 6, 'radio');
+        // 规则一判定窗口：广播在响的这几秒里，不许看向海的方向
+        this.g.story?.onBroadcast?.(8);
         this.onStage?.(this.stage, false);
       }
     }

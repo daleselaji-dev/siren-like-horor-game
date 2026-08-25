@@ -115,6 +115,12 @@ export function buildMaterials(lowspec = false) {
     map: T.signAqua, emissive: 0x9fd8e8, emissiveMap: T.signAqua, emissiveIntensity: 0.7, roughness: 0.6,
   });
   M.mural = new THREE.MeshStandardMaterial({ map: T.mural, roughness: 0.85 });
+  // 镇口公路沥青（2001 年的县道：补丁摞补丁）
+  M.asphalt = std(T.slab, { normalScale: 0.7, envInt: 0.6, roughness: 1.0 });
+  M.asphalt.color = new THREE.Color(0x4a4c4e);
+  // 巨物残骸骨料：陈年象牙色，盐析出的干骨面
+  M.bone = std(T.salt, { normalScale: 0.8, envInt: 1.1, roughness: 0.95 });
+  M.bone.color = new THREE.Color(0xcfc4ac);
   M.notice = new THREE.MeshStandardMaterial({ map: T.notice, roughness: 0.9, side: THREE.DoubleSide });
   M.tableCloth = new THREE.MeshStandardMaterial({ color: 0xa41c1a, roughness: 0.85 }); // 圆桌红台布
   M.aquaGlass = new THREE.MeshPhysicalMaterial({

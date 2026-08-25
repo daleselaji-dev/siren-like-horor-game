@@ -81,6 +81,13 @@ const enemyDefs = [
     fov: 1, sightRange: 0, hearRange: 0,
   },
   {
+    // 岗亭员：镇口栅门的守夜人。对玩家全盲全聋——视奸教学位：
+    // 他的眼睛一整夜都钉在栅门内侧的闩杆上
+    id: 'booth', label: '岗亭员', kind: 'worker', role: 'booth',
+    workPos: P.boothWork, workMode: 'post', workYaw: -2.33,
+    fov: 1, sightRange: 0, hearRange: 0,
+  },
+  {
     id: 'templeGuard', label: '看祠的人', kind: 'patrol', role: 'townsman',
     waypoints: P.templeGuard, lantern: true, lanternLight: true,
     fov: 90, sightRange: 17, hearRange: 15,
@@ -116,6 +123,13 @@ const enemyDefs = [
     id: 'matron', label: '全福婆', kind: 'patrol', role: 'matron',
     waypoints: P.matron3F, floorY: HFY.f3, enabled: false,
     fov: 104, sightRange: 15, hearRange: 13, walkSpeed: 0.78, chaseSpeed: 2.35,
+  },
+  {
+    // 理骨员：海洋馆主展厅的看守。绕残骸台座巡一整夜——头永远歪向骨头那侧。
+    // 母带在处理间：侦察他的巡线（视奸），沿展柜外圈绕行
+    id: 'osteo', label: '理骨员', kind: 'patrol', role: 'osteo', mute: true,
+    waypoints: P.osteoHall, floorY: HFY.f1,
+    fov: 92, sightRange: 13, hearRange: 12, walkSpeed: 0.68, chaseSpeed: 2.3,
   },
 ];
 

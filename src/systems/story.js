@@ -7,7 +7,7 @@ import { Humanoid, poseAs } from '../entities/humanoid.js';
 // ---------------- 文书全文 ----------------
 export const NOTES = [
   {
-    id: 'note1', title: '① 喜帖（周宅）',
+    id: 'note1', title: '① 喜帖（长途车站·行李箱）',
     body: `谨詹于辛巳年九月十九（公历二〇〇一年十一月三日）
 为小女 周絮 于归之期
 假座 蚀湾南方大酒店一楼宴会厅 敬备喜筵
@@ -26,26 +26,27 @@ export const NOTES = [
 不要出声。`,
   },
   {
-    id: 'note2', title: '② 渔民日记（渔寮·残页）',
-    body: `九月十二　阴
+    id: 'note9', title: '② 蚀湾镇夜间告示（镇前街·告示墙）',
+    body: `【蚀湾镇夜间告示　二〇〇一年十一月】
 
-湾填了三年，酒店起了三年。
-石头是从湾底捞的。老石匠说那不是石头，
-是"床板"——海睡了一万年的床。
+一、广播报时期间，行人止步，
+　　背海而立，勿面向海。
+　　广播念完再走。
 
-九月十四　阴
+二、家中电视若映出本人影像，
+　　当即断电，或离开该房间。
+　　（供电所岁修期间映像不准，
+　　一切以画面为先。）
 
-给酒店送鱼，走的后头服务道。
-新来的侍应帮我卸筐。他不说话，光笑。
-他的手腕搭在筐沿上，我看了一眼——
-那不是晒黑。那是浪蚀的木头纹。
+三、婚丧宴席，全镇同往，不留人看家。
 
-我这辈子在海上，什么怪浪都见过。
-可我头一回见着：潮来了，水没有来。
-滩涂是干的，蟹洞是干的，
-但你把耳朵贴在泥上，底下是涨潮的声音。
+　　　　　　蚀湾镇人民政府（代章）
 
-喜宴我不去了。份子钱托人带到。`,
+【告示右下角，另有一行手写小字，很急】
+第二条说轻了。断电要快——
+你那格录像播完之前，
+必须让画面跟现实对不上。
+它才会作废重播。`,
   },
   {
     id: 'note3', title: '③ 婚宴通知（镇公告栏）',
@@ -87,7 +88,24 @@ export const NOTES = [
 广播是跟着他念的。不是他跟着广播。`,
   },
   {
-    id: 'note5', title: '⑤ 酒店登记簿（总台）',
+    id: 'note10', title: '⑤ 员工须知（酒店服务走廊）',
+    body: `【南方大酒店　宴会部　员工须知】
+
+一、托盘不离手。上菜满盘，收盘空盘。
+二、空盘回廊时，目不视客；
+　　客亦当收手侧立，勿使空盘见掌。
+三、见掌者，按引座例办理。
+
+【下面是另一种笔迹，写给新来的】
+说人话：他们端空盘回来的时候，
+别让他们看见你的手。
+手背过去，或者蹲下来把手收在膝上。
+
+盘子空着，就得有东西往上放。
+别让那是你的。`,
+  },
+  {
+    id: 'note5', title: '⑥ 酒店登记簿（总台）',
     body: `【南方大酒店　客房登记　十一月三日】
 
 103　周宅亲眷　　已到
@@ -106,7 +124,7 @@ export const NOTES = [
 　　到时自来　毋须引路`,
   },
   {
-    id: 'note6', title: '⑥ 保卫科值班日志',
+    id: 'note6', title: '⑦ 保卫科值班日志',
     body: `十月廿八　夜班　老鲁记
 
 监控是新装的，九个头。夜里看屏幕，
@@ -131,18 +149,22 @@ export const NOTES = [
 这几天不怎么沉底了。`,
   },
   {
-    id: 'note7', title: '⑦ 海洋馆巡检单（末次）',
+    id: 'note7', title: '⑧ 海洋馆巡检单（末次）',
     body: `【蚀湾海洋馆　闭馆巡检单　2001.9.30】
 
-一、主展缸水位：未测（水位计读数为负）
-二、增氧机：停（缸内含氧量恒定，来源不明）
-三、照明：停
-四、展品：白化珊瑚群　沉积柱×6　　均在
-　　"镇馆之物"：在。姿势与昨日不同。
+一、主展厅："镇馆之物"在。
+　　吊索三根，紧。姿势与昨日不同。
+　　标本牌仍写"未定种"——
+　　馆长说等县里给个说法。等了三年。
+二、主展缸水位：未测（水位计读数为负）
+三、增氧机：停（含氧量恒定，来源不明）
+四、照明：只留检视灯。
+五、理骨：进度照旧。理骨员说
+　　骨头"越理越多"。已报馆长。
 
-五、其他：
+六、其他：
 　　彩排录像母带（周宅喜宴，试机拍摄）
-　　存值班室铁柜。周家的人说过两天来取，
+　　存处理间铁柜。周家的人说过两天来取，
 　　叮嘱：不要在馆里放这盘带子。
 　　它拍到了不该拍的东西——
 　　摄像师没说是什么。摄像师第二天就退了押金走了。
@@ -150,7 +172,7 @@ export const NOTES = [
 【单末盖章处没有章，只有一圈盐霜】`,
   },
   {
-    id: 'note8', title: '⑧ 许潮旧俗（从母带里抄下的话）',
+    id: 'note8', title: '⑨ 许潮旧俗（从母带里抄下的话）',
     body: `【母带 00:41:17 起，是一段老人的画外音。
 录像里，彩排的新娘坐在三面镜前。】
 
@@ -174,6 +196,28 @@ export const NOTES = [
 录像里，镜中的全福婆转过头来，看镜头。
 现实里的全福婆，晚了一拍才转。】`,
   },
+  {
+    id: 'note2', title: '⑩ 渔民日记（渔寮·残页）',
+    body: `九月十二　阴
+
+湾填了三年，酒店起了三年。
+石头是从湾底捞的。老石匠说那不是石头，
+是"床板"——海睡了一万年的床。
+
+九月十四　阴
+
+给酒店送鱼，走的后头服务道。
+新来的侍应帮我卸筐。他不说话，光笑。
+他的手腕搭在筐沿上，我看了一眼——
+那不是晒黑。那是浪蚀的木头纹。
+
+我这辈子在海上，什么怪浪都见过。
+可我头一回见着：潮来了，水没有来。
+滩涂是干的，蟹洞是干的，
+但你把耳朵贴在泥上，底下是涨潮的声音。
+
+喜宴我不去了。份子钱托人带到。`,
+  },
 ];
 
 // 石碑铭文（气氛互动，不计入文书）
@@ -191,14 +235,16 @@ export class Story {
     this.g = game; // {scene,engine,world,player,hud,audio,enemies,byId,sightjack,stealth,ocean,sky,M,crt,agenda,guest,gaze,floaters}
     this.flags = {
       intro: false, stealthTip: false, sightjackTip: false,
-      knowKeySpot: false, hasKey: false, gateOpen: false,
+      knowLatch: false, townGateOpen: false, gateOpen: false,
       radioOn: true, knowHotel: false,
+      phoneRinging: false, phoneAnswered: false,
       inHotel: false, metBride: false, hasMirror: false,
       crtTip: false, leaked: false,
       namedByCrt: false, imageBroken: false,
       hasAquaKey: false, hasTape: false, tapeSeen: false,
       matronChase: false, finaleBroken: false,
       ended: false, breakerCut: false,
+      ruleSeaViolated: 0, ruleNameExpired: 0, ruleTraySeen: 0,
     };
     this.notesFound = new Set();
     this.checkpoint = null;
@@ -211,6 +257,14 @@ export class Story {
     this.drownTimer = 0;
     this.time = 0;
     this.phoneT = -1;      // 前台电话调虎离山计时
+    // —— 规则怪谈状态 ——
+    this.broadcastT = 0;   // 规则一：广播在响的窗口（秒）
+    this.seaGazeT = 0;     // 广播期间面朝海的累计秒数
+    this.nextTownCast = -1;// 下一次镇广播报时
+    this.nameCountdown = 0;// 规则二：CRT 点名倒计时
+    this.boothSpyT = 0;    // 岗亭员视奸教学累计
+    this.busGo = false;    // 末班车离站
+    this.streetPhoneT = -1;// 街头电话亭响铃计时
 
     this.interactables = [];
     this.triggers = [];
@@ -230,9 +284,9 @@ export class Story {
       next: 40, idx: 0,
       pool: ['horn', 'gull', 'creak', 'buoy'],
       beats: [
-        { at: 55, act: () => { this.g.audio.hornDistant(); this.g.hud.subtitle('渡船搁在滩上。今晚不会再有船离开蚀湾。', 5); } },
-        { at: 170, cond: () => !this.flags.gateOpen, act: () => this.g.hud.subtitle('镇里在放喜歌。调子飘过堤来，潮声一顿一顿地和。', 5, 'song') },
-        { at: 320, cond: () => this.flags.gateOpen && !this.flags.inHotel, act: () => this.g.hud.subtitle('家家门上贴着囍。可街上一个人也没有——都赴宴去了。', 5.5) },
+        { at: 55, act: () => { this.g.audio.hornDistant(); this.g.hud.subtitle('站牌背后就是海。今晚不会再有车进蚀湾。', 5); } },
+        { at: 170, cond: () => !this.flags.townGateOpen, act: () => this.g.hud.subtitle('镇里在放喜歌。调子从栅门里飘出来，潮声一顿一顿地和。', 5, 'song') },
+        { at: 320, cond: () => this.flags.townGateOpen && !this.flags.inHotel, act: () => this.g.hud.subtitle('家家门上贴着囍。可街上一个人也没有——都赴宴去了。', 5.5) },
         { at: 520, cond: () => this.flags.inHotel && !this.flags.leaked, act: () => this.g.hud.subtitle('酒店里很暖。暖得像是楼在替什么东西焐着。', 5) },
         { at: 700, cond: () => this.flags.leaked, act: () => this.g.hud.subtitle('墙纸在鼓包。楼是干的，可它在承受水压。', 5, 'song') },
       ],
@@ -392,7 +446,7 @@ export class Story {
       this.g.scene.add(m);
       this.noteMeshes.set(id, m);
     }
-    // note3 公告栏 / note4 收音机 / note8 母带播放，无纸张网格
+    // note3 公告栏 / note4 收音机 / note8 母带播放 / note9 告示墙 / note10 员工须知，无纸张网格
   }
 
   notePickupAction(id, after) {
@@ -415,16 +469,21 @@ export class Story {
 
     // —— 文书 ——
     add({
-      id: 'note1', pos: L.luggage, r: 2.0, prompt: '打开行李箱',
+      id: 'note1', pos: L.luggage, r: 2.0, prompt: '取回行李箱',
       cond: () => !this.notesFound.has('note1'),
       act: this.notePickupAction('note1', () => {
-        g.hud.objective('沿滩涂进镇——喜宴在南方大酒店');
+        g.hud.objective('过牌坊下的栅门进镇——喜宴在南方大酒店');
       }),
     });
     add({
       id: 'note2', pos: L.note2, r: 2.0, prompt: '翻看日记',
       cond: () => !this.notesFound.has('note2'),
       act: this.notePickupAction('note2'),
+    });
+    add({
+      id: 'note10', pos: L.staffNotice, r: 2.2, prompt: '读员工须知',
+      cond: () => !this.notesFound.has('note10'),
+      act: this.notePickupAction('note10'),
     });
     add({
       id: 'note3', pos: L.noticeBoard, r: 2.2, prompt: '看公告栏',
@@ -467,41 +526,86 @@ export class Story {
       act: () => { g.hud.subtitle(STELE_TEXT, 5); g.audio.paper(); },
     });
 
-    // —— 堤门（视奸教学：巡堤人管钥匙） ——
+    // —— 镇口栅门（视奸教学：岗亭员整夜盯着闩杆） ——
     add({
-      id: 'gate', pos: L.gate, r: 3.4, prompt: '推门',
-      cond: () => !F.gateOpen,
+      id: 'townGate', pos: L.townGate, r: 3.2, prompt: '过栅门',
+      cond: () => !F.townGateOpen,
       act: () => {
-        if (F.hasKey) {
-          F.gateOpen = true;
-          g.audio.doorCreak();
-          g.stealth.emitNoise(L.gate.x, L.gate.z, 18);
-          g.hud.subtitle('锈锁应声而开。门里飘来喜歌，和着潮声。', 4.5);
-          g.hud.objective('进镇——找人问路，或看公告栏');
-          this.saveCheckpoint('gate', L.gate.x, L.gate.z + 3);
-          if (g.agenda.stage < 0) g.agenda.advance(); // 迎宾
-        } else {
-          g.hud.subtitle('锁着。赴宴的人走正街——你从滩涂来，只有这道堤门。', 4);
-          if (!F.sightjackTip) {
-            F.sightjackTip = true;
-            g.hud.subtitle('堤上有个提灯的人来回走。守堤是他的职。', 4.5);
-            g.hud.subtitle('静下来，按 Q ——借他的眼睛看。', 5);
-            g.hud.objective('视奸提灯人，找到堤门钥匙');
-          }
+        g.hud.subtitle('栅门落了闩。闩在里侧——从这边够不着。', 4);
+        if (!F.sightjackTip) {
+          F.sightjackTip = true;
+          g.hud.subtitle('岗亭里有个人。灯亮着，他一动不动。', 4.5);
+          g.hud.subtitle('静下来，按 Q ——借他的眼睛看看他在看什么。', 5.5);
+          g.hud.objective('视奸岗亭员，找到过栅门的办法');
+        } else if (F.knowLatch) {
+          g.hud.subtitle('闩杆挨着岗亭的小窗。绕到岗亭跟前去。', 4);
         }
       },
     });
 
-    // 水缸下的钥匙（须先视奸获知）
+    // 岗亭小窗（视奸获知后可拨闩）
     add({
-      id: 'vat', pos: () => g.world.dynamic.hut2.local(-1.35, 0.6, 1.0), r: 1.8,
-      prompt: '搬开水缸',
-      cond: () => F.knowKeySpot && !F.hasKey,
+      id: 'boothWindow', pos: L.boothWindow, r: 2.2, prompt: '从小窗探手拨闩',
+      cond: () => F.knowLatch && !F.townGateOpen,
       act: () => {
-        F.hasKey = true;
-        g.audio.blip(500, 0.1, 0.2);
-        g.hud.subtitle('缸底压着一把黄铜钥匙，缠着红线。', 4);
-        g.hud.objective('打开堤门');
+        F.townGateOpen = true;
+        g.audio.doorCreak();
+        g.stealth.emitNoise(L.townGate.x, L.townGate.z, 14);
+        g.hud.subtitle('闩杆很凉，像刚从水里捞出来。栅门吱呀着荡开了。', 4.5);
+        g.hud.subtitle('岗亭里的人没有转头。他看的还是那根已经不在了的闩。', 5, 'song');
+        g.hud.objective('沿镇前街往里走——先看告示墙');
+        this.saveCheckpoint('town', L.townGate.x - 3, L.townGate.z);
+        if (g.agenda.stage < 0) g.agenda.advance(); // 迎宾
+      },
+    });
+
+    // —— 告示墙（文书②：夜间三则——规则怪谈的教学） ——
+    add({
+      id: 'ruleBoard', pos: L.ruleBoard, r: 2.4, prompt: '看告示',
+      cond: () => !this.notesFound.has('note9'),
+      act: this.notePickupAction('note9', () => {
+        g.hud.subtitle('三条告示。第一条和第二条的纸比第三条新得多。', 4.5);
+        g.hud.objective('去街心公告栏——打听喜宴的地方');
+        this.saveCheckpoint('rules');
+      }),
+    });
+
+    // —— 街头电话亭（路过时它响一次） ——
+    add({
+      id: 'streetPhone', pos: L.phoneBooth, r: 2.0, prompt: '接电话',
+      cond: () => F.phoneRinging && !F.phoneAnswered,
+      act: () => {
+        F.phoneRinging = false;
+        F.phoneAnswered = true;
+        g.audio.blip(320, 0.25, 0.2);
+        g.hud.subtitle('「……到了？」是个女声，隔着水响。', 4.5, 'radio');
+        g.hud.subtitle('「到了就往回走。宴席不缺你一双筷子。」', 5, 'radio');
+        g.hud.subtitle('电话挂了。投币口退出来一枚湿的硬币。', 4.5);
+        this.saveCheckpoint('phone');
+      },
+    });
+
+    // —— 堤门（通滩涂的支线——闩在镇这侧） ——
+    add({
+      id: 'gate', pos: L.gate, r: 3.4, prompt: '拨闩推门',
+      cond: () => !F.gateOpen,
+      act: () => {
+        F.gateOpen = true;
+        g.audio.doorCreak();
+        g.stealth.emitNoise(L.gate.x, L.gate.z, 18);
+        g.hud.subtitle('门闩是从镇里落的。锈闩拨开，堤外滩涂的腥气涌进来。', 4.5);
+        g.hud.subtitle('堤上有个提灯的人来回走。渔寮的灯也还亮着。', 4.5);
+      },
+    });
+
+    // —— 主展厅标本牌 ——
+    add({
+      id: 'specimen', pos: L.specimenPlate, r: 2.2, prompt: '看标本牌',
+      cond: () => true,
+      act: () => {
+        g.audio.paper();
+        g.hud.subtitle('「未定种。一九九八年填湾工地出土。」', 4.5);
+        g.hud.subtitle('牌子背面有一行粉笔字，擦过又写上：别念它的旧名。', 5, 'song');
       },
     });
 
@@ -596,18 +700,51 @@ export class Story {
     const add = (o) => this.triggers.push(o);
 
     add({
-      zone: Z.dikeArea, once: true,
+      zone: Z.frontStreet, once: true, cond: () => this.flags.townGateOpen,
       act: () => {
-        g.hud.subtitle('堤上有人。渔寮的灯还亮着——喜宴之夜，还有人在补网。', 5);
-        g.hud.subtitle('按住 Shift 放低身子。别惊动干活的人：他们手里的活不能停。', 5.5);
-        this.flags.stealthTip = true;
+        g.hud.subtitle('镇前街。卷帘门都落了一半，杂货铺的灯还亮着。', 5);
+        g.hud.subtitle('录像厅在放通宵场——里头只有雪花的声音。', 5);
+        this.saveCheckpoint('frontstreet');
+      },
+    });
+    add({
+      zone: Z.villageCenter, once: true, cond: () => this.flags.townGateOpen,
+      act: () => {
+        g.hud.subtitle('满街的囍。灶是温的，碗筷齐整——人全在酒店。', 5.5);
+        if (!this.flags.stealthTip) {
+          this.flags.stealthTip = true;
+          g.hud.subtitle('街心有挑担的伙计来回走。按住 Shift 放低身子，别撞进灯里。', 5.5);
+        }
+      },
+    });
+    add({
+      zone: Z.dormArea, once: true,
+      act: () => {
+        g.hud.subtitle('水产公司家属楼。只有一扇窗亮着——灯后头没有人影。', 5.5);
+        g.hud.subtitle('晾了一天的衣裳，夜里也没人收。', 4.5);
+      },
+    });
+    add({
+      zone: Z.aquaMain, once: true,
+      act: () => {
+        g.hud.subtitle('主展厅。房间尺度的肋骨罩着半个展台，吊索绷得很紧。', 5.5);
+        g.hud.subtitle('眼眶是空的，是干的。标本牌上只写了三个字。', 5, 'song');
+        this.saveCheckpoint('aquaMain');
+      },
+    });
+    add({
+      zone: Z.dikeArea, once: true, cond: () => this.flags.gateOpen,
+      act: () => {
+        g.hud.subtitle('石堤。提灯的人来回走——守堤是他的职，喜宴也没去。', 5);
+        g.hud.subtitle('渔寮里有本没写完的日记。别惊动干活的人。', 5);
         this.saveCheckpoint('dike');
       },
     });
     add({
-      zone: Z.villageCenter, once: true, cond: () => this.flags.gateOpen,
+      zone: Z.beach, once: true,
       act: () => {
-        g.hud.subtitle('满街的囍。灶是温的，碗筷齐整——人全在酒店。', 5.5);
+        g.hud.subtitle('滩涂。渡船在滩上搁了三年，龙骨陷进泥里。', 5);
+        g.hud.subtitle('蟹洞是干的。可你把耳朵贴在泥上——底下是涨潮的声音。', 5.5, 'song');
       },
     });
     add({
@@ -672,6 +809,7 @@ export class Story {
       zone: Z.annex, once: true, cond: () => this.flags.imageBroken,
       act: () => {
         g.hud.subtitle('玻璃连廊。展缸的方向传来一声很低的嗡。', 4.5);
+        g.hud.subtitle('铁柜在主展厅深处的处理间。理骨员在骨头边上绕圈。', 5);
         this.saveCheckpoint('annex');
       },
     });
@@ -716,6 +854,7 @@ export class Story {
     g.stealth.envSightFactor = 0.85;
     g.hud.subtitle('敬酒的杯子还举着——整栋楼往下沉了一寸。没有水。来的是深度。', 6, 'song');
     g.hud.subtitle('大堂的人不见了。席上的人还在——脚尖离了地。', 5.5, 'song');
+    g.hud.subtitle('侍应把托盘收空了。想想员工须知里那句话。', 5);
     // 人群切换：满员正常态 → 浮客
     this.crowdNormal.visible = false;
     this.crowdLeak.visible = true;
@@ -748,12 +887,13 @@ export class Story {
     const F = this.flags;
     if (F.namedByCrt || F.imageBroken) return;
     F.namedByCrt = true;
+    this.nameCountdown = 75; // 规则二：那格录像播完之前必须破像
     const g = this.g;
     g.audio.tvBlip();
     g.crt.setForetell([this.ftSeated], []);
     g.hud.subtitle('身后的九个屏幕同时换了画面——宴会厅，上宾的空席。', 5);
     g.hud.subtitle('席上坐了个人。那身衣服……是你的。', 5, 'song');
-    g.hud.subtitle('电视先播，现实照做。除非——现实先不认账。', 5);
+    g.hud.subtitle('告示第二条。你那格录像播完之前，得让画面跟现实对不上。', 5.5);
     g.hud.objective('去一楼配电间拉总闸：让现实与录像不符（破像）');
     this.saveCheckpoint('named');
   }
@@ -780,7 +920,7 @@ export class Story {
     g.hud.subtitle('总闸落下。整栋楼黑了一拍——屏幕里的画面撕成雪花。', 5.5);
     g.hud.subtitle('录像作废了。这一次点名不算。', 4.5, 'song');
     g.hud.subtitle('但大堂里进来了别的东西。走红毯。硬地会把你的脚步传给它。', 6);
-    g.hud.objective('穿过大堂去东廊，从玻璃连廊进海洋馆取母带');
+    g.hud.objective('从玻璃连廊进海洋馆——母带在主展厅深处的处理间');
     // 上宾入场
     g.guest.setEnabled(true);
     g.stealth.vibrationActive = true;
@@ -948,7 +1088,7 @@ export class Story {
           g.hud.showEnding(
             ['潮退了半寸。', '絮絮还在楼里。你还欠她一场喜酒。', '', '—— Demo 结束 ——'],
             `返潮 FANCHAO · 蚀湾 2001<br/>
-             文书拾获：${this.notesFound.size} / 8 · 被引座 ${this.deathCount} 次<br/><br/>
+             文书拾获：${this.notesFound.size} / ${NOTES.length} · 被引座 ${this.deathCount} 次<br/><br/>
              「电视先播，现实照做。喜事不许退席。」<br/><br/>
              按 F5 重新赴宴`
           );
@@ -990,19 +1130,17 @@ export class Story {
     }
   }
 
-  // ---------- 视奸获知钥匙（堤门） ----------
-  updateKeySpy() {
+  // ---------- 视奸获知闩杆（镇口岗亭） ----------
+  updateBoothSpy(dt) {
     const F = this.flags;
-    if (F.knowKeySpot || !this.g.sightjack.active) return;
-    const patrol = this.g.byId.dikePatrol;
-    if (this.g.sightjack.current !== patrol) return;
-    if (patrol.state === 'PATROL' && patrol.wpIndex >= 5 && patrol.wpIndex <= 7) {
-      const d = Math.hypot(patrol.pos.x - 20, patrol.pos.z - 59);
-      if (d < 4.5) {
-        F.knowKeySpot = true;
-        this.g.hud.subtitle('他每晚都要看一眼那口水缸的缸底。', 4.5);
-        this.g.hud.subtitle('钥匙在渔寮里的水缸下面。', 4);
-      }
+    if (F.knowLatch || !this.g.sightjack.active) return;
+    if (this.g.sightjack.current !== this.g.byId.booth) return;
+    this.boothSpyT += dt;
+    if (this.boothSpyT > 1.4) {
+      F.knowLatch = true;
+      this.g.hud.subtitle('他的眼睛一整夜没动过——钉着栅门内侧的那根闩杆。', 5);
+      this.g.hud.subtitle('闩杆挨着岗亭的小窗。手能探进去。', 4.5);
+      this.g.hud.objective('从岗亭小窗探手，拨开栅门的闩');
     }
   }
 
@@ -1012,16 +1150,17 @@ export class Story {
     if (F.intro) return;
     F.intro = true;
     const hud = this.g.hud;
-    this.introSeq = { t: 0, dur: 9.5 };
+    this.introSeq = { t: 0, dur: 10.5 };
     hud.setLetterbox(true);
     this.g.player.frozen = true;
     hud.subtitle('二〇〇一年，秋。蚀湾。', 4);
     hud.subtitle('……喜宴实况转播……南方大酒店……全镇同贺……', 5, 'radio');
-    hud.subtitle('末班渡船在滩涂搁了浅。船老大说：今晚的潮不对，你自己走过去吧。', 6);
+    hud.subtitle('末班长途车。司机没熄火——他等的不是你，是掉头。', 5.5);
     hud.subtitle('絮絮的喜帖在行李箱里。她只求了你一件事：上头的时候，别出声。', 6);
+    setTimeout(() => this.g.audio.doorCreak(), 1200); // 车门合拢
     setTimeout(() => {
-      hud.objective('从行李箱里取回喜帖');
-    }, 11000);
+      hud.objective('从站台长椅上取回行李');
+    }, 11500);
   }
 
   updateIntro(dt) {
@@ -1031,12 +1170,14 @@ export class Story {
     const g = this.g;
     const p = g.player;
     const cam = g.engine.camera;
+    if (s.t > 2.2) this.busGo = true; // 末班车掉头回县城
     const T = Math.min(1, s.t / s.dur);
     const ease = T * T * (3 - 2 * T);
-    const yaw = p.yaw + (1 - ease) * 2.3;
-    const pitch = -(1 - ease) * 0.6;
-    const back = (1 - ease) * 4.2;
-    const h = 1.62 + (1 - ease) * 9.5;
+    // 从「望着末班车尾灯」摇回第一人称——车往东走，人往西看
+    const yaw = p.yaw + (1 - ease) * -2.3;
+    const pitch = -(1 - ease) * 0.5;
+    const back = (1 - ease) * 4.0;
+    const h = 1.62 + (1 - ease) * 7.5;
     cam.position.set(
       p.pos.x + Math.sin(yaw) * back,
       p.pos.y + h,
@@ -1052,9 +1193,25 @@ export class Story {
   endIntro() {
     if (!this.introSeq) return;
     this.introSeq = null;
+    this.busGo = true;
     this.g.hud.setLetterbox(false);
     if (this.g.state === 'PLAY' && !this.g.player.dead) this.g.player.frozen = false;
     this.g.player.syncCamera(0);
+  }
+
+  // ---------- 末班车离站 ----------
+  updateBus(dt) {
+    if (!this.busGo) return;
+    const bus = this.g.world.dynamic.bus;
+    if (!bus || !bus.visible) return;
+    // 碰撞体随首次移动作废
+    const col = this.g.world.dynamic.busCollider;
+    if (col && col.minX < 9000) { col.minX = 9999; col.maxX = 9999; col.maxY = -Infinity; }
+    this._busV = Math.min(9, (this._busV ?? 1.2) + dt * 2.2);
+    bus.position.x += this._busV * dt;
+    const g2 = this.g.world.heightAt(bus.position.x, bus.position.z);
+    bus.position.y += (g2 + 0.06 - bus.position.y) * Math.min(1, dt * 4);
+    if (bus.position.x > 128) bus.visible = false;
   }
 
   // ---------- 检查点 ----------
@@ -1079,6 +1236,12 @@ export class Story {
     g.stealth.vibration = 0;
     g.stealth.danger = 0;
     this.drownTimer = 0;
+    // 规则状态复位：点名倒计时重新走，广播窗口清空
+    this.broadcastT = 0;
+    this.seaGazeT = 0;
+    if (this.flags.namedByCrt && !this.flags.imageBroken) this.nameCountdown = 75;
+    this._nameWarn30 = false;
+    this._nameWarn10 = false;
     g.hud.setDeath(false);
     g.hud.fade(false);
   }
@@ -1137,7 +1300,7 @@ export class Story {
     g.engine.finalPass.uniforms.uRedShift.value = 0.35;
     document.getElementById('death-text').textContent = reason ?? '席';
     const m = Math.floor(this.time / 60);
-    const stats = `入镇 ${m} 分 · 文书 ${this.notesFound.size}/8 · 第 ${this.deathCount} 次被引座`;
+    const stats = `入镇 ${m} 分 · 文书 ${this.notesFound.size}/${NOTES.length} · 第 ${this.deathCount} 次被引座`;
     g.hud.setDeath(true, sub ?? '喜事不许退席 —— 正在回到检查点', stats);
   }
 
@@ -1187,6 +1350,156 @@ export class Story {
       g.hud.subtitle('地面在把你的脚步一格一格递过去。走红毯。慢下来。', 5);
     }
     if (v < 0.15) this._vibWarned = false;
+  }
+
+  // ---------- 规则怪谈 ----------
+  /** 玩家是否在室内（规则一只对露天生效） */
+  isIndoors() {
+    const p = this.g.player.pos;
+    const D = this.g.world.dynamic;
+    const HI = D.hotelInfo;
+    const rects = [HI?.footprint, HI?.annexRect, D.aquaMainRect, D.videoHallRect];
+    for (const r of rects) {
+      if (r && p.x >= r.minX && p.x <= r.maxX && p.z >= r.minZ && p.z <= r.maxZ) return true;
+    }
+    return false;
+  }
+
+  /** 广播开始（议程推进或镇报时都会调）——规则一的判定窗口 */
+  onBroadcast(dur = 8) {
+    this.broadcastT = dur;
+    this.seaGazeT = 0;
+    this._seaWarned = false;
+    if (!this.isIndoors() && !this.g.player.dead) {
+      if (this.notesFound.has('note9')) {
+        this.g.hud.subtitle('广播。止步——背海而立。', 3.5, 'radio');
+      } else {
+        this.g.hud.subtitle('全镇的喇叭一起响了。', 3.5, 'radio');
+      }
+    }
+  }
+
+  /** 规则一：广播在响时不许看向海的方向 */
+  updateRuleSea(dt) {
+    if (this.broadcastT <= 0) return;
+    this.broadcastT -= dt;
+    const g = this.g;
+    const p = g.player;
+    if (p.dead || p.frozen || this.flags.ended || g.sightjack.active) return;
+    if (this.isIndoors()) { this.seaGazeT = Math.max(0, this.seaGazeT - dt); return; }
+    // 海的方向 = 背离岛心 (-10,-10) 的方向
+    const dx = p.pos.x + 10, dz = p.pos.z + 10;
+    const dl = Math.hypot(dx, dz) || 1;
+    const lookDot = (-Math.sin(p.yaw)) * (dx / dl) + (-Math.cos(p.yaw)) * (dz / dl);
+    if (lookDot > 0.7 && p.pitch > -0.5) {
+      this.seaGazeT += dt;
+      if (this.seaGazeT > 0.7 && !this._seaWarned) {
+        this._seaWarned = true;
+        g.audio.blip(170, 0.35, 0.3);
+        g.hud.subtitle('（喉咙里发紧）——别看海。', 2.8, 'song');
+      }
+      if (this.seaGazeT > 2.1) {
+        this.broadcastT = 0;
+        this.flags.ruleSeaViolated++;
+        g.sightjack.forceView(this.seaViewer, 2.2, () => {});
+        g.hud.subtitle('你的视线被接走了。海从它那头看了回来。', 4, 'song');
+        setTimeout(() => {
+          if (!this.flags.ended) {
+            g.sightjack.exit();
+            g.sightjack.restorePost();
+            this.kill('望', '广播念到一半，你看了海。海也看了你——把你的名字添进了席单。—— 回到检查点', true);
+          }
+        }, 2300);
+      }
+    } else {
+      this.seaGazeT = Math.max(0, this.seaGazeT - dt * 1.4);
+    }
+  }
+
+  /** 镇广播报时：进镇后周期性响起（规则一的日常考验） */
+  updateTownCast() {
+    const F = this.flags;
+    if (!F.townGateOpen || F.ended || F.finaleBroken) return;
+    if (this.nextTownCast < 0) this.nextTownCast = this.time + 45;
+    if (this.time >= this.nextTownCast) {
+      this.nextTownCast = this.time + 75 + Math.random() * 40;
+      if (this.g.player.dead || this.g.agenda.silence > 0) return;
+      this.g.audio.broadcast();
+      this.g.hud.subtitle('……蚀湾广播站。现在报时——', 4, 'radio');
+      this.onBroadcast(8);
+    }
+  }
+
+  /** 规则二：CRT 点名倒计时——那格录像播完之前必须破像 */
+  updateRuleName(dt) {
+    const F = this.flags;
+    if (!F.namedByCrt || F.imageBroken || this.g.player.dead || F.ended) return;
+    this.nameCountdown -= dt;
+    if (this.nameCountdown < 30 && !this._nameWarn30) {
+      this._nameWarn30 = true;
+      this.g.audio.tvBlip();
+      this.g.hud.subtitle('录像在走。你还在画面里。', 4, 'song');
+    }
+    if (this.nameCountdown < 12 && !this._nameWarn10) {
+      this._nameWarn10 = true;
+      this.g.audio.blip(240, 0.3, 0.3);
+      this.g.hud.subtitle('快没时间了——拉总闸，让画面作废。', 4, 'song');
+    }
+    if (this.nameCountdown <= 0) {
+      this.flags.ruleNameExpired++;
+      this.kill('名', '那格录像播完了。画面里的人坐进了席，现实照做。—— 回到检查点');
+    }
+  }
+
+  /** 规则三：侍应托盘空着时不要让他看见你的手（蹲下=收手） */
+  updateRuleTray(dt) {
+    const F = this.flags;
+    if (!F.leaked || this.g.player.dead || F.ended) return;
+    const g = this.g;
+    for (const id of ['waiterBanquet', 'waiterLobby', 'waiterEast']) {
+      const w = g.byId[id];
+      if (!w || !w.enabled || w.state !== 'SUSPECT') continue;
+      if (!g.player.crouching && w.suspectMeter > 0.12) {
+        F.ruleTraySeen++;
+        w.enterAlert(g.player, g.audio, undefined);
+        if (!this._trayShown) {
+          this._trayShown = true;
+          g.hud.subtitle('他的托盘是空的。他看见了你的手。', 4.5, 'song');
+        }
+      } else if (g.player.crouching) {
+        w.suspectMeter = Math.max(0, w.suspectMeter - dt * 0.55);
+        if (!this._trayGood && w.suspectMeter <= 0.01) {
+          this._trayGood = true;
+          g.hud.subtitle('你把手收在膝上。空托盘从你面前过去了。', 4.5);
+        }
+      }
+    }
+  }
+
+  /** 街头电话亭：第一次路过时响铃 */
+  updateStreetPhone(dt) {
+    const F = this.flags;
+    if (F.phoneAnswered) return;
+    const L = this.g.world.locations;
+    const p = this.g.player.pos;
+    const d = Math.hypot(L.phoneBooth.x - p.x, L.phoneBooth.z - p.z);
+    if (!F.phoneRinging && !this._phoneDone && F.townGateOpen && d < 10) {
+      this._phoneDone = true;
+      this.streetPhoneT = 0.8;
+    }
+    if (this.streetPhoneT > 0) {
+      this.streetPhoneT -= dt;
+      if (this.streetPhoneT <= 0) {
+        F.phoneRinging = true;
+        this.g.audio.phoneRing();
+        this.g.hud.subtitle('电话亭响了。这个点，不会有人打给这个亭子。', 4.5);
+        this._phoneRering = this.time + 6;
+      }
+    }
+    if (F.phoneRinging && this.time > (this._phoneRering ?? 0)) {
+      this._phoneRering = this.time + 6;
+      if (d < 26) this.g.audio.phoneRing();
+    }
   }
 
   // ---------- 前台电话（调虎离山） ----------
@@ -1283,6 +1596,7 @@ export class Story {
     const g = this.g;
 
     this.updateIntro(dt);
+    this.updateBus(dt);
     this.updateCaught(dt);
     this.updateDeath(dt);
     this.updateTape(dt);
@@ -1290,9 +1604,14 @@ export class Story {
     if (g.player.dead || this.caughtSeq || this.tapeSeq) return;
 
     this.updateDrown(dt);
-    this.updateKeySpy();
+    this.updateBoothSpy(dt);
     this.updateVibration();
     this.updatePhone(dt);
+    this.updateStreetPhone(dt);
+    this.updateTownCast();
+    this.updateRuleSea(dt);
+    this.updateRuleName(dt);
+    this.updateRuleTray(dt);
     this.updateAmbient();
     this.updateWatchers();
     this.updateGaze();
@@ -1316,6 +1635,12 @@ export class Story {
       d.gateDoor.rotation.y = Math.max(-1.9, d.gateDoor.rotation.y - dt * 1.4);
       d.gateCollider.maxY = -Infinity;
       d.gateCollider.minX = 9999; d.gateCollider.maxX = 9999;
+    }
+    // 镇口栅门动画
+    if (this.flags.townGateOpen && d.townGate && d.townGate.rotation.y < 1.7) {
+      d.townGate.rotation.y = Math.min(1.7, d.townGate.rotation.y + dt * 1.3);
+      d.townGateCollider.maxY = -Infinity;
+      d.townGateCollider.minX = 9999; d.townGateCollider.maxX = 9999;
     }
 
     // 收音机刻度盘
