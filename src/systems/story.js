@@ -1261,7 +1261,7 @@ export class Story {
       const k = Math.min(1, this._busV / 7);
       const on = k > 0.14;
       this.g.world.dynamic.busSprayMat.opacity = on
-        ? Math.max(0, 0.09 + 0.13 * k + Math.sin(this.time * 37) * 0.03 * k) : 0;
+        ? Math.max(0, 0.13 + 0.2 * k + Math.sin(this.time * 37) * 0.04 * k) : 0;
       for (const sp of sprays) {
         sp.visible = on;
         const pulse = 1 + Math.sin(this.time * 23 + sp.position.x * 3.1) * 0.12;

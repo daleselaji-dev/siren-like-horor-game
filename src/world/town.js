@@ -647,7 +647,8 @@ export function buildTown(scene, M) {
       // 车身：四条长棱倒角的挤出壳（客车蒙皮是弯折的铁皮，不是刀切的箱子）——
       // 横截面圆角矩形沿车长挤出，bevel 再把前后脸的立棱一并倒掉
       {
-        const hw2 = 1.15, by0 = 0.65, by1 = 2.35, chm = 0.1;
+        // bevel 会把中段轮廓向外扩 bevelSize：截面按 1.15-0.05 内收，扩完正好 1.15 半宽
+        const hw2 = 1.10, by0 = 0.70, by1 = 2.30, chm = 0.08;
         const prof = new THREE.Shape();
         prof.moveTo(-hw2 + chm, by0);
         prof.lineTo(hw2 - chm, by0);
@@ -662,6 +663,11 @@ export function buildTown(scene, M) {
           depth: 8.28, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.05,
           bevelSegments: 2, curveSegments: 3,
         });
+        // 挤出 UV 以米为单位——灰泥纹会平铺 8 次读成迷彩；缩到 0.12 恢复整面舒展
+        {
+          const buv = bodyG.attributes.uv;
+          for (let i = 0; i < buv.count; i++) buv.setXY(i, buv.getX(i) * 0.12, buv.getY(i) * 0.12);
+        }
         bodyG.rotateY(Math.PI / 2);          // 挤出轴转到车长（x）方向
         bodyG.computeBoundingBox();
         bodyG.translate(-(bodyG.boundingBox.min.x + bodyG.boundingBox.max.x) / 2, 0, 0);
@@ -816,18 +822,14 @@ export function buildTown(scene, M) {
       // 驶离轮迹水花：四轮后各一支加法混合的低锥「雾雨尾」——静止不可见，
       // story.updateBus 按车速点亮/撑大（湿沥青上开走的车必须带起水）
       {
-        const sprayM = new THREE.MeshBasicMaterial({
-          color: 0x9fb4ba, transparent: true, opacity: 0,
-          blending: THREE.AdditiveBlending, depthWrite: false, fog: true,
-        });
-        dynamic.busSprayMat = sprayM;
+        const spray0 = makeLightCone(0x9fb4ba, 0.0, 0.05, 0.42, 1.3);
+        dynamic.busSprayMat = spray0.material;   // 渐变光锥材质：雾状收梢，不是实心白角
         dynamic.busSprays = [];
-        const sprayG = new THREE.ConeGeometry(0.3, 1.15, 7, 1, true);
-        sprayG.translate(0, -0.575, 0);       // 锥尖挪到原点（尖=轮后溅起点）
         for (const [wx, wz] of [[-2.9, -1.05], [2.9, -1.05], [-2.9, 1.05], [2.9, 1.05]]) {
-          const sp = new THREE.Mesh(sprayG, sprayM);
-          sp.position.set(wx - 0.5, 0.12, wz + Math.sign(wz) * 0.08);
-          sp.rotation.z = -2.0;               // 锥口指向车尾偏上——轮后拖出的水雾扇
+          const sp = dynamic.busSprays.length === 0 ? spray0
+            : new THREE.Mesh(spray0.geometry, spray0.material);
+          sp.position.set(wx - 0.45, 0.14, wz + Math.sign(wz) * 0.08);
+          sp.rotation.z = -2.03;               // 锥口指向车尾偏上——轮后拖出的水雾扇
           sp.scale.set(0.4, 0.4, 0.35);
           sp.visible = false;
           sp.renderOrder = 6;
