@@ -644,10 +644,85 @@ export function buildTown(scene, M) {
         bus.add(m);
         return m;
       };
-      mkBox(M.plaster, 0, 1.5, 0, 8.4, 1.7, 2.3);                    // 车身
+      // 车身：四条长棱倒角的挤出壳（客车蒙皮是弯折的铁皮，不是刀切的箱子）——
+      // 横截面圆角矩形沿车长挤出，bevel 再把前后脸的立棱一并倒掉
+      {
+        const hw2 = 1.15, by0 = 0.65, by1 = 2.35, chm = 0.1;
+        const prof = new THREE.Shape();
+        prof.moveTo(-hw2 + chm, by0);
+        prof.lineTo(hw2 - chm, by0);
+        prof.quadraticCurveTo(hw2, by0, hw2, by0 + chm);
+        prof.lineTo(hw2, by1 - chm);
+        prof.quadraticCurveTo(hw2, by1, hw2 - chm, by1);
+        prof.lineTo(-hw2 + chm, by1);
+        prof.quadraticCurveTo(-hw2, by1, -hw2, by1 - chm);
+        prof.lineTo(-hw2, by0 + chm);
+        prof.quadraticCurveTo(-hw2, by0, -hw2 + chm, by0);
+        const bodyG = new THREE.ExtrudeGeometry(prof, {
+          depth: 8.28, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.05,
+          bevelSegments: 2, curveSegments: 3,
+        });
+        bodyG.rotateY(Math.PI / 2);          // 挤出轴转到车长（x）方向
+        bodyG.computeBoundingBox();
+        bodyG.translate(-(bodyG.boundingBox.min.x + bodyG.boundingBox.max.x) / 2, 0, 0);
+        const body = new THREE.Mesh(bodyG, M.plaster);
+        bus.add(body);
+      }
       mkBox(M.ironDark, 0, 0.55, 0, 8.4, 0.55, 2.34);                // 裙边
       mkBox(M.clothRed, 0, 1.05, 0, 8.42, 0.22, 2.36);               // 红腰线
-      mkBox(M.crtGlass, 0, 1.95, 0, 7.2, 0.62, 2.36);                // 窗带
+      // 窗带：车厢内微光 + 座椅背板剪影烘进贴图（一格一窗、窗柱分隔）——
+      // 夜里路过的大巴车窗永远是「暖光里一排空椅背」，不是一条黑玻璃
+      {
+        const wc = document.createElement('canvas');
+        wc.width = 512; wc.height = 96;
+        const wx2 = wc.getContext('2d');
+        wx2.fillStyle = '#0b0e10';
+        wx2.fillRect(0, 0, 512, 96);
+        for (let i = 0; i < 8; i++) {
+          const gx = 6 + i * 63, gw = 52;
+          // 车厢内昏黄微光（顶亮向下衰减——车内灯在天花上）
+          const gr = wx2.createLinearGradient(0, 8, 0, 88);
+          gr.addColorStop(0, '#41331e');
+          gr.addColorStop(0.55, '#2a2013');
+          gr.addColorStop(1, '#120e08');
+          wx2.fillStyle = gr;
+          wx2.fillRect(gx, 8, gw, 80);
+          // 座椅背板剪影：每窗两座高背 + 圆角头枕（2001 长途车的直背椅）
+          wx2.fillStyle = '#0a0806';
+          for (const sx2 of [gx + 6, gx + 28]) {
+            wx2.beginPath();
+            wx2.moveTo(sx2, 88);
+            wx2.lineTo(sx2, 42);
+            wx2.quadraticCurveTo(sx2, 33, sx2 + 8, 33);
+            wx2.quadraticCurveTo(sx2 + 16, 33, sx2 + 16, 42);
+            wx2.lineTo(sx2 + 16, 88);
+            wx2.closePath();
+            wx2.fill();
+          }
+          // 窗柱
+          wx2.fillStyle = '#14181a';
+          wx2.fillRect(gx + gw, 0, 63 - gw + 2, 96);
+        }
+        // 玻璃斜反光两道（低 alpha 白斜带——湿夜玻璃的「膜」）
+        wx2.globalAlpha = 0.07;
+        wx2.fillStyle = '#cfe0e8';
+        for (const rx of [60, 300]) {
+          wx2.save();
+          wx2.translate(rx, 0);
+          wx2.rotate(0.35);
+          wx2.fillRect(0, -20, 26, 150);
+          wx2.restore();
+        }
+        wx2.globalAlpha = 1;
+        const winTex = new THREE.CanvasTexture(wc);
+        winTex.colorSpace = THREE.SRGBColorSpace;
+        winTex.anisotropy = 4;
+        const winMat = new THREE.MeshStandardMaterial({
+          map: winTex, emissive: 0xffffff, emissiveMap: winTex, emissiveIntensity: 0.55,
+          roughness: 0.22, metalness: 0.15, envMapIntensity: 1.5,
+        });
+        mkBox(winMat, 0, 1.95, 0, 7.2, 0.62, 2.36);
+      }
       mkBox(M.crtGlass, 4.16, 1.9, 0, 0.1, 0.8, 1.9);                // 前挡
       // 弧顶：客车顶是拱不是平板（低机位仰拍时的关键轮廓线）
       {
@@ -738,6 +813,28 @@ export function buildTown(scene, M) {
       const inl = new THREE.PointLight(0xffe2b0, 5, 6, 2);
       inl.position.set(0, 2.0, 0);
       bus.add(inl);
+      // 驶离轮迹水花：四轮后各一支加法混合的低锥「雾雨尾」——静止不可见，
+      // story.updateBus 按车速点亮/撑大（湿沥青上开走的车必须带起水）
+      {
+        const sprayM = new THREE.MeshBasicMaterial({
+          color: 0x9fb4ba, transparent: true, opacity: 0,
+          blending: THREE.AdditiveBlending, depthWrite: false, fog: true,
+        });
+        dynamic.busSprayMat = sprayM;
+        dynamic.busSprays = [];
+        const sprayG = new THREE.ConeGeometry(0.3, 1.15, 7, 1, true);
+        sprayG.translate(0, -0.575, 0);       // 锥尖挪到原点（尖=轮后溅起点）
+        for (const [wx, wz] of [[-2.9, -1.05], [2.9, -1.05], [-2.9, 1.05], [2.9, 1.05]]) {
+          const sp = new THREE.Mesh(sprayG, sprayM);
+          sp.position.set(wx - 0.5, 0.12, wz + Math.sign(wz) * 0.08);
+          sp.rotation.z = -2.0;               // 锥口指向车尾偏上——轮后拖出的水雾扇
+          sp.scale.set(0.4, 0.4, 0.35);
+          sp.visible = false;
+          sp.renderOrder = 6;
+          bus.add(sp);
+          dynamic.busSprays.push(sp);
+        }
+      }
       bus.position.set(64.5, g(64.5, -1.3) + 0.06, -1.3);
       scene.add(bus);
       dynamic.bus = bus;

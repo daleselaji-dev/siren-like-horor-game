@@ -20,42 +20,44 @@ const R0 = 0.098;                                     // 前脸平均半径
 
 // 每张脸的照片标定（画面比例 0..1）：眼线 y / 左右瞳 x / 嘴线 y / 下巴 y
 // browY=眉中线 / noseY=鼻底孔线——3D 眉贴片与鼻件按此逐脸落位（消双眉/双鼻影残留）
+// hairY=正中发际线 / hairSag=发际线向两鬓下垂量（抛物线，单位=瞳距平方系数）——
+// 烘焙时发际以上像素一律 gate 掉：照片头发不再涂上头皮与 3D 发壳打成双重发际
 // （由人工读图标定；照片要求正面、平光、中性表情）
 const FACE_DEFS = {
   m: {
     url: urlMYoung, base: 'skin',
     eyeY: 0.433, eyeLX: 0.397, eyeRX: 0.620, mouthY: 0.708, chinY: 0.862,
-    browY: 0.372, noseY: 0.593,
+    browY: 0.372, noseY: 0.593, hairY: 0.295, hairSag: 0.10,
     mat: { envInt: 0.6, cc: 0.3, ccRough: 0.32, normalScale: 0.85, poreScale: 0.9 },
   },
   f: {
     url: urlFYoung, base: 'skin',
     eyeY: 0.449, eyeLX: 0.400, eyeRX: 0.614, mouthY: 0.711, chinY: 0.845,
-    browY: 0.378, noseY: 0.607,
+    browY: 0.378, noseY: 0.607, hairY: 0.180, hairSag: 0.33,
     mat: { envInt: 0.6, cc: 0.32, ccRough: 0.3, normalScale: 0.75, poreScale: 0.8 },
   },
   oldm: {
     url: urlMOld, base: 'skinOld',
     eyeY: 0.458, eyeLX: 0.386, eyeRX: 0.615, mouthY: 0.748, chinY: 0.878,
-    browY: 0.398, noseY: 0.628,
+    browY: 0.398, noseY: 0.628, hairY: 0.245, hairSag: 0.10,
     mat: { envInt: 0.55, cc: 0.16, ccRough: 0.5, normalScale: 1.15, poreScale: 1.25 },
   },
   oldf: {
     url: urlFOld, base: 'skinOld',
     eyeY: 0.419, eyeLX: 0.388, eyeRX: 0.607, mouthY: 0.678, chinY: 0.792,
-    browY: 0.345, noseY: 0.563,
+    browY: 0.345, noseY: 0.563, hairY: 0.290, hairSag: 0.28,
     mat: { envInt: 0.55, cc: 0.18, ccRough: 0.48, normalScale: 1.1, poreScale: 1.2 },
   },
   pale: {
     url: urlPale, base: 'skin',
     eyeY: 0.400, eyeLX: 0.407, eyeRX: 0.598, mouthY: 0.635, chinY: 0.714,
-    browY: 0.352, noseY: 0.545,
+    browY: 0.352, noseY: 0.545, hairY: 0.295, hairSag: 0.13,
     mat: { envInt: 0.9, cc: 0.48, ccRough: 0.24, normalScale: 0.9, poreScale: 0.8 },
   },
   chalk: {
     url: urlChalk, base: 'skinOld',
     eyeY: 0.427, eyeLX: 0.400, eyeRX: 0.611, mouthY: 0.700, chinY: 0.812,
-    browY: 0.388, noseY: 0.600,
+    browY: 0.388, noseY: 0.600, hairY: 0.280, hairSag: 0.10,
     mat: { envInt: 0.4, cc: 0.05, ccRough: 0.7, normalScale: 1.25, poreScale: 1.4 },
   },
 };
@@ -81,6 +83,27 @@ export function faceAnchor(key) {
 function sstep(a, b, t) {
   t = Math.min(1, Math.max(0, (t - a) / (b - a)));
   return t * t * (3 - 2 * t);
+}
+
+/** 皮肤背光透光近似：耳缘/鼻翼等薄组织在掠射角泛一层暖红——
+ *  注入 rim 项叠在 sheen 之上，且用「已接收的漫射光」门控（黑暗里不自发光）。
+ *  clone() 不带走 onBeforeCompile：hdSkinVariant 等克隆处需重新调用本函数。 */
+export function applySkinRim(m, k = 0.6) {
+  m.userData.rimK = k;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uRimK = { value: m.userData.rimK ?? 0.6 };
+    sh.fragmentShader = ('uniform float uRimK;\n' + sh.fragmentShader).replace(
+      '#include <opaque_fragment>',
+      `{
+        vec3 rimV = normalize( vViewPosition );
+        float rimF = pow( clamp( 1.0 - dot( normal, rimV ), 0.0, 1.0 ), 3.0 );
+        float rimLit = clamp( dot( reflectedLight.directDiffuse + reflectedLight.indirectDiffuse, vec3( 1.6 ) ), 0.0, 1.0 );
+        outgoingLight += vec3( 0.62, 0.17, 0.11 ) * ( rimF * rimLit * uRimK );
+      }
+      #include <opaque_fragment>`);
+  };
+  m.customProgramCacheKey = () => 'skinRim';
+  return m;
 }
 
 /**
@@ -167,13 +190,15 @@ export function buildFaceMaterials(M, T) {
     });
     m.clearcoatNormalMap = T.skinPoreN;
     m.clearcoatNormalScale = new THREE.Vector2(D.mat.poreScale, D.mat.poreScale);
+    // 背光透光近似：耳缘/鼻翼掠射角一层暖红叠在 sheen 上（受光门控，暗处不亮）
+    applySkinRim(m, key === 'chalk' ? 0.25 : key === 'pale' ? 0.4 : 0.7);
     M.faceMats[key] = m;
     // 眼睑/鼻翼小件：纯色同调（避免小件 UV 乱采照片）
-    M.faceLids[key] = new THREE.MeshPhysicalMaterial({
+    M.faceLids[key] = applySkinRim(new THREE.MeshPhysicalMaterial({
       color: 0xc9997c, roughness: 0.62, envMapIntensity: D.mat.envInt,
       clearcoat: D.mat.cc * 0.7, clearcoatRoughness: D.mat.ccRough + 0.1,
       sheen: 0.25, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffe2d0),
-    });
+    }), key === 'chalk' ? 0.25 : 0.55);
     // 颈裙材质：与脸皮同源取色、只降明度不动色相（烘焙后统一乘暗），
     // 开顶点色给下颌接触阴影用
     M.faceNecks[key] = new THREE.MeshPhysicalMaterial({
@@ -236,6 +261,14 @@ function compositeFace(M, job, img) {
   const ecx = cx, ecy = D.eyeY * S + mePx * 0.5;
   const eax = ioPx * 1.1, eay = mePx * 2.05;
   const chinPy = D.chinY * S;
+  // 发际线 gate（照片空间）：正中 hairY、向两鬓按抛物线下垂——
+  // 发际线及以上的照片头发一个像素都不许烘上头皮（双重发际涂鸦的根治）。
+  // 羽化带整个落在发际线以下（向皮肤渐入 ~4% 画幅）：底皮→照片的过渡是坡不是坎
+  const hairGate = (spx, spy) => {
+    const dxn = (spx - cx) / ioPx;
+    const gy = (D.hairY + D.hairSag * dxn * dxn) * S;
+    return sstep(gy + S * 0.004, gy + S * 0.042, spy);
+  };
 
   // 颊部取色（肤色均值→睑色/底皮色调匹配）
   const sampleAvg = (x0, y0, r) => {
@@ -260,6 +293,12 @@ function compositeFace(M, job, img) {
     const dr = Math.abs(pr - bgTR[0]) + Math.abs(pg - bgTR[1]) + Math.abs(pb - bgTR[2]);
     return sstep(16, 46, Math.min(dl, dr));
   };
+  // 碎发亮度 gate（眉线以上的额区）：横过额头的散落发丝远暗于肤色——
+  // 抛物线 gate 之下漏网的那几笔（老年脸的额前灰发）按亮度整根拒收
+  const skinLum = skinAvg[0] * 0.35 + skinAvg[1] * 0.5 + skinAvg[2] * 0.15;
+  const browGateY = (D.browY - 0.012) * S;
+  const strandGate = (spy, pr, pg, pb) =>
+    spy >= browGateY ? 1 : sstep(0.42, 0.6, (pr * 0.35 + pg * 0.5 + pb * 0.15) / skinLum);
 
   // 睑/唇材质取色（略压暗睑色——上睑总在阴影里）
   // 照片像素是 sRGB——setRGB 必须声明色彩空间，否则被当线性值放亮（颈白脸黄的元凶）
@@ -300,11 +339,17 @@ function compositeFace(M, job, img) {
         const spx = cx + x3 * sx;
         const spy = cy - y3 * sy;
         if (spx > 1 && spx < S - 2 && spy > 1 && spy < S - 2) {
-          // 权重：朝前 × 椭圆 × 下巴截止
-          let w = sstep(0.14, 0.48, dz);
+          const frontW = sstep(0.14, 0.48, dz);
+          const gate = hairGate(spx, spy);
+          // 发际以上头皮压暗一档（发根阴影）：发壳羽化边下露出的头皮不是亮粉的秃皮
+          const rootDk = 1 - (1 - gate) * 0.13 * frontW;
+          r *= rootDk; g *= rootDk; b *= rootDk;
+          // 权重：朝前 × 椭圆 × 下巴截止 × 发际线 gate
+          let w = frontW;
           const rex = (spx - ecx) / eax, rey = (spy - ecy) / eay;
           w *= 1 - sstep(0.72, 0.98, Math.sqrt(rex * rex + rey * rey));
           w *= 1 - sstep(chinPy - 8, chinPy + 22, spy);
+          w *= gate;
           if (w > 0.003) {
             // 双线性采样照片
             const xi = spx | 0, yi = spy | 0, xf = spx - xi, yf = spy - yi;
@@ -313,6 +358,7 @@ function compositeFace(M, job, img) {
             const pg = (P[p00 + 1] * (1 - xf) + P[p10 + 1] * xf) * (1 - yf) + (P[p01 + 1] * (1 - xf) + P[p11 + 1] * xf) * yf;
             const pb = (P[p00 + 2] * (1 - xf) + P[p10 + 2] * xf) * (1 - yf) + (P[p01 + 2] * (1 - xf) + P[p11 + 2] * xf) * yf;
             w *= bgGate(pr, pg, pb); // 背景色（灰墙/衣领）拒绝上皮
+            w *= strandGate(spy, pr, pg, pb); // 额区散落发丝拒绝上皮
             r += (pr - r) * w; g += (pg - g) * w; b += (pb - b) * w;
           }
         }
@@ -354,9 +400,11 @@ function compositeFace(M, job, img) {
       const rex = (spx - ecx) / eax, rey = (spy - ecy) / eay;
       w *= 1 - sstep(0.7, 0.95, Math.sqrt(rex * rex + rey * rey));
       w *= 1 - sstep(chinPy - 10, chinPy + 16, spy);
+      w *= hairGate(spx, spy); // 发际以上的照片头发假法线一并拒绝
       if (w < 0.01) continue;
       const bi = ((spy | 0) * S + (spx | 0)) * 4;
       w *= bgGate(P[bi], P[bi + 1], P[bi + 2]); // 背景边界的假法线一并拒绝
+      w *= strandGate(spy, P[bi], P[bi + 1], P[bi + 2]); // 额区发丝假法线一并拒绝
       if (w < 0.01) continue;
       // 高频亮度差分 → 法线扰动（暗=凹：皱纹沟、唇纹、毛孔）
       const gx = (hp(spx + 2, spy) - hp(spx - 2, spy)) * kN * w;

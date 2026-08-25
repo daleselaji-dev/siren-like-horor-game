@@ -1255,6 +1255,19 @@ export class Story {
     bus.position.x += this._busV * dt;
     const g2 = this.g.world.heightAt(bus.position.x, bus.position.z);
     bus.position.y += (g2 + 0.06 - bus.position.y) * Math.min(1, dt * 4);
+    // 轮迹水花：按车速点亮轮后水雾尾（湿沥青被轮胎带起——车是「碾着水」走的）
+    const sprays = this.g.world.dynamic.busSprays;
+    if (sprays) {
+      const k = Math.min(1, this._busV / 7);
+      const on = k > 0.14;
+      this.g.world.dynamic.busSprayMat.opacity = on
+        ? Math.max(0, 0.09 + 0.13 * k + Math.sin(this.time * 37) * 0.03 * k) : 0;
+      for (const sp of sprays) {
+        sp.visible = on;
+        const pulse = 1 + Math.sin(this.time * 23 + sp.position.x * 3.1) * 0.12;
+        sp.scale.set((0.35 + 0.6 * k) * pulse, 0.35 + 0.85 * k, (0.3 + 0.4 * k) * pulse);
+      }
+    }
     if (bus.position.x > 128) bus.visible = false;
   }
 

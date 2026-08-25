@@ -793,43 +793,141 @@ export function lashStrokesTexture(w = 128, h = 48) {
   return c;
 }
 
-/** 长发前帘贴图：上段多股重叠近实底，下 1/3 分股参差收梢——
- *  梢部锯齿 alpha（每股末端变细变淡 + 整体梢端渐隐），发帘下摆不再是一条直切线。 */
-export function hairCurtainTexture(w = 160, h = 256, seed = 9911) {
+/** 长发前帘贴图（双层化）：沿宽分 3–4 绺（clumps），每绺一束股线绕自己的中轴拢紧，
+ *  绺间留窄缝——帘不再是一块均匀毛玻璃，而是「几绺头发」。
+ *  dense=true 内帘：绺芯垫近实底缎带、股多线粗（前帘的「体」）；
+ *  dense=false 外帘：股稀线细摆幅大（浮在内帘外的「散」）。
+ *  帘根压暗成接壳带：顶部 ~14% 明度乘暗且 alpha 抬满——发根挤在一起是暗的，
+ *  正好接住发壳下檐，消掉壳-帘之间的亮缝。 */
+export function hairCurtainTexture(w = 160, h = 256, seed = 9911, opts = {}) {
+  const clumps = opts.clumps ?? 4;
+  const dense = opts.dense ?? true;
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const x = c.getContext('2d');
   const rand = mulberry32(seed);
   x.lineCap = 'round';
-  for (let i = 0; i < 130; i++) {
-    const bx = (0.03 + rand() * 0.94) * w;
-    const len = h * (0.66 + rand() * 0.36);      // 股末参差 → 锯齿下摆
-    const sway = (rand() - 0.5) * w * 0.12;
-    const shade = 190 + (rand() * 50) | 0;
-    const a = 0.45 + rand() * 0.5;
-    const lw = 1.3 + rand() * 2.6;
-    // 主股
-    x.strokeStyle = `rgba(${shade},${shade - 4},${shade - 8},${a.toFixed(2)})`;
-    x.lineWidth = lw;
-    x.beginPath();
-    x.moveTo(bx, -2);
-    x.bezierCurveTo(bx + sway * 0.25, len * 0.4, bx + sway * 0.7, len * 0.72, bx + sway * 0.92, len * 0.82);
-    x.stroke();
-    // 收梢：末端变细变淡（锯齿是「梢」不是「切口」）
-    x.strokeStyle = `rgba(${shade},${shade - 4},${shade - 8},${(a * 0.55).toFixed(2)})`;
-    x.lineWidth = lw * 0.42;
-    x.beginPath();
-    x.moveTo(bx + sway * 0.92, len * 0.82);
-    x.quadraticCurveTo(bx + sway * 0.98, len * 0.92, bx + sway, len);
-    x.stroke();
+  const perClump = dense ? 40 : 14;
+  for (let k = 0; k < clumps; k++) {
+    const ccx = ((k + 0.5) / clumps + (rand() - 0.5) * 0.05) * w; // 绺中轴
+    const cw = (w / clumps) * (0.34 + rand() * 0.08);            // 绺半宽（留绺间缝）
+    const cSway = (rand() - 0.5) * w * (dense ? 0.10 : 0.2);     // 绺级摆（整绺一起弯）
+    const cLen = h * (0.8 + rand() * 0.16);                      // 绺末参差
+    if (dense) {
+      // 绺芯缎带：近实底的宽带（内帘的「体」——外帘透过缝看到的是它，不是头皮）
+      const grad = x.createLinearGradient(ccx, 0, ccx, cLen);
+      grad.addColorStop(0, 'rgba(150,146,140,0.92)');
+      grad.addColorStop(0.7, 'rgba(196,192,184,0.85)');
+      grad.addColorStop(1, 'rgba(206,202,194,0.2)');
+      x.strokeStyle = grad;
+      x.lineWidth = cw * 1.5;
+      x.beginPath();
+      x.moveTo(ccx, -2);
+      x.bezierCurveTo(ccx + cSway * 0.25, cLen * 0.4, ccx + cSway * 0.7, cLen * 0.75, ccx + cSway, cLen * 0.94);
+      x.stroke();
+    }
+    for (let i = 0; i < perClump; i++) {
+      const off = (rand() - 0.5) * 2;                            // 绺内横位 -1..1
+      const bx = ccx + off * cw;
+      const len = cLen * (0.82 + rand() * 0.22);
+      const sway = cSway + (rand() - 0.5) * w * 0.05;
+      // 股线向绺中轴拢紧（梢端 off 收半）——「绺」是拢出来的，不是排出来的
+      const tipX = ccx + off * cw * 0.5 + sway;
+      const shade = (dense ? 178 : 192) + (rand() * 52) | 0;
+      const a = (dense ? 0.5 : 0.4) + rand() * 0.45;
+      const lw = (dense ? 1.4 : 0.9) + rand() * (dense ? 2.2 : 1.3);
+      x.strokeStyle = `rgba(${shade},${shade - 4},${shade - 8},${a.toFixed(2)})`;
+      x.lineWidth = lw;
+      x.beginPath();
+      x.moveTo(bx, -2);
+      x.bezierCurveTo(bx + (tipX - bx) * 0.2, len * 0.4, bx + (tipX - bx) * 0.65, len * 0.72, tipX - (tipX - bx) * 0.08, len * 0.82);
+      x.stroke();
+      // 收梢：末端变细变淡（锯齿是「梢」不是「切口」）
+      x.strokeStyle = `rgba(${shade},${shade - 4},${shade - 8},${(a * 0.55).toFixed(2)})`;
+      x.lineWidth = lw * 0.42;
+      x.beginPath();
+      x.moveTo(tipX - (tipX - bx) * 0.08, len * 0.82);
+      x.quadraticCurveTo(tipX - (tipX - bx) * 0.03, len * 0.92, tipX, len);
+      x.stroke();
+    }
   }
+  // 帘根暗色接壳带：顶部明度乘暗（只动已画像素的颜色，不动 alpha）
+  x.globalCompositeOperation = 'source-atop';
+  const root = x.createLinearGradient(0, 0, 0, h * 0.16);
+  root.addColorStop(0, 'rgba(20,16,12,0.72)');
+  root.addColorStop(0.65, 'rgba(20,16,12,0.34)');
+  root.addColorStop(1, 'rgba(20,16,12,0)');
+  x.fillStyle = root;
+  x.fillRect(0, 0, w, h * 0.16);
+  x.globalCompositeOperation = 'source-over';
+  if (dense) {
+    // 内帘帘根 alpha 抬满：顶带用近实底暗色补一条（接壳带不许漏缝）
+    const cap = x.createLinearGradient(0, 0, 0, h * 0.12);
+    cap.addColorStop(0, 'rgba(56,50,44,0.88)');
+    cap.addColorStop(1, 'rgba(56,50,44,0)');
+    x.fillStyle = cap;
+    x.fillRect(0, 0, w, h * 0.12);
+  }
+  // 顶缘 3% alpha 软入：帘顶不许在空间里留一条水平硬切口（帘根探进壳下）
+  x.globalCompositeOperation = 'destination-in';
+  const capIn = x.createLinearGradient(0, 0, 0, h * 0.03);
+  capIn.addColorStop(0, 'rgba(0,0,0,0.35)');
+  capIn.addColorStop(1, 'rgba(0,0,0,1)');
+  x.fillStyle = capIn;
+  x.fillRect(0, 0, w, h * 0.03);
   // 梢端整体渐隐：0.72h 起 alpha 走低——下摆在锯齿之上再叠一层「散」
   const fade = x.createLinearGradient(0, h * 0.7, 0, h);
   fade.addColorStop(0, 'rgba(0,0,0,1)');
   fade.addColorStop(0.75, 'rgba(0,0,0,0.72)');
   fade.addColorStop(1, 'rgba(0,0,0,0.3)');
-  x.globalCompositeOperation = 'destination-in';
   x.fillStyle = fade;
+  x.fillRect(0, 0, w, h);
+  x.globalCompositeOperation = 'source-over';
+  return c;
+}
+
+/** 发际线绒边：顶带近实（发根挤在一起=接壳暗带）→ 向下快速稀疏成细绒毛梢。
+ *  专供发际线过渡卡片——离散粗笔画贴在裸皮上读成「涂鸦」，绒边读成「长出来的」。
+ *  左右端 alpha 渐隐，卡片侧缘不留切线。 */
+export function hairlineFringeTexture(w = 256, h = 96, seed = 8811) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  const rand = mulberry32(seed);
+  x.lineCap = 'round';
+  // 发根软影带：顶 20% 一条低alpha暗带（贴着壳檐的过渡底色）
+  const rootG = x.createLinearGradient(0, 0, 0, h * 0.34);
+  rootG.addColorStop(0, 'rgba(120,112,104,0.66)');
+  rootG.addColorStop(0.55, 'rgba(140,132,122,0.3)');
+  rootG.addColorStop(1, 'rgba(150,142,132,0)');
+  x.fillStyle = rootG;
+  x.fillRect(0, 0, w, h * 0.34);
+  // 逐根绒毛：根密（每 1.6px 一根）、梢短而淡——长度指数衰减，没有一根戳到卡底
+  for (let i = 0; i < 160; i++) {
+    const bx = (0.02 + rand() * 0.96) * w;
+    const len = h * (0.22 + rand() * rand() * 0.62); // 平方偏置：长毛是少数
+    const sway = (rand() - 0.5) * w * 0.06;
+    const shade = 150 + (rand() * 70) | 0;
+    x.strokeStyle = `rgba(${shade},${shade - 5},${shade - 10},${(0.3 + rand() * 0.45).toFixed(2)})`;
+    x.lineWidth = 0.5 + rand() * 0.9;
+    x.beginPath();
+    x.moveTo(bx, -1);
+    x.quadraticCurveTo(bx + sway * 0.4, len * 0.55, bx + sway, len);
+    x.stroke();
+  }
+  // 左右端渐隐 + 梢端整体softout
+  x.globalCompositeOperation = 'destination-in';
+  const endF = x.createLinearGradient(0, 0, w, 0);
+  endF.addColorStop(0, 'rgba(0,0,0,0)');
+  endF.addColorStop(0.12, 'rgba(0,0,0,1)');
+  endF.addColorStop(0.88, 'rgba(0,0,0,1)');
+  endF.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = endF;
+  x.fillRect(0, 0, w, h);
+  const tipF = x.createLinearGradient(0, h * 0.5, 0, h);
+  tipF.addColorStop(0, 'rgba(0,0,0,1)');
+  tipF.addColorStop(1, 'rgba(0,0,0,0.25)');
+  x.fillStyle = tipF;
   x.fillRect(0, 0, w, h);
   x.globalCompositeOperation = 'source-over';
   return c;
@@ -1376,7 +1474,11 @@ export function buildTextureSet(lowspec = false) {
   set.lash = toTex(lashStrokesTexture(), { aniso, clamp: true });
   set.hairStrand = toTex(hairStrandsTexture(192, 128, 6161, false), { aniso, clamp: true });
   set.hairWisp = toTex(hairStrandsTexture(192, 128, 7273, true), { aniso, clamp: true });
+  set.hairFringe = toTex(hairlineFringeTexture(), { aniso, clamp: true });
   set.hairCurtain = toTex(hairCurtainTexture(), { aniso, clamp: true });
+  // 前帘双层：内实（绺芯缎带+密股）/ 外散（稀股大摆）——沿宽 4/3 绺
+  set.hairCurtainIn = toTex(hairCurtainTexture(160, 256, 9911, { clumps: 4, dense: true }), { aniso, clamp: true });
+  set.hairCurtainOut = toTex(hairCurtainTexture(160, 256, 5533, { clumps: 3, dense: false }), { aniso, clamp: true });
   set.waterNormal = waterNormalTexture(99, lowspec ? 256 : 512);
   set.net = netTexture();
   set.lantern = lanternTexture('潮');

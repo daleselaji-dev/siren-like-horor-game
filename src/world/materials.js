@@ -2,7 +2,7 @@
 // v2：接入粗糙度图（湿面真正反光）+ 环境反射强度分级
 import * as THREE from 'three';
 import { buildTextureSet } from './textures.js';
-import { buildFaceMaterials } from './faces.js';
+import { buildFaceMaterials, applySkinRim } from './faces.js';
 
 export function buildMaterials(lowspec = false) {
   const T = buildTextureSet(lowspec);
@@ -39,6 +39,8 @@ export function buildMaterials(lowspec = false) {
     });
     m.clearcoatNormalMap = T.skinPoreN;
     m.clearcoatNormalScale = new THREE.Vector2(o.poreScale ?? 0.9, o.poreScale ?? 0.9);
+    // 背光透光近似：耳缘/鼻翼掠射角泛暖红，叠在 sheen 绒毛光之上（受光门控）
+    applySkinRim(m, o.rimK ?? 0.55);
     return m;
   };
 
@@ -60,7 +62,7 @@ export function buildMaterials(lowspec = false) {
 
   // ===== 蚀湾 · 人物 =====
   M.skin = skinPhys(T.skin, { envInt: 0.6, cc: 0.3, ccRough: 0.32 });
-  M.skinPale = skinPhys(T.skin, { color: 0xd8dee0, envInt: 0.9, cc: 0.48, ccRough: 0.24 }); // 深压下失血的脸——更湿
+  M.skinPale = skinPhys(T.skin, { color: 0xd8dee0, envInt: 0.9, cc: 0.48, ccRough: 0.24, rimK: 0.35 }); // 深压下失血的脸——更湿
   // 肤色池：2 张底皮 × 色调乘子——人群不再共享同一张皮
   M.skinTones = [
     M.skin,
@@ -82,7 +84,7 @@ export function buildMaterials(lowspec = false) {
     skinPhys(T.skinOld, { color: 0xd8dcd4, normalScale: 1.0, envInt: 0.9, cc: 0.44, ccRough: 0.26 }),
   ];
   // 骨粉白垩皮（理骨员：干、白、粗糙——像常年裹着一层粉；几乎无油）
-  M.skinChalk = skinPhys(T.skinOld, { color: 0xe2e4da, normalScale: 1.25, envInt: 0.4, cc: 0.05, ccRough: 0.7, poreScale: 1.4 });
+  M.skinChalk = skinPhys(T.skinOld, { color: 0xe2e4da, normalScale: 1.25, envInt: 0.4, cc: 0.05, ccRough: 0.7, poreScale: 1.4, rimK: 0.18 });
   // 盐霜附居痕迹（人脸上的结晶主异常）：干白晶壳、边缘微闪
   M.saltFrost = std(T.salt, { color: 0xf2efe2, normalScale: 1.1, envInt: 1.5, roughness: 1.0 });
   M.rubber = std(T.rubber, { normalScale: 1.2, envInt: 1.3, extra: { side: THREE.DoubleSide } }); // 胶皮围裙/手套/胶靴（围裙为开放壳，双面）
