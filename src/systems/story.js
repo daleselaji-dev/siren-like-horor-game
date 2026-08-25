@@ -1153,8 +1153,8 @@ export class Story {
     this.introSeq = { t: 0, dur: 12.0, thunder2: false };
     hud.setLetterbox(true);
     this.g.player.frozen = true;
-    // 三拍运镜的光雷谱：开场首闪（远雷慢半拍）；5.4s 双闪烧出牌坊剪影（近雷同拍压下）
-    this.g.sky.flashSeq = { t: 0, strikes: [0.6, 0.85, 5.4, 5.62] };
+    // 光雷谱一拍：开场首闪（远雷慢半拍跟上）；二拍双闪由 updateIntro 按真实时钟触发
+    this.g.sky.flashSeq = { t: 0, strikes: [0.6, 0.85] };
     this.g.sky.thunderQueued = 1;
     this.g.sky._boltAz = -1.7; // 闪电裂纹立在牌坊背后的西天——剪影要有光源
     this.g.sky.boltMesh.visible = true;
@@ -1171,7 +1171,9 @@ export class Story {
   updateIntro(dt) {
     if (!this.introSeq) return;
     const s = this.introSeq;
-    s.t += dt;
+    // 用真实时钟驱动（低配下游戏 dt 被钳制会拖慢三拍，与字幕/音效的墙钟错拍）
+    if (s.t0 === undefined) s.t0 = performance.now();
+    s.t = (performance.now() - s.t0) / 1000;
     const g = this.g;
     const p = g.player;
     const cam = g.engine.camera;
@@ -1182,33 +1184,36 @@ export class Story {
     };
     const lv = (a, b, t) => a + (b - a) * t;
     if (s.t > 1.6) this.busGo = true; // 末班车掉头回县城
-    // 门 3 冲击拍：镜头咬住牌坊剪影的同一瞬，近雷压顶（与 5.4s 双闪同步）
-    if (!s.thunder2 && s.t >= 5.3) {
+    // 门 3 冲击拍：镜头咬住牌坊剪影的同一瞬，双闪+近雷同拍压下
+    if (!s.thunder2 && s.t >= 5.2) {
       s.thunder2 = true;
-      g.audio.thunderDistant(0.12);
+      g.sky.flashSeq = { t: 0, strikes: [0.05, 0.28] };
+      g.sky._boltAz = -1.7;
+      g.sky.boltMesh.visible = true;
+      g.audio.thunderDistant(0.15);
     }
     let px, py, pz, tx, ty, tz, roll = 0;
     if (s.t < 5.0) {
       // 【一拍 · 低机位仰拍】蹲在湿沥青上：大巴车身压着镜头驶离，
       // 车灯锥扎进雨里，尾灯两点红缩进雾里
       const u = ss(0, 5.0, s.t);
-      px = 61.6 - u * 1.1;
-      pz = 0.9 + u * 0.5;
-      py = gnd(px, pz) + 0.36;
+      px = 60.9 - u * 0.7;
+      pz = 2.0 + u * 0.4;
+      py = gnd(px, pz) + 0.35;
       const bus = g.world.dynamic.bus;
       const bx = bus ? bus.position.x : 64.5;
-      tx = bx + 2.0;
-      ty = gnd(64.5, -1.3) + 2.3 + u * 0.5;
+      tx = bx + 2.6;
+      ty = gnd(64.5, -1.3) + 1.55 + u * 0.5;
       tz = -1.3;
       roll = Math.sin(s.t * 0.7) * 0.028;
     } else if (s.t < 8.4) {
-      // 【二拍 · 牌坊剪影】仰角咬住「蚀湾」牌坊——双闪把瓦顶石柱烧成剪影，雷声同拍
+      // 【二拍 · 牌坊剪影】低机位仰角咬住「蚀湾」牌坊——双闪把瓦顶石柱烧成剪影，雷声同拍
       const u = ss(5.0, 8.4, s.t);
-      px = 55.0 - u * 2.2;
-      pz = 1.7 - u * 0.5;
-      py = gnd(px, pz) + 0.5 + u * 0.55;
+      px = 51.5 - u * 1.6;
+      pz = 1.3 - u * 0.4;
+      py = gnd(px, pz) + 0.45 + u * 0.4;
       tx = 44;
-      ty = gnd(44, 0) + 4.7 - u * 1.2;
+      ty = gnd(44, 0) + 5.1 - u * 1.4;
       tz = 0;
     } else {
       // 【三拍 · 落回眼睛】从眼前两米倒退着落回眼窝，接第一人称
