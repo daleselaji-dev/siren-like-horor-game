@@ -1,5 +1,6 @@
-// 材质库：基于程序化贴图的 PBR(MeshStandardMaterial) 材质
-// v2：接入粗糙度图（湿面真正反光）+ 环境反射强度分级
+// 材质库：基于程序化贴图的 PBR 材质
+// v3：颜色/法线/粗糙度/AO 四通道齐备；潮尸皮肤升级为物理材质
+//     （clearcoat＝皮肤表面那层永远干不掉的水膜，与皮下哑光分层响应光照）
 import * as THREE from 'three';
 import { buildTextureSet } from './textures.js';
 
@@ -10,6 +11,8 @@ export function buildMaterials(lowspec = false) {
   const std = (tex, opts = {}) => new THREE.MeshStandardMaterial({
     map: tex?.map, normalMap: tex?.normalMap,
     roughnessMap: tex?.roughnessMap,
+    aoMap: tex?.aoMap,
+    aoMapIntensity: opts.aoInt ?? 0.9,
     // 有粗糙度图时基值给 1，交由贴图调制
     roughness: tex?.roughnessMap ? (opts.roughness ?? 1.0) : (opts.roughness ?? 0.9),
     metalness: opts.metalness ?? 0.0,
@@ -24,13 +27,28 @@ export function buildMaterials(lowspec = false) {
   M.stone = std(T.stone, { normalScale: 1.5, envInt: 1.1 });
   M.plaster = std(T.plaster, { normalScale: 1.1, envInt: 0.55 });
   M.roof = std(T.roof, { normalScale: 1.6, envInt: 1.2 });
-  M.sand = std(T.sand, { normalScale: 1.0, envInt: 0.9 });
+  M.sand = std(T.sand, { normalScale: 1.0, envInt: 0.9, aoInt: 0.6 });
   M.slab = std(T.slab, { normalScale: 1.4, envInt: 1.4 });
   M.salt = std(T.salt, { envInt: 1.3 });
   M.rock = std(T.rock, { normalScale: 1.9, envInt: 1.1 });
 
-  // 潮尸皮肤：灌水的湿油光
-  M.corpseSkin = std(T.corpseSkin, { normalScale: 0.9, envInt: 1.5 });
+  // 潮尸皮肤：物理材质双层——皮下泡胀的哑光肉 + 表面灌不干的水膜(clearcoat)
+  // 次表面感用轻微暖色 sheen 模拟灯光下皮缘的透光
+  M.corpseSkin = new THREE.MeshPhysicalMaterial({
+    map: T.corpseSkin.map,
+    normalMap: T.corpseSkin.normalMap,
+    roughnessMap: T.corpseSkin.roughnessMap,
+    aoMap: T.corpseSkin.aoMap,
+    aoMapIntensity: 1.0,
+    roughness: 1.0,
+    normalScale: new THREE.Vector2(1.1, 1.1),
+    envMapIntensity: 1.4,
+    clearcoat: lowspec ? 0 : 0.55,
+    clearcoatRoughness: 0.32,
+    sheen: lowspec ? 0 : 0.4,
+    sheenColor: new THREE.Color(0x2c3d38),
+    sheenRoughness: 0.6,
+  });
   M.clothNavy = std(T.clothNavy, { envInt: 0.4 });
   M.clothGrey = std(T.clothGrey, { envInt: 0.4 });
   M.clothRed = std(T.clothRed, { envInt: 0.55 });
@@ -60,6 +78,21 @@ export function buildMaterials(lowspec = false) {
   });
   // 湿发（贴头皮的乱发）
   M.hair = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.55, envMapIntensity: 0.8 });
+
+  // 地面积水洼：近镜面的暗水，专职反射灯火与天光
+  M.puddle = new THREE.MeshStandardMaterial({
+    color: 0x0e1517, roughness: 0.05, metalness: 0.35, envMapIntensity: 2.4,
+  });
+  // 湿海带/海藻（挂在人身上、堆在滩上）
+  M.kelp = new THREE.MeshStandardMaterial({
+    color: 0x2b3a26, roughness: 0.32, envMapIntensity: 1.2, side: THREE.DoubleSide,
+  });
+  // 缆绳/草绳
+  M.rope = new THREE.MeshStandardMaterial({ color: 0x6a5b41, roughness: 0.95, envMapIntensity: 0.4 });
+  // 陶缸/瓦罐
+  M.clay = new THREE.MeshStandardMaterial({ color: 0x5c4a3c, roughness: 0.88, envMapIntensity: 0.6 });
+  // 咸鱼干（挂在架上晒了三年也不干）
+  M.driedFish = new THREE.MeshStandardMaterial({ color: 0x93826a, roughness: 0.75, envMapIntensity: 0.7 });
 
   M.textures = T;
   return M;

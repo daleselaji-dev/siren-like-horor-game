@@ -701,13 +701,46 @@ export class Story {
   beginCaught(enemy) {
     if (this.g.player.dead || this.flags.ended || this.caughtSeq) return;
     const g = this.g;
-    this.caughtSeq = { t: 0, enemy };
+    this.caughtSeq = { t: 0, enemy, choked: false };
     enemy.grabbing = true;
     g.player.frozen = true;
     g.sightjack.exit();
     g.sightjack.restorePost();
     g.audio.grabSting?.();
     g.hud.prompt(null);
+  }
+
+  /** 两只泡胀的湿手（掐喉演出用，建一次反复用） */
+  _buildGrabHands() {
+    const M = this.g.M;
+    const mk = () => {
+      const hand = new THREE.Group();
+      const palm = new THREE.Mesh(new THREE.BoxGeometry(0.088, 0.105, 0.036), M.corpseSkin);
+      hand.add(palm);
+      for (let i = 0; i < 4; i++) {
+        const f = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.014, 0.088, 6), M.corpseSkin);
+        f.position.set(-0.033 + i * 0.022, 0.085, -0.008);
+        f.rotation.x = -0.6; // 指尖朝内抠
+        hand.add(f);
+        const tip = new THREE.Mesh(new THREE.SphereGeometry(0.0125, 6, 5), M.corpseSkin);
+        tip.position.set(f.position.x, 0.122, -0.034);
+        hand.add(tip);
+      }
+      const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.016, 0.07, 6), M.corpseSkin);
+      thumb.position.set(0.058, 0.005, -0.008);
+      thumb.rotation.z = -0.95;
+      hand.add(thumb);
+      return hand;
+    };
+    const group = new THREE.Group();
+    const l = mk(), r = mk();
+    r.scale.x = -1;
+    group.add(l, r);
+    group.userData = { l, r };
+    group.visible = false;
+    group.traverse((o) => { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; });
+    this.g.scene.add(group);
+    return group;
   }
 
   updateCaught(dt) {
@@ -717,19 +750,43 @@ export class Story {
     const g = this.g;
     const p = g.player;
     const e = s.enemy;
-    // 视线被拽向那张凑过来的脸
+    // 视线被拽向那张凑过来的脸；挣扎期镜头细抖
     const targetYaw = Math.atan2(-(e.pos.x - p.pos.x), -(e.pos.z - p.pos.z));
     p.yaw += angleWrap(targetYaw - p.yaw) * Math.min(1, dt * 10);
     p.pitch += (-0.08 - p.pitch) * Math.min(1, dt * 8);
+    const struggle = Math.min(1, s.t * 2);
+    p.yaw += Math.sin(s.t * 47) * 0.006 * struggle;
+    p.pitch += Math.sin(s.t * 39 + 1.7) * 0.005 * struggle;
     p.syncCamera(dt);
+    // 两只湿手从画面两侧滑进来，掐向喉咙（贴在相机空间）
+    const hands = this._grabHands ?? (this._grabHands = this._buildGrabHands());
+    const cam = g.engine.camera;
+    hands.visible = true;
+    hands.position.copy(cam.position);
+    hands.quaternion.copy(cam.quaternion);
+    const k = Math.min(1, s.t / 0.5);
+    const ease = 1 - (1 - k) * (1 - k);
+    const squeeze = Math.min(0.05, Math.max(0, s.t - 0.5) * 0.06); // 收紧
+    const tr = Math.sin(s.t * 31) * 0.004 * k;                     // 手也在抖——他很用力
+    const { l, r } = hands.userData;
+    l.position.set(-0.34 + ease * 0.245 + squeeze + tr, -0.32 + ease * 0.215, -0.4);
+    l.rotation.set(0.55, 0.6 - ease * 0.25, 0.8 - ease * 0.6);
+    r.position.set(0.34 - ease * 0.245 - squeeze - tr, -0.32 + ease * 0.215, -0.4);
+    r.rotation.set(0.55, -0.6 + ease * 0.25, -0.8 + ease * 0.6);
+    // 掐紧后喉咙开始进水
+    if (s.t > 0.8 && !s.choked) {
+      s.choked = true;
+      g.audio.chokeGurgle?.();
+    }
     // 挤压感：畸变 + 心跳 + 漫红一起收紧
     const u = g.engine.finalPass.uniforms;
     u.uPulse.value = Math.min(1.5, s.t * 2.2);
-    u.uDistort.value = Math.min(0.55, s.t * 0.5);
-    u.uRedShift.value = Math.min(0.55, s.t * 0.5);
-    if (s.t > 1.45) {
+    u.uDistort.value = Math.min(0.55, s.t * 0.45);
+    u.uRedShift.value = Math.min(0.55, s.t * 0.45);
+    if (s.t > 1.7) {
       this.caughtSeq = null;
       e.grabbing = false;
+      hands.visible = false;
       this.kill('溺', `${e.label}把你按进了水里。—— 回到检查点`);
     }
   }
@@ -739,6 +796,7 @@ export class Story {
     if ((this.g.player.dead && !force) || this.flags.ended) return;
     const g = this.g;
     this.deathCount++;
+    if (this._grabHands) this._grabHands.visible = false;
     g.player.dead = true;
     g.player.frozen = true;
     g.audio.drown();

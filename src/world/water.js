@@ -1,4 +1,5 @@
-// 海面 v2：滚动双层法线 + 顶点微波 + 近岸浅水变色 + 岸线白沫（跟随潮位）
+// 海面 v3：滚动双层法线 + 顶点微波 + 近岸浅水变色 + 岸线白沫（跟随潮位）
+// + 离岸二道碎浪白 + 月光碎波带（与天空月位对齐，血潮翻成血鳞）
 // + 血潮变色/水位上涨 + 血潮后海平线上的灯笼串（它的鳞，随歌一明一灭）
 import * as THREE from 'three';
 
@@ -52,7 +53,8 @@ export class Ocean {
           uniform float uMeshY;
           attribute float aShore;
           varying float vWave;
-          varying float vShoreD;`)
+          varying float vShoreD;
+          varying vec3 vWPos;`)
         .replace('#include <begin_vertex>', `
           #include <begin_vertex>
           float chop = 1.0 + uBlood * 0.9;      // 血潮时浪更躁
@@ -66,13 +68,15 @@ export class Ocean {
           transformed.y += wa;
           vWave = wa;
           vShoreD = shoreDepth;
+          vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
         `);
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
           uniform float uTime;
           uniform float uBlood;
           varying float vWave;
-          varying float vShoreD;`)
+          varying float vShoreD;
+          varying vec3 vWPos;`)
         .replace('#include <normal_fragment_maps>', `
           // 双层滚动法线
           vec3 mapN1 = texture2D( normalMap, vNormalMapUv + vec2(uTime*0.008, uTime*0.011) ).xyz * 2.0 - 1.0;
@@ -96,6 +100,11 @@ export class Ocean {
           float foam = band * smoothstep(0.34, 0.78, foamN + sin(uTime*0.7 + vShoreD*8.0) * 0.13);
           vec3 foamCol = mix(vec3(0.70, 0.75, 0.73), vec3(0.58, 0.32, 0.29), uBlood);
           diffuseColor.rgb = mix(diffuseColor.rgb, foamCol, foam * 0.8);
+          // 离岸二道白：浪在暗处先破一次——比岸线的那道淡，走得也慢
+          float band2 = 1.0 - smoothstep(0.05, 1.2, abs(vShoreD - 1.15));
+          float foam2N = texture2D( normalMap, vNormalMapUv * 2.6 - vec2(uTime*0.016, uTime*0.010) ).y;
+          float foam2 = band2 * smoothstep(0.42, 0.82, foam2N + sin(uTime*0.5 + vShoreD*5.0) * 0.1);
+          diffuseColor.rgb = mix(diffuseColor.rgb, foamCol, foam2 * 0.34);
           // 浪尖碎沫：只有掀得最高的浪头翻出一线白（血潮翻出粉灰）
           float capN = texture2D( normalMap, vNormalMapUv * 2.3 + vec2(uTime*0.017, -uTime*0.009) ).x;
           float cap = smoothstep(0.30, 0.46, vWave) * smoothstep(0.45, 0.75, capN);
@@ -107,6 +116,17 @@ export class Ocean {
           // 血潮：水体从内部透出的一点血光，随潮歌节律呼吸
           float pulse = 0.5 + 0.5 * sin(uTime * 0.8);
           totalEmissiveRadiance += vec3(0.10, 0.008, 0.006) * uBlood * (0.6 + pulse * 0.4);
+          // 月光碎波带：与天空月位(-0.4,·,-0.6)对齐，向西南海面拖出一条碎银——
+          // 每一粒都在闪，也每一粒都在灭。血潮后整条道翻成暗红的"鳞"。
+          vec2 mdir = vec2(-0.5547, -0.8321);
+          float axis = dot(vWPos.xz, vec2(-mdir.y, mdir.x));
+          float along = dot(vWPos.xz, mdir);
+          float lane = exp(-axis * axis * 0.00030) * smoothstep(20.0, 90.0, along);
+          float glintN = texture2D( normalMap, vWPos.xz * 0.043 + vec2(uTime*0.019, -uTime*0.016) ).z;
+          float glintN2 = texture2D( normalMap, vWPos.xz * 0.11 - vec2(uTime*0.023, uTime*0.013) ).y;
+          float glint = smoothstep(0.98, 1.35, glintN + glintN2 * 0.7 + vWave * 0.5) * lane;
+          vec3 glintCol = mix(vec3(0.60, 0.66, 0.68), vec3(0.55, 0.14, 0.09), uBlood);
+          totalEmissiveRadiance += glintCol * glint * 0.85;
         `);
     };
 

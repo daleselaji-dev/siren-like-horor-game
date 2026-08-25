@@ -139,6 +139,10 @@ export class HUD {
     if (state) {
       this.el.danger.style.opacity = Math.min(1, state.danger * 0.9).toFixed(2);
       this.el.resonance.style.opacity = Math.min(1, state.resonance * 1.1).toFixed(2);
+      // 蹲进苇丛：指示词换成"苇中"，字色染上一点苇绿——玩家由此得知自己被吃进背景里了
+      const inReeds = !!state.crouching && (state.conceal ?? 0) > 0.5;
+      this.el.stealth.textContent = inReeds ? '— 苇 中 —' : '— 潜 行 —';
+      this.el.stealth.style.color = inReeds ? '#7fa08a' : '';
       this.el.stealth.classList.toggle('show', !!state.crouching);
       this.el.drown.style.opacity = Math.min(1, (state.drown ?? 0)).toFixed(2);
       // 共鸣计量：进入歌声范围才浮现

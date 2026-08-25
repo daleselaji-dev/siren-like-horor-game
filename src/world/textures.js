@@ -1,6 +1,7 @@
-// 程序化贴图库 v2：全部用 Canvas 在运行时生成（漫反射 + 高度→法线 + 粗糙度），零二进制资产。
+// 程序化贴图库 v3：全部用 Canvas 在运行时生成（漫反射 + 高度→法线 + 粗糙度 + AO），零二进制资产。
 // 风格规范见 docs/美术圣经.md：低饱和青灰基调、盐霜、湿痕。
-// v2 管线：单趟逐像素同时产出 颜色/高度/粗糙度，法线由高度场数组差分（平铺无缝），
+// v3 管线：单趟逐像素同时产出 颜色/高度/粗糙度，法线由高度场数组差分（平铺无缝），
+//          AO 由高度场双尺度盒模糊凹腔法推导（板缝/石缝/静脉沟壑真正吃光），
 //          非低配下关键材质 768–1024 分辨率；粗糙度图让"湿"真正反光。
 import * as THREE from 'three';
 
@@ -63,10 +64,36 @@ function makeRidged(seed, octaves = 3) {
 function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 function sstep(a, b, t) { t = clamp01((t - a) / (b - a)); return t * t * (3 - 2 * t); }
 
+// 平铺盒模糊（可分离，O(n)）：AO 凹腔法的基础
+function boxBlurWrap(src, size, radius) {
+  const tmp = new Float32Array(size * size);
+  const out = new Float32Array(size * size);
+  const w = radius * 2 + 1;
+  for (let y = 0; y < size; y++) {
+    const row = y * size;
+    let sum = 0;
+    for (let i = -radius; i <= radius; i++) sum += src[row + ((i + size) % size)];
+    for (let x = 0; x < size; x++) {
+      tmp[row + x] = sum / w;
+      sum += src[row + ((x + radius + 1) % size)] - src[row + ((x - radius + size) % size)];
+    }
+  }
+  for (let x = 0; x < size; x++) {
+    let sum = 0;
+    for (let i = -radius; i <= radius; i++) sum += tmp[((i + size) % size) * size + x];
+    for (let y = 0; y < size; y++) {
+      out[y * size + x] = sum / w;
+      sum += tmp[((y + radius + 1) % size) * size + x] - tmp[((y - radius + size) % size) * size + x];
+    }
+  }
+  return out;
+}
+
 /**
- * v2 核心：单趟逐像素填充 颜色 + 高度 + 粗糙度。
+ * v3 核心：单趟逐像素填充 颜色 + 高度 + 粗糙度；再由高度场差分出法线、
+ * 双尺度凹腔差推导 AO（低于周围平均高度的像素在吃阴影）。
  * fn(u, v, out)：写 out[0..2]=RGB(0-255)  out[3]=height(0-1)  out[4]=rough(0-1)
- * 返回 { map, normal, rough }（均为 canvas）
+ * 返回 { map, normal, rough, ao }（均为 canvas）
  */
 function buildMaps(size, fn, normalStrength = 1.8) {
   const [cMap, ctxMap] = makeCanvas(size);
@@ -110,7 +137,23 @@ function buildMaps(size, fn, normalStrength = 1.8) {
     }
   }
   ctxN.putImageData(imgN, 0, 0);
-  return { map: cMap, normal: cN, rough: cRough };
+  // AO：双尺度凹腔（小半径抓缝隙刻痕，大半径抓整体起伏的背光坑）
+  const rSmall = Math.max(2, size >> 7);
+  const rLarge = Math.max(6, size >> 5);
+  const bSmall = boxBlurWrap(H, size, rSmall);
+  const bLarge = boxBlurWrap(H, size, rLarge);
+  const [cAO, ctxAO] = makeCanvas(size);
+  const imgAO = ctxAO.createImageData(size, size);
+  const dA = imgAO.data;
+  for (let i = 0; i < size * size; i++) {
+    const cav = Math.max(0, bSmall[i] - H[i]) * 2.4 + Math.max(0, bLarge[i] - H[i]) * 1.5;
+    const ao = (1 - Math.min(0.62, cav)) * 255;
+    const i4 = i * 4;
+    dA[i4] = dA[i4 + 1] = dA[i4 + 2] = ao;
+    dA[i4 + 3] = 255;
+  }
+  ctxAO.putImageData(imgAO, 0, 0);
+  return { map: cMap, normal: cN, rough: cRough, ao: cAO };
 }
 
 function toTex(canvas, { srgb = true, repeat = [1, 1], aniso = 8 } = {}) {
@@ -536,12 +579,19 @@ export function corpseSkinTexture(seed = 111, size = 512) {
     const saltF = fbm(u * 6 + 9, v * 6 + 9);
     const salt = sstep(0.66, 0.72, saltF);
     r += salt * (216 - r) * 0.85; g += salt * (212 - g) * 0.85; b += salt * (198 - b) * 0.85;
+    // 藤壶环带（皮肤上长出的小白环——海把他们当礁石用了三年）
+    const bn = fbm(u * 14 + 3, v * 14 + 3);
+    const barn = sstep(0.735, 0.765, bn) * (1 - sstep(0.79, 0.83, bn));
+    r += barn * 52; g += barn * 48; b += barn * 40;
+    // 皮下浅淤（贴着静脉的一圈青黄）
+    const bruise = clamp01((fbm(u * 2.8 + 21, v * 2.8 + 21) - 0.58) * 3) * (1 - salt);
+    r -= bruise * 10; g += bruise * 6; b -= bruise * 14;
     // 毛孔/细噪
     const pore = (fbm(u * 22, v * 22) - 0.5) * 10;
     out[0] = r + pore; out[1] = g + pore; out[2] = b + pore;
-    out[3] = clamp01(0.5 + f * 0.28 - vn * 0.2 + salt * 0.22);
-    out[4] = clamp01(0.4 + salt * 0.5 + mottle * 0.06 - f * 0.08); // 湿尸低粗糙、盐痂哑光
-  }, 1.4);
+    out[3] = clamp01(0.5 + f * 0.28 - vn * 0.2 + salt * 0.22 + barn * 0.12);
+    out[4] = clamp01(0.4 + salt * 0.5 + mottle * 0.06 - f * 0.08 + barn * 0.3); // 湿尸低粗糙、盐痂/藤壶哑光
+  }, 1.5);
 }
 
 /** 渔民布衣 v2：织纹 + 补丁 + 磨白 + 湿摆盐渍 */
@@ -603,17 +653,21 @@ export function buildTextureSet(lowspec = false) {
     slab: slabTexture(66, mid),
     salt: saltTexture(77, lowspec ? 128 : 256),
     rock: rockTexture(88, mid),
-    corpseSkin: corpseSkinTexture(111, mid),
+    // 潮尸皮肤是全程近景主角——非低配给主视觉分辨率
+    corpseSkin: corpseSkinTexture(111, hero),
     clothNavy: clothTexture(122, [38, 46, 62], lowspec ? 128 : 256),
     clothGrey: clothTexture(123, [58, 60, 58], lowspec ? 128 : 256),
     clothRed: clothTexture(124, [110, 22, 18], lowspec ? 128 : 256),
   };
   const aniso = lowspec ? 2 : 8;
   for (const [k, v] of Object.entries(defs)) {
+    const aoTex = toTex(v.ao, { srgb: false, aniso });
+    aoTex.channel = 0; // 复用第一套 UV（合批几何只有一套）
     set[k] = {
       map: toTex(v.map, { aniso }),
       normalMap: toTex(v.normal, { srgb: false, aniso }),
       roughnessMap: toTex(v.rough, { srgb: false, aniso }),
+      aoMap: aoTex,
     };
   }
   set.waterNormal = waterNormalTexture(99, lowspec ? 256 : 512);

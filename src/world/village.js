@@ -206,6 +206,8 @@ export function buildVillage(scene, M) {
     mat.vertexColors = true;
     mat.map.repeat.set(48, 48);
     mat.normalMap.repeat.set(48, 48);
+    mat.roughnessMap?.repeat.set(48, 48);
+    mat.aoMap?.repeat.set(48, 48);
     const terrain = new THREE.Mesh(geo, mat);
     terrain.receiveShadow = true;
     scene.add(terrain);
@@ -405,6 +407,161 @@ export function buildVillage(scene, M) {
     scene.add(b);
   }
 
+  // ================= 渔村杂物套件 =================
+  // 全部走静态合批：几百件杂物也不涨 draw call。80 年代渔村的家什，
+  // 每一件都停在三年前被放下的那个位置。
+  const torusRing = new THREE.TorusGeometry(0.5, 0.05, 6, 14);
+  const torusRope = new THREE.TorusGeometry(0.5, 0.11, 6, 16);
+
+  // 木桶（铁箍两道）
+  function barrel(x, z, s = 1) {
+    const b = g(x, z);
+    B.add(GEO.cyl, M.wood, x, b + 0.42 * s, z, rand() * 3, 0.66 * s, 0.84 * s, 0.66 * s);
+    B.add(torusRing, M.ironDark, x, b + 0.18 * s, z, 0, 0.68 * s, 0.68 * s, 0.68 * s, Math.PI / 2, 0);
+    B.add(torusRing, M.ironDark, x, b + 0.66 * s, z, 0, 0.62 * s, 0.62 * s, 0.62 * s, Math.PI / 2, 0);
+    circle(x, z, 0.36 * s, b + 0.85 * s, { noSightBlock: true });
+  }
+
+  // 陶缸/瓦罐
+  function jar(x, z, s = 1) {
+    const b = g(x, z);
+    B.add(GEO.sphere, M.clay, x, b + 0.34 * s, z, rand() * 3, 0.74 * s, 0.82 * s, 0.74 * s);
+    B.add(GEO.cyl, M.clay, x, b + 0.68 * s, z, 0, 0.36 * s, 0.16 * s, 0.36 * s);
+    circle(x, z, 0.3 * s, b + 0.75 * s, { noSightBlock: true });
+  }
+
+  // 竹篓
+  function basket(x, z, s = 1) {
+    const b = g(x, z);
+    B.add(GEO.cyl6, M.rope, x, b + 0.21 * s, z, rand() * 3, 0.5 * s, 0.42 * s, 0.5 * s);
+    B.add(torusRing, M.rope, x, b + 0.42 * s, z, 0, 0.5 * s, 0.5 * s, 0.5 * s, Math.PI / 2, 0);
+  }
+
+  // 板凳
+  function stool(x, z, ry = 0) {
+    const b = g(x, z);
+    const c = Math.cos(ry), sn = Math.sin(ry);
+    B.add(GEO.box, M.woodDark, x, b + 0.3, z, ry, 0.36, 0.05, 0.24);
+    B.add(GEO.box, M.woodDark, x - 0.14 * c, b + 0.14, z + 0.14 * sn, ry, 0.05, 0.28, 0.2);
+    B.add(GEO.box, M.woodDark, x + 0.14 * c, b + 0.14, z - 0.14 * sn, ry, 0.05, 0.28, 0.2);
+  }
+
+  // 柴堆（两层交叠的湿柴）
+  function firewood(x, z, ry = 0) {
+    const b = g(x, z);
+    const c = Math.cos(ry), sn = Math.sin(ry);
+    for (let i = 0; i < 7; i++) {
+      const layer = (i / 4) | 0;
+      const off = ((i % 4) - 1.5 + layer * 0.5) * 0.14;
+      B.add(GEO.cyl, M.woodDark, x + off * c, b + 0.08 + layer * 0.13, z - off * sn,
+        ry + (rand() - 0.5) * 0.18, 0.11, 0.85 + rand() * 0.3, 0.11, Math.PI / 2, 0);
+    }
+    circle(x, z, 0.4, b + 0.32, { noSightBlock: true });
+  }
+
+  // 缆绳圈（三环叠放）
+  function ropeCoil(x, z, s = 1) {
+    const b = g(x, z);
+    B.add(torusRope, M.rope, x, b + 0.07, z, 0, 0.62 * s, 0.62 * s, 0.62 * s, Math.PI / 2, 0);
+    B.add(torusRope, M.rope, x + 0.04 * s, b + 0.17, z - 0.02 * s, 0, 0.52 * s, 0.52 * s, 0.52 * s, Math.PI / 2, 0);
+    B.add(torusRope, M.rope, x - 0.03 * s, b + 0.26, z + 0.03 * s, 0, 0.44 * s, 0.44 * s, 0.44 * s, Math.PI / 2, 0);
+  }
+
+  // 靠墙的橹
+  function oar(x, z, ry, lean = 0.42) {
+    const b = g(x, z);
+    B.add(GEO.cyl, M.woodDark, x, b + 1.15, z, ry, 0.05, 2.4, 0.05, 0, lean);
+    B.add(GEO.box, M.woodDark, x + Math.sin(lean) * Math.cos(ry) * 1.0, b + 0.32,
+      z - Math.sin(lean) * Math.sin(ry) * 1.0, ry, 0.16, 0.7, 0.045, 0, lean);
+  }
+
+  // 咸鱼架：挂着一排三年晒不干的鱼——重要剪影道具
+  function fishRack(x, z, ry = 0) {
+    const b = g(x, z);
+    const c = Math.cos(ry), sn = Math.sin(ry);
+    B.add(GEO.cyl, M.woodDark, x - c * 1.1, b + 0.95, z + sn * 1.1, 0, 0.09, 1.9, 0.09);
+    B.add(GEO.cyl, M.woodDark, x + c * 1.1, b + 0.95, z - sn * 1.1, 0, 0.09, 1.9, 0.09);
+    B.add(GEO.box, M.woodDark, x, b + 1.84, z, ry, 2.5, 0.07, 0.07);
+    const n = 4 + (rand() * 3 | 0);
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n - 0.5;
+      const fx = x + c * t * 2.0, fz = z - sn * t * 2.0;
+      const fl = 1 + rand() * 0.5;
+      B.add(GEO.cyl, M.rope, fx, b + 1.72, fz, 0, 0.012, 0.18, 0.012);
+      B.add(GEO.sphere, M.driedFish, fx, b + 1.45, fz, ry, 0.09, 0.36 * fl, 0.028);
+      B.add(GEO.cone, M.driedFish, fx, b + 1.45 - 0.24 * fl, fz, ry, 0.09, 0.14, 0.02, Math.PI, 0);
+    }
+    circle(x - c * 1.1, z + sn * 1.1, 0.14, b + 1.9, { noSightBlock: true });
+    circle(x + c * 1.1, z - sn * 1.1, 0.14, b + 1.9, { noSightBlock: true });
+  }
+
+  // 蟹笼
+  function crabPot(x, z, ry = 0) {
+    const b = g(x, z);
+    B.add(GEO.cyl6, M.rope, x, b + 0.05, z, ry, 0.66, 0.06, 0.66);
+    B.add(GEO.cyl6, M.rope, x, b + 0.42, z, ry + 0.3, 0.46, 0.06, 0.46);
+    for (let k = 0; k < 3; k++) {
+      const a = ry + (k / 3) * Math.PI * 2;
+      B.add(GEO.cyl, M.rope, x + Math.cos(a) * 0.26, b + 0.24, z + Math.sin(a) * 0.26, 0, 0.03, 0.42, 0.03, 0.2, 0.2);
+    }
+    const netSkin = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.32, 0.38, 6, 1, true), M.net);
+    netSkin.position.set(x, b + 0.24, z);
+    scene.add(netSkin);
+  }
+
+  // 地面积水洼：反着天光和灯火的一小片镜面
+  function puddle(x, z, s = 1) {
+    const b = g(x, z);
+    B.add(GEO.cyl, M.puddle, x, b + 0.02, z, rand() * 3, s * (0.9 + rand() * 0.7), 0.018, s * (0.6 + rand() * 0.5));
+  }
+
+  // 滩涂海藻堆
+  function kelpPile(x, z, s = 1) {
+    const b = terrainHeight(x, z);
+    B.add(GEO.sphere, M.kelp, x, b + 0.05 * s, z, rand() * 3, 1.15 * s, 0.16 * s, 0.8 * s);
+    B.add(GEO.sphere, M.kelp, x + 0.42 * s, b + 0.04 * s, z + 0.24 * s, rand() * 3, 0.7 * s, 0.12 * s, 0.5 * s);
+  }
+
+  // 浮木
+  function driftwood(x, z, ry) {
+    const b = terrainHeight(x, z);
+    B.add(GEO.cyl, M.woodDark, x, b + 0.1, z, ry, 0.15, 2.3 + rand(), 0.13, Math.PI / 2, 0.05);
+    B.add(GEO.cyl, M.woodDark, x + 0.5, b + 0.07, z + 0.3, ry + 0.6, 0.08, 1.2, 0.08, Math.PI / 2, 0);
+  }
+
+  // 木电线杆（80 年代的村：一根杆、一条垂着的线，也停在三年前）
+  function powerPole(x, z) {
+    const b = g(x, z);
+    B.add(GEO.cyl, M.woodDark, x, b + 3.3, z, 0, 0.17, 6.6, 0.17);
+    B.add(GEO.box, M.woodDark, x, b + 6.0, z, 0.35, 1.5, 0.1, 0.1);
+    B.add(GEO.cyl, M.salt, x - 0.62, b + 6.14, z, 0, 0.08, 0.13, 0.08);
+    B.add(GEO.cyl, M.salt, x + 0.62, b + 6.14, z, 0, 0.08, 0.13, 0.08);
+    circle(x, z, 0.24, b + 6.6);
+    return { x, z, y: b + 6.05 };
+  }
+  // 两点之间下垂的电线（悬链近似：分段圆柱）
+  function wireBetween(a, b2, sag = 0.9) {
+    const segs = 7;
+    let prev = null;
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const p = {
+        x: a.x + (b2.x - a.x) * t,
+        z: a.z + (b2.z - a.z) * t,
+        y: a.y + (b2.y - a.y) * t - Math.sin(t * Math.PI) * sag,
+      };
+      if (prev) {
+        const dx = p.x - prev.x, dy = p.y - prev.y, dz = p.z - prev.z;
+        const len = Math.hypot(dx, dy, dz);
+        const horiz = Math.hypot(dx, dz);
+        B.add(GEO.cyl, M.ironDark,
+          (p.x + prev.x) / 2, (p.y + prev.y) / 2, (p.z + prev.z) / 2,
+          Math.atan2(dx, dz), 0.035, len, 0.035, Math.atan2(horiz, dy), 0);
+      }
+      prev = p;
+    }
+  }
+
   // ================= ① 礁滩·搁浅点 =================
   {
     // 搁浅的渡船（船底埋进滩涂，微倾）：分层船壳 + 舷缘 + 矮舱室 + 歪烟囱
@@ -514,9 +671,11 @@ export function buildVillage(scene, M) {
     house(10, 16, 0, 5.0, 4.2, { plaster: true });
     house(-24, -6, 1, 4.8, 4.0, { plaster: true });
     const v4 = house(24, 0, 3, 5.2, 4.2, { plaster: true });
-    house(6, -26, 2, 5.6, 4.4, { plaster: true });
+    const v5 = house(6, -26, 2, 5.6, 4.4, { plaster: true });
     house(-10, -30, 0, 4.6, 3.8);
     locations.note_v4 = v4.local(-1.2, 0.85, -0.8);
+    dynamic.houseV4 = v4;
+    dynamic.houseV5 = v5;
     // 水井
     const wb = g(2, 2);
     B.add(GEO.cyl, M.stone, 2, wb + 0.45, 2, 0, 1.7, 0.9, 1.7);
@@ -873,11 +1032,103 @@ export function buildVillage(scene, M) {
     locations.stele = new THREE.Vector3(stx, g(stx, stz) + 1.2, stz);
   }
 
-  // ================= 芦苇丛（成簇，避开出生路径） =================
+  // ================= 生活痕迹布置（v3 场景密度） =================
+  // 每一件家什都停在三年前被放下的那个位置——标本村的「日常感」全靠这些东西撑着。
+  {
+    // —— ① 礁滩：海留下的东西 ——
+    kelpPile(72, 118, 1.1); kelpPile(88, 104, 0.8); kelpPile(60, 124, 1.4); kelpPile(95, 116);
+    driftwood(68, 112, 0.8); driftwood(84, 96, 2.1);
+    crabPot(64, 100, 0.4); ropeCoil(74, 102, 0.9);
+
+    // —— ② 石堤·渔寮：干了一半的活计 ——
+    barrel(5.1, 51.2); barrel(5.9, 52.1, 0.85);
+    jar(23.3, 58.6); jar(24.1, 57.7, 0.8);
+    basket(-0.7, 50.4); stool(3.1, 54.8, 0.4);
+    firewood(35.3, 49.9, 0.3);
+    oar(40.8, 52.2, 0.5);
+    ropeCoil(12, 68.4, 1.1); ropeCoil(44, 70.5, 0.8);
+    fishRack(26, 50, 0.2); fishRack(8, 44.2, -0.15);
+    crabPot(46, 66, 0.7); crabPot(-8, 66, 0.2);
+    puddle(10, 60); puddle(28, 64, 1.3); puddle(-2, 70, 0.9); puddle(40, 60.5, 1.1);
+
+    // —— ③ 村中心：被撂下的日常 ——
+    barrel(-13.5, 17.6); basket(-15.8, 17.4);
+    jar(6.6, 15.0, 1.05); stool(11.6, 19.1, 0.3); firewood(7.8, 12.9, 1.2);
+    firewood(-26.2, -2.5, 0.2); jar(-21.0, -7.5, 0.9);
+    barrel(27.3, 1.5, 0.9); ropeCoil(27.0, -1.8, 0.85);
+    stool(4.5, -29.3, 2.9); jar(9.7, -24.7); basket(9.5, -27.5);
+    firewood(-13.4, -31.2, 1.7); barrel(-6.6, -29.1, 0.85);
+    basket(-0.5, 4.8); stool(3.8, 3.6, 1.9); // 井边：打了一半的水
+    fishRack(-18, 4, 1.35);
+    puddle(0, 8, 1.2); puddle(8, -4); puddle(-8, 2, 0.8); puddle(18, -14, 1.1); puddle(14, 22, 0.9);
+
+    // —— 电线杆：80 年代唯一的现代物，也停了电 ——
+    const p1 = powerPole(13, 32);
+    const p2 = powerPole(2, 20);
+    const p3 = powerPole(-8, 4);
+    const p4 = powerPole(-18, -12);
+    wireBetween(p1, p2); wireBetween(p2, p3); wireBetween(p3, p4);
+    const p5 = powerPole(27, -8);
+    wireBetween(p2, p5, 1.2);
+    wireBetween(p5, { x: 34, y: g(34, -18) + 9.2, z: -20.5 }, 0.7); // 接进广播站天线
+
+    // —— 晒盐场边角 ——
+    barrel(-30, 12, 0.9); barrel(-29, 10.7, 0.75); jar(-33, -3, 0.9); basket(-31.5, 13.5);
+
+    // —— ④ 潮母宫院落 ——
+    jar(-58, -68, 1.1); jar(-57.1, -69.2, 0.85); basket(-59, -80.6); stool(-61.5, -79.4, 0.8);
+
+    // —— ⑤ 沉船湾 / 灯塔脚下 ——
+    driftwood(30, -64, 1.1); driftwood(44, -80, 2.4);
+    kelpPile(26, -84, 1.2); crabPot(42, -64, 0.5); ropeCoil(48, -86, 0.9);
+    barrel(72.8, -116.2, 0.9); oar(73.1, -117.4, 2.4, 0.3);
+    puddle(66, -104, 1.2); puddle(58, -94, 0.9);
+  }
+
+  // ================= 坟茔坡（村与宫之间的山腰） =================
+  // 一片旧坟，加三座新坟——碑还没来得及刻字。最扎眼的是一个挖开却空着的坑。
+  {
+    const gy = [[-44, -34], [-47, -37.5], [-42.5, -39], [-49.5, -33], [-46, -30.5], [-51, -40.5], [-41, -30]];
+    for (let i = 0; i < gy.length; i++) {
+      const [mx, mz] = gy[i];
+      const mb = g(mx, mz);
+      B.add(GEO.sphere, M.sand, mx, mb + 0.12, mz, rand() * 3, 1.5, 0.55, 1.05);
+      // 碑：前四座旧坟歪碑，后三座新坟直碑无字
+      const tilt = i < 4 ? (rand() - 0.5) * 0.5 : 0;
+      B.add(GEO.box, M.stone, mx - 0.75, mb + 0.55, mz, rand() * 0.4, 0.5, 0.9, 0.12, tilt, tilt * 0.6);
+      circle(mx, mz, 0.7, mb + 0.55, { noSightBlock: true });
+    }
+    // 挖开的空坑：黑洞 + 旁边一堆翻出来的土、一把插着的锹
+    const hx = -45, hz = -42.5, hb = g(hx, hz);
+    const pit = new THREE.MeshStandardMaterial({ color: 0x0c0d0f, roughness: 1 });
+    B.add(GEO.box, pit, hx, hb - 0.02, hz, 0.3, 2.0, 0.08, 0.9);
+    B.add(GEO.sphere, M.sand, hx + 1.5, hb + 0.15, hz + 0.4, 0.8, 1.2, 0.5, 0.9);
+    B.add(GEO.cyl, M.woodDark, hx - 1.2, hb + 0.65, hz + 0.5, 0, 0.05, 1.4, 0.05, 0, 0.4);
+    B.add(GEO.box, M.ironDark, hx - 1.62, hb + 0.08, hz + 0.5, 0, 0.22, 0.3, 0.04, 0, 0.4);
+    banner(-48.5, -43.5, 0.9);
+  }
+
+  // ================= 炊烟（死村的烟囱还冒着烟——没人做饭，但火没灭过） =================
+  {
+    const chimney = (hh, lx, lz, hWall, wW) => {
+      const topY = hWall + 0.3 + (wW / 2 - Math.abs(lx)) * 0.5 * 0.5 + 0.7;
+      const p = hh.local(lx, topY, lz);
+      B.add(GEO.box, M.stone, p.x, p.y, p.z, 0, 0.5, 1.2, 0.5);
+      B.add(GEO.box, M.stone, p.x, p.y + 0.66, p.z, 0, 0.66, 0.14, 0.66);
+      makeSmoke(p.x, p.y + 0.8, p.z, { count: 20, rise: 3.4, spread: 0.22, size: 0.22, opacity: 0.22 });
+    };
+    if (dynamic.hut2) chimney(dynamic.hut2, 1.2, -1.0, 2.3, 5.2);
+    if (dynamic.houseV4) chimney(dynamic.houseV4, 1.2, -1.0, 2.3, 5.2);
+    if (dynamic.houseV5) chimney(dynamic.houseV5, -1.3, 0.9, 2.3, 5.6);
+  }
+
+  // ================= 芦苇丛（成簇，避开出生路径；簇心供潜行系统隐蔽判定） =================
+  const reedClusters = [];
   {
     const reedMat = new THREE.MeshStandardMaterial({ color: 0x59614a, roughness: 0.95 });
     const reedGeo = new THREE.ConeGeometry(0.075, 1.35, 4);
-    const inst = new THREE.InstancedMesh(reedGeo, reedMat, 420);
+    const MAX_REED = 760;
+    const inst = new THREE.InstancedMesh(reedGeo, reedMat, MAX_REED);
     const m4 = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const e = new THREE.Euler();
@@ -886,30 +1137,36 @@ export function buildVillage(scene, M) {
     // 找合法簇心
     const centers = [];
     let guard = 0;
-    while (centers.length < 14 && guard++ < 4000) {
+    while (centers.length < 20 && guard++ < 5000) {
       const x = (rand() - 0.5) * 260, z = (rand() - 0.5) * 280;
       const h = terrainHeight(x, z);
       if (h < 0.6 || h > 1.6) continue;
       if (Math.hypot(x - 80, z - 111) < 15) continue; // 避开出生礁滩
       centers.push([x, z]);
     }
+    // 固定簇：巡逻线附近，保证潜行玩法一定有芦苇可用
+    centers.push([-4, 60], [30, 58], [-20, 24], [30, -34], [-38, -52], [46, -56]);
     for (const [cx, cz] of centers) {
-      const n = 18 + Math.floor(rand() * 12);
-      for (let i = 0; i < n && placed < 420; i++) {
-        const x = cx + (rand() - 0.5) * 6, z = cz + (rand() - 0.5) * 6;
+      const n = 22 + Math.floor(rand() * 14);
+      let used = 0;
+      for (let i = 0; i < n && placed < MAX_REED; i++) {
+        const x = cx + (rand() - 0.5) * 6.5, z = cz + (rand() - 0.5) * 6.5;
         const h = terrainHeight(x, z);
-        if (h < 0.4 || h > 1.9) continue;
+        if (h < 0.4 || h > 2.2) continue;
         e.set((rand() - 0.5) * 0.22, rand() * 6.28, (rand() - 0.5) * 0.22);
         q.setFromEuler(e);
         s3.set(1, 0.7 + rand() * 0.7, 1);
         m4.compose(new THREE.Vector3(x, h + 0.6, z), q, s3);
         inst.setMatrixAt(placed++, m4);
+        used++;
       }
+      if (used >= 10) reedClusters.push({ x: cx, z: cz, r: 3.4 });
     }
     inst.count = placed;
     inst.instanceMatrix.needsUpdate = true;
     scene.add(inst);
   }
+  locations.reedClusters = reedClusters;
 
   // ---- 提交静态合批 ----
   B.flush(scene);
