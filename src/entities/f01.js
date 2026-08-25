@@ -111,6 +111,7 @@ export class F01Body extends Humanoid {
         ageSag: 0.85,
         chinSize: 0.9,
         jawWidth: 0.95,
+        segW: 96, segH: 72, // 高分段：井口孔缘更圆
       },
     });
 

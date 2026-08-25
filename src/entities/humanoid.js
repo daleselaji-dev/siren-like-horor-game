@@ -40,8 +40,10 @@ export function sculptHeadGeometry(opts = {}) {
     socketDepth = 1.0,   // 眼窝深度（F01 更深）
     chinSize = 1.0,
     ageSag = 0.5,        // 面颊下坠
+    segW = 48,           // 球面分段（F01 开井需要更高分段让孔缘圆滑）
+    segH = 40,
   } = opts;
-  const geo = new THREE.SphereGeometry(1, 48, 40);
+  const geo = new THREE.SphereGeometry(1, segW, segH);
   const pos = geo.attributes.position;
   const v = new THREE.Vector3();
   for (let i = 0; i < pos.count; i++) {
@@ -267,10 +269,10 @@ function hairGeoSidePart() {
     const back = new THREE.SphereGeometry(0.088, 20, 12, 0, Math.PI * 2, Math.PI * 0.42, Math.PI * 0.26);
     back.scale(0.95, 1.1, 0.9);
     parts.push(xform(back, 0, 0.02, -0.018, 0.16, 0, 0));
-    // 鬓角
-    const sb = new THREE.BoxGeometry(0.012, 0.036, 0.03);
-    parts.push(xform(sb, -0.082, -0.02, 0.012, 0, 0, 0.1));
-    parts.push(xform(sb, 0.082, -0.02, 0.012, 0, 0, -0.1));
+    // 鬓角（贴耳前缘的窄条，避免读成耳罩）
+    const sb = new THREE.BoxGeometry(0.008, 0.026, 0.02);
+    parts.push(xform(sb, -0.081, -0.012, 0.002, 0, 0, 0.1));
+    parts.push(xform(sb, 0.081, -0.012, 0.002, 0, 0, -0.1));
     const g = BufferGeometryUtils.mergeGeometries(parts, false);
     g.computeVertexNormals();
     return g;
