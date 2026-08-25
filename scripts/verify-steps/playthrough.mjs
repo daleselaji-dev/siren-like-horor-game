@@ -25,6 +25,18 @@ export async function run(page, h) {
     return false;
   };
   const assert = (ok, msg) => { if (!ok) throw new Error('ASSERT: ' + msg); };
+  // 同步快进游戏逻辑 sec 秒（SwiftShader 1-2fps 下 dt 被钳制，演出实时等不完；
+  // 与主循环相同的 update 调用，只是密集补帧——不改变行为，只压缩真实时间）
+  const ff = (sec) => page.evaluate((s) => {
+    const g = window.__game;
+    if (g.game.state !== 'PLAY' && g.game.state !== 'ENDED') return;
+    const step = 0.25;
+    for (let t = 0; t < s; t += step) {
+      g.agenda.update(step);
+      g.story.update(step);
+      if (g.game.state !== 'PLAY' && g.game.state !== 'ENDED') break; // 演出弹出文书等
+    }
+  }, sec);
 
   await page.click('#title-start');
   await h.sleep(2000);
@@ -127,12 +139,36 @@ export async function run(page, h) {
   await tp(-4, -42, 0, 3.5);
   await h.sleep(800); // hotelFront 触发
   await h.shot('p08-hotel-front');
+  // 万一在门口撞上侍应巡逻线：快进走完引座演出并复位，保证触发器能评估
+  const ensureAlive = () => page.evaluate(() => {
+    const g = window.__game;
+    for (let i = 0; i < 400 && (g.story.caughtSeq || g.story.deathSeq || g.player.dead); i++) {
+      g.story.updateCaught(0.4);
+      g.story.updateDeath(0.4);
+    }
+    for (const id of ['waiterBanquet', 'waiterLobby', 'waiterEast', 'security']) {
+      const w = g.byId[id];
+      if (w) { w.state = 'PATROL'; w.suspectMeter = 0; }
+    }
+    g.stealth.danger = 0;
+    return { dead: g.player.dead, caught: !!g.story.caughtSeq };
+  });
+  await ensureAlive();
   await tp(-4, -48, 0, 3.5);
-  await h.sleep(1200); // hotelLobby 触发
+  await h.sleep(600);
+  await ff(1); // 强制评估 zone 触发器（不依赖低帧率的真实循环）
   f = await flags();
+  if (!f.inHotel) { // 被抓打断：复位后再进一次
+    await ensureAlive();
+    await tp(-4, -48, 0, 3.5);
+    await h.sleep(600);
+    await ff(1);
+    f = await flags();
+  }
   assert(f.inHotel, 'inHotel not set');
   await h.shot('p09-lobby-full');
   // 登记簿文书⑤
+  await ensureAlive();
   const reg = await loc('registry');
   await tp(reg.x + 1.2, reg.z, 1.57, 3.5);
   await h.sleep(300);
@@ -143,13 +179,18 @@ export async function run(page, h) {
   const dresser = await loc('dresser807');
   await tp(dresser.x + 1.4, dresser.z + 1.6, -2.4, 10.3);
   await h.sleep(400);
-  await interact(); // 上头教学（演出 13.5s 真实时间）
+  await interact(); // 上头教学（演出 13.5s 游戏时间，快进消化）
   await h.shot('p10-bride-scene');
-  const gotMirror = await waitFlag('hasMirror', 25000);
+  let gotMirror = false;
+  for (let i = 0; i < 40 && !gotMirror; i++) {
+    gotMirror = await page.evaluate(() => window.__game.story.flags.hasMirror);
+    if (!gotMirror) { await ff(0.75); await h.sleep(250); }
+  }
   assert(gotMirror, 'mirror not given');
   await h.shot('p11-mirror');
 
   // ---- 节拍4：服务走廊 CRT 对照教学 → 宴会厅敬酒 = 返潮点火 ----
+  await ensureAlive();
   const crtc = await loc('crtCorridor');
   await tp(crtc.x - 0.3, crtc.z + 1.6, Math.PI, 3.5);
   await h.sleep(400);
@@ -157,10 +198,11 @@ export async function run(page, h) {
   f = await flags();
   assert(f.crtTip, 'crt tutorial missed');
   await h.shot('p12-crt-foretell');
-  // 进宴会厅触发敬酒（议程收声 2.4s 后 applyStage → 渗漏）
+  // 进宴会厅触发敬酒（议程收声 2.4s 后 applyStage → 渗漏）——收声用快进消化
   await tp(-14, -56, 0.6, 3.5);
-  await h.sleep(600);
-  const leaked = await waitFlag('leaked', 15000);
+  await h.sleep(1200); // 等真实循环跑到 zone 触发
+  await ff(4);
+  const leaked = await waitFlag('leaked', 30000);
   assert(leaked, 'leak not fired after toast');
   await h.sleep(1500);
   await h.shot('p13-leak-banquet');
@@ -234,17 +276,22 @@ export async function run(page, h) {
   await interact(); // 播带
   await h.sleep(1000);
   await h.shot('p18-tape-play');
-  // 等 note8 打开（演出 stage1 → 8.5s）
+  // 等 note8 打开（演出 stage1 → 8.5s 游戏时间，低帧率下快进消化）
   let noteOpened = false;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 40; i++) {
     noteOpened = await page.evaluate(() => window.__game.game.state === 'NOTE');
     if (noteOpened) break;
-    await h.sleep(800);
+    await ff(0.75);
+    await h.sleep(250);
   }
   assert(noteOpened, 'note8 never opened during tape');
   await h.shot('p19-note8');
   await h.tapKey('KeyE'); // 合上 → 演出尾声
-  const chase = await waitFlag('matronChase', 25000);
+  let chase = false;
+  for (let i = 0; i < 40 && !chase; i++) {
+    chase = await page.evaluate(() => window.__game.story.flags.matronChase);
+    if (!chase) { await ff(0.75); await h.sleep(250); }
+  }
   assert(chase, 'matron chase not started');
   await h.sleep(800);
   await h.shot('p20-matron-chase');
@@ -262,7 +309,7 @@ export async function run(page, h) {
     for (const e of g.enemies) { if (e.state === 'ALERT') { e.state = 'SEARCH'; e.searchTarget = null; } }
   });
   const mic = await loc('stageMic');
-  await tp(mic.x, mic.z + 2.6, Math.PI, 3.5);
+  await tp(mic.x, mic.z + 0.4, Math.PI, 4.0); // 台上（舞台抬高 0.45，交互点在麦后 1.6m 半径 3）
   await h.sleep(400);
   await interact(); // 扯囍匾
   f = await flags();
@@ -280,28 +327,29 @@ export async function run(page, h) {
   assert(f.ended, 'ending not triggered at lighthouse');
   console.log('[verify] ending begun, checkpoint:', f.checkpoint);
 
-  // 终局演出（海的视角 → 淡出 → 结算）——按阶段轮询
+  // 终局演出（海的视角 → 淡出 → 结算）——按阶段轮询 + 快进消化演出时长
   const waitStage = async (stage, timeoutMs) => {
     const t0 = Date.now();
     while (Date.now() - t0 < timeoutMs) {
       const st = await page.evaluate(() => window.__game.story.endSeq?.stage ?? 99);
       if (st >= stage) return true;
-      await h.sleep(800);
+      await ff(0.75);
+      await h.sleep(300);
     }
     return false;
   };
-  await waitStage(1, 25000);
+  await waitStage(1, 40000);
   await h.sleep(3000);
   await h.shot('p22-fog-clears');
-  await waitStage(2, 25000);
+  await waitStage(2, 40000);
   await h.sleep(2500);
   await h.shot('p23-sea-eye');
   await waitStage(4, 90000);
   let endShown = false;
-  for (let i = 0; i < 25 && !endShown; i++) {
+  for (let i = 0; i < 40 && !endShown; i++) {
     endShown = await page.evaluate(() =>
       document.getElementById('ending-overlay').classList.contains('show'));
-    if (!endShown) await h.sleep(1000);
+    if (!endShown) { await ff(0.75); await h.sleep(300); }
   }
   await h.shot('p24-ending');
   console.log('[verify] ending overlay shown:', endShown);
