@@ -117,9 +117,13 @@ function browGeo() {
 function hairGeo(style = 'crop') {
   return G('hair_' + style, () => {
     const parts = [];
-    const cap = (scaleY = 1, lift = 0) =>
+    const cap = (scaleY = 1, lift = 0) => {
       parts.push(xform(new THREE.SphereGeometry(0.108, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.47),
         0, 0.03 + lift, -0.014, 0.21, 0, 0, 0.84, scaleY, 0.99));
+      // 后脑+颈窝补片（φ π..2π 是 -z 后半球）——缺了这块，背影读成光头戴小帽
+      parts.push(xform(new THREE.SphereGeometry(0.107, 16, 8, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
+        0, 0.03 + lift, -0.012, 0.16, 0, 0, 0.85, scaleY * 1.02, 0.97));
+    };
     switch (style) {
       case 'crop': { // 平头/寸头
         cap(0.96);

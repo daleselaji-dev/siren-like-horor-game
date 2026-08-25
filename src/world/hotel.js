@@ -234,9 +234,9 @@ export function buildHotel(ctx) {
     ]);
   };
   winRow(F2); winRow(F3);
-  // 窗玻璃（整排一次性，暗色，个别房间亮灯）
+  // 窗玻璃（整排一次性，暗色，藏进墙厚中缝——只在窗洞处露出，不能贴到内墙面）
   for (const y0 of [F2, F3]) {
-    box(M.crtGlass, 0, y0 + 1.7, 10.86, 33.4, 1.35, 0.04);
+    box(M.crtGlass, 0, y0 + 1.7, 11.02, 33.4, 1.35, 0.04);
   }
   // 南立面 z=-11：厨房后门 + 窗
   wallX(TILE, -17, 17, -11, 0, F2, [
@@ -244,9 +244,10 @@ export function buildHotel(ctx) {
     { from: -4, to: -2, top: 2.4, sill: 1.2 }, { from: 2, to: 4, top: 2.4, sill: 1.2 },
   ]);
   wallX(TILE, -17, 17, -11, F2, ROOF, [
-    { from: -14, to: -12, top: 2.4, sill: 4.4 }, { from: -8, to: -6, top: 2.4, sill: 4.4 },
-    { from: -2, to: 0, top: 2.4, sill: 4.4 }, { from: 4, to: 6, top: 2.4, sill: 4.4 }, { from: 10, to: 12, top: 2.4, sill: 4.4 },
+    { from: -14, to: -12, top: 5.8, sill: 4.4 }, { from: -8, to: -6, top: 5.8, sill: 4.4 },
+    { from: -2, to: 0, top: 5.8, sill: 4.4 }, { from: 4, to: 6, top: 5.8, sill: 4.4 }, { from: 10, to: 12, top: 5.8, sill: 4.4 },
   ]);
+  box(M.crtGlass, -1, F3 + 1.7, -11.02, 27, 1.35, 0.04); // 3F 南窗玻璃带（藏墙缝）
   // 西立面 x=-17
   wallZ(TILE, -11, 11, -17, 0, ROOF, [
     { from: -6, to: -4, top: 2.4, sill: 1.0 }, { from: 1, to: 3, top: 2.4, sill: 1.0 }, { from: 6, to: 8, top: 2.4, sill: 1.0 },
@@ -257,8 +258,9 @@ export function buildHotel(ctx) {
   ]);
   lintelZ(TILE, 8.6, 11, 17, 2.3, F2);
   wallZ(TILE, -11, 11, 17, F2, ROOF, [
-    { from: -6, to: -4, top: 2.4, sill: 4.4 }, { from: 0, to: 2, top: 2.4, sill: 4.4 }, { from: 5, to: 7, top: 2.4, sill: 4.4 },
+    { from: -6, to: -4, top: 5.8, sill: 4.4 }, { from: 0, to: 2, top: 5.8, sill: 4.4 }, { from: 5, to: 7, top: 5.8, sill: 4.4 },
   ]);
+  box(M.crtGlass, 17.02, F3 + 1.7, 0.5, 0.04, 1.35, 13.5); // 3F 东窗玻璃带（藏墙缝）
   // 屋顶
   slabRect(-17, -11, 17, 11, ROOF, null, { walk: false });
   // 女儿墙
@@ -398,7 +400,8 @@ export function buildHotel(ctx) {
       cyl(M.brass, px, F2 - 0.2, pz, 0.7, 0.4, 0.7);
       colliders.push({ x: hx + px, z: hz + pz, r: 0.4, maxY: hb + F2 });
     }
-    // 大吊灯（挑空中央，黄铜+灯球）
+    // 大吊灯（挑空中央，黄铜+灯球）——吊杆从挑空顶(F3 楼板)垂下
+    cyl(M.brass, 0, (6.35 + F3 - 0.2) / 2, 5.2, 0.06, F3 - 0.2 - 6.35, 0.06);
     cyl(M.brass, 0, 6.6, 5.2, 0.5, 0.5, 0.5);
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
@@ -432,7 +435,7 @@ export function buildHotel(ctx) {
     for (const px of [-5, 0, 5]) {
       box(M.fluorescent, px, F2 - 0.06, 0.8, 1.4, 0.05, 0.16);
     }
-    addLight(0xdfe8d8, 8, 10, 0, F2 - 0.3, 1.2, 0.5);
+    addLight(0xdfe8d8, 8, 10, 0, F2 - 0.8, 1.2, 0.5);
     locations.lobbyCenter = world(0, 0.5, 5.5);
   }
 
@@ -528,11 +531,22 @@ export function buildHotel(ctx) {
         scene.add(lan);
       }
     }
-    addLight(0xff5040, 10, 12, -12.5, F2 - 0.8, 0.5, 0.3);
-    addLight(0xffd9a0, 12, 12, -12.5, F2 - 0.6, -7, 0.15);
-    // 墙面囍剪纸 + 荧光灯管
+    // 藻井灯箱（宴会厅主光源）：金边+暖白发光面，压在天花中央
+    box(M.brass, -12.5, F2 - 0.05, 0.5, 6.6, 0.1, 5.6);
+    box(M.tungsten, -12.5, F2 - 0.115, 0.5, 5.9, 0.05, 4.9);
+    // 灯挂低一些：既照桌面又能把天花/灯笼打出来（贴顶时掠射角=全黑）
+    addLight(0xffd9a0, 14, 14, -12.5, F2 - 1.35, 0.5, 0.2);
+    addLight(0xff5040, 8, 10, -12.5, F2 - 1.1, 4.5, 0.3);
+    addLight(0xffd9a0, 12, 12, -12.5, F2 - 1.0, -7, 0.15);
+    // 墙面囍剪纸 + 红幔围边（东墙内侧原本是裸灰泥，喜宴要挂红）
     box(M.xiPanel, -16.85, 1.9, 2, 0.06, 1.2, 1.2);
     box(M.xiPanel, -16.85, 1.9, -4, 0.06, 1.2, 1.2);
+    box(M.xiPanel, -8.15, 1.9, -1, 0.06, 1.2, 1.2);
+    for (const pz of [2.5, -4.5]) box(M.curtain, -8.18, 1.5, pz, 0.08, 3.0, 2.6);
+    // 檐口红幔围边一圈（天花边界读得出来）
+    box(M.curtain, -12.5, F2 - 0.32, 10.82, 8.5, 0.6, 0.1);
+    box(M.curtain, -16.82, F2 - 0.32, 0, 0.1, 0.6, 21.4);
+    box(M.curtain, -8.22, F2 - 0.32, 0, 0.1, 0.6, 21.4);
     for (const pz of [-6, 0, 6]) box(M.fluorescent, -12.5, F2 - 0.06, pz, 1.5, 0.05, 0.16);
     locations.banquetCenter = world(-12.5, 0.5, 0);
   }
@@ -562,7 +576,7 @@ export function buildHotel(ctx) {
     locations.crtCorridor = world(4.8, 1.0, -8.9);
     // 走廊冷荧光
     for (const px of [-5, 0.5, 6]) box(M.fluorescent, px, F2 - 0.06, -9.5, 1.4, 0.05, 0.14);
-    addLight(0xdfe8d8, 9, 11, 0.5, F2 - 0.4, -9.5, 0.8);
+    addLight(0xdfe8d8, 9, 11, 0.5, F2 - 0.9, -9.5, 0.8);
     // 员工告示
     box(plateMat('今晚喜宴 全员留守', { w: 256, h: 96, bg: '#c8bfa8', fg: '#4a3428', font: 0.36 }), -1.5, 1.6, -8.16, 0.9, 0.4, 0.04);
     // 经理室(西)：桌+柜+文书
@@ -587,7 +601,7 @@ export function buildHotel(ctx) {
     colliders.push({ minX: hx + 9.3, maxX: hx + 10.7, minZ: hz - 6.4, maxZ: hz - 3.6, minY: hb, maxY: hb + 0.9, noSightBlock: true });
     // 挂钩排(空的)
     for (let i = 0; i < 5; i++) box(M.ironDark, 11 + i * 1.1, 2.3, -8.8, 0.04, 0.5, 0.04);
-    addLight(0xdfe8d8, 7, 9, 13, F2 - 0.4, -6, 1.2);
+    addLight(0xdfe8d8, 7, 9, 13, F2 - 1.0, -6, 1.2);
     locations.kitchen = world(12.5, 0.5, -6);
     // 后门(逃生口)标牌
     box(plateMat('后勤通道', { w: 160, h: 64, bg: '#2a3a2a', fg: '#cfe0c8', font: 0.44, emissive: 0.5 }), 12.25, 2.35, -10.8, 0.8, 0.32, 0.05);
@@ -718,7 +732,7 @@ export function buildHotel(ctx) {
     }
     // 南走廊荧光
     for (const px of [-12, -4, 4]) box(M.fluorescent, px, F3 - 0.06, -8.6, 1.4, 0.05, 0.14);
-    addLight(0xdfe8d8, 8, 12, -4, F3 - 0.4, -8.6, 0.4);
+    addLight(0xdfe8d8, 8, 12, -4, F3 - 0.9, -8.6, 0.4);
     // 回廊装饰：镜面柱头对位的栏杆已建；墙挂旧照片框
     for (const pz of [3, 6]) box(M.veneer, -7.9, F2 + 1.8, pz, 0.05, 0.7, 0.5);
   }
@@ -775,6 +789,13 @@ export function buildHotel(ctx) {
     // 107 客房（可进）：双床+印花被+暖瓶+窗
     {
       box(M.carpet, 2, F3 + 0.03, 7, 5.9, 0.03, 7.9);
+      // 北墙(外墙)内面墙纸衬板（留出两扇窗）
+      box(WP, 0.5, F3 + 1.7, 10.8, 2.0, 3.4, 0.08);
+      box(WP, 4.25, F3 + 1.7, 10.8, 1.5, 3.4, 0.08);
+      box(WP, -0.75, F3 + 0.5, 10.8, 0.5, 1.0, 0.08);
+      box(WP, 2.5, F3 + 0.5, 10.8, 2.0, 1.0, 0.08);
+      box(WP, -0.75, F3 + 2.9, 10.8, 0.5, 1.0, 0.08);
+      box(WP, 2.5, F3 + 2.9, 10.8, 2.0, 1.0, 0.08);
       for (const px of [0.6, 3.4]) {
         box(M.veneer, px, F3 + 0.25, 8.5, 1.25, 0.5, 2.1);
         box(M.clothShirt, px, F3 + 0.56, 8.5, 1.22, 0.16, 2.05);
@@ -789,6 +810,12 @@ export function buildHotel(ctx) {
     // 807 套房：外间(圆桌茶具) + 卧室(喜床/三面镜梳妆台/CRT 电视)
     {
       box(M.carpet, -12.5, F3 + 0.03, -5.5, 8.9, 0.03, 10.9);
+      // 墙纸衬板：外墙内面是白瓷砖（外立面材质），客房里要读成墙纸
+      box(WP, -16.8, F3 + 1.7, -5.5, 0.1, 3.4, 10.9);                 // 西墙
+      box(WP, -15.6, F3 + 1.7, -10.78, 2.4, 3.4, 0.08);               // 南墙左段
+      box(WP, -9.9, F3 + 1.7, -10.78, 3.8, 3.4, 0.08);                // 南墙右段
+      box(WP, -13, F3 + 0.5, -10.78, 2.4, 1.0, 0.08);                 // 南窗下槛
+      box(WP, -13, F3 + 2.9, -10.78, 2.4, 1.0, 0.08);                 // 南窗上楣
       // 外间
       cyl(M.veneerRed, -10.5, F3 + 0.42, -1.8, 0.9, 0.84, 0.9);
       colliders.push({ x: hx - 10.5, z: hz - 1.8, r: 0.55, maxY: hb + F3 + 0.9, noSightBlock: true });

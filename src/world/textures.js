@@ -695,6 +695,34 @@ export function wallpaperTexture(seed = 331, size = 512) {
   }, 1.0);
 }
 
+/** 矿棉吊顶板：0.6m T 型龙骨格 + 针孔肌理 + 板边水渍圈（2.4m 一周期=4×4 板） */
+export function ceilingTexture(seed = 345, size = 512) {
+  const fbm = makeFbm(seed, 4);
+  const n = 4;
+  return buildMaps(size, (u, v, out) => {
+    const iu = (u * n) | 0, iv = (v * n) | 0;
+    const fu = (u * n) % 1, fv = (v * n) % 1;
+    const eg = Math.min(fu, 1 - fu, fv, 1 - fv);
+    const bar = 1 - sstep(0.012, 0.035, eg); // T 型龙骨
+    // 板面：米白 + 针孔噪点
+    const pin = fbm(u * 40, v * 40) > 0.62 ? 1 : 0;
+    const shade = 0.93 + (mulberry32(seed + iu * 53 + iv * 17)() - 0.5) * 0.09;
+    let r = 216 * shade - pin * 26, g = 212 * shade - pin * 25, b = 200 * shade - pin * 22;
+    // 板边水渍圈（返潮从吊顶开始）：靠板缘的黄褐晕
+    const stain = clamp01((fbm(u * 2.2 + 4, v * 2.2 + 9) - 0.5) * 3.2) * (1 - sstep(0.05, 0.30, eg));
+    r = r * (1 - stain * 0.4) + stain * 96;
+    g = g * (1 - stain * 0.44) + stain * 74;
+    b = b * (1 - stain * 0.5) + stain * 48;
+    // 龙骨压暗成金属灰
+    r = r * (1 - bar) + 148 * bar;
+    g = g * (1 - bar) + 146 * bar;
+    b = b * (1 - bar) + 140 * bar;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = 0.5 - bar * 0.35 + fbm(u * 18, v * 18) * 0.08;
+    out[4] = clamp01(0.92 - bar * 0.3 - stain * 0.1);
+  }, 1.2);
+}
+
 /** 白瓷砖（服务走廊/后厨）：小方砖 + 发黑灰缝 + 陈年油垢 */
 export function tileTexture(seed = 341, size = 512) {
   const fbm = makeFbm(seed, 4);
@@ -1044,6 +1072,7 @@ export function buildTextureSet(lowspec = false) {
     marble: marbleTexture(321, mid),
     wallpaper: wallpaperTexture(331, mid),
     tile: tileTexture(341, mid),
+    ceiling: ceilingTexture(345, mid),
     veneer: veneerTexture(351, mid),
     curtain: curtainTexture(361, mid),
     satin: satinTexture(391, small),

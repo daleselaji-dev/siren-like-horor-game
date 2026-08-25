@@ -64,7 +64,12 @@ export function buildMaterials(lowspec = false) {
   M.steel = new THREE.MeshStandardMaterial({ color: 0x9aa0a4, roughness: 0.35, metalness: 0.85, envMapIntensity: 1.3 });
   M.mirror = new THREE.MeshStandardMaterial({ color: 0xcfd6da, roughness: 0.06, metalness: 0.95, envMapIntensity: 2.2 }); // 镜面柱
   M.plasticGreen = new THREE.MeshStandardMaterial({ color: 0x2e5c30, roughness: 0.55, envMapIntensity: 0.7 }); // 塑料绿植
-  M.ceilingTile = new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.95 }); // 矿棉吊顶
+  // 矿棉吊顶：微量自发光=室内反弹光近似——朝下的面收不到半球光/掠射点光，
+  // 没有这点假反弹整个天花会是纯黑，室内在夜里读成"没有屋顶"
+  M.ceilingTile = std(T.ceiling, { normalScale: 0.7, envInt: 0.4 });
+  M.ceilingTile.emissive = new THREE.Color(0x3a342c);
+  M.ceilingTile.emissiveMap = T.ceiling.map;
+  M.ceilingTile.emissiveIntensity = 1.15;
   M.crtGlass = new THREE.MeshStandardMaterial({ color: 0x0a0c0a, roughness: 0.15, metalness: 0.2, envMapIntensity: 1.5 }); // 熄屏CRT
   M.crtShell = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, roughness: 0.7 }); // CRT米黄塑壳
   M.fluorescent = new THREE.MeshBasicMaterial({ color: 0xeef2e4 }); // 荧光灯管发光面
