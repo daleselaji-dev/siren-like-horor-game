@@ -37,6 +37,20 @@ export async function run(page, h) {
       if (g.game.state !== 'PLAY' && g.game.state !== 'ENDED') break; // 演出弹出文书等
     }
   }, sec);
+  // 确认文书已拾取；低帧率下 100ms 的 E 键可能没被任何一帧采样到——没拾到就重按
+  const pickNote = async (id) => {
+    for (let i = 0; i < 5; i++) {
+      const got = await page.evaluate((n) => window.__game.story.notesFound.has(n), id);
+      if (got) {
+        const open = await page.evaluate(() => window.__game.game.state === 'NOTE');
+        if (open) { await h.tapKey('KeyE'); await h.sleep(300); }
+        return true;
+      }
+      await h.tapKey('KeyE');
+      await h.sleep(600);
+    }
+    return page.evaluate((n) => window.__game.story.notesFound.has(n), id);
+  };
 
   await page.click('#title-start');
   await h.sleep(2000);
@@ -51,8 +65,8 @@ export async function run(page, h) {
   await h.shot('p01-note1');
   await h.tapKey('KeyE');
   await h.sleep(300);
+  assert(await pickNote('note1'), 'note1 not picked');
   let f = await flags();
-  assert(f.notes >= 1, 'note1 not picked');
 
   // ---- 节拍1b：石堤潜行教学 · 文书②渔民日记 ----
   await tp(10, 55, 0);
@@ -64,6 +78,7 @@ export async function run(page, h) {
   await h.shot('p02-note2');
   await h.tapKey('KeyE');
   await h.sleep(200);
+  assert(await pickNote('note2'), 'note2 not picked');
 
   // ---- 节拍1c：堤门锁着 → 视奸巡堤人 → 缸底钥匙 → 开门(议程·迎宾) ----
   const gate = await loc('gate');
@@ -125,6 +140,7 @@ export async function run(page, h) {
   await h.shot('p06-notice');
   await h.tapKey('KeyE');
   await h.sleep(200);
+  assert(await pickNote('note3'), 'note3 not picked');
   f = await flags();
   assert(f.knowHotel, 'knowHotel not set');
   const radio = await loc('radio');
@@ -134,6 +150,7 @@ export async function run(page, h) {
   await h.shot('p07-radio');
   await h.tapKey('KeyE');
   await h.sleep(300);
+  assert(await pickNote('note4'), 'note4 not picked');
 
   // ---- 节拍3：进酒店 → 大堂(议程·入席/CRT上电) → 807 陪新娘上头 ----
   await tp(-4, -42, 0, 3.5);
@@ -189,6 +206,7 @@ export async function run(page, h) {
   await interact();
   await h.tapKey('KeyE');
   await h.sleep(200);
+  assert(await pickNote('note5'), 'note5 not picked');
   // 上 3F 807（传送模拟走楼梯）
   const dresser = await loc('dresser807');
   await tp(dresser.x + 1.4, dresser.z + 1.6, -2.4, 10.3);
@@ -237,6 +255,7 @@ export async function run(page, h) {
   await interact(); // 值班日志（文书⑥）
   await h.tapKey('KeyE');
   await h.sleep(200);
+  assert(await pickNote('note6'), 'note6 not picked');
   const kc = await loc('keyCabinet');
   await tp(kc.x, kc.z + 1.3, Math.PI, 6.9);
   await h.sleep(300);
@@ -279,6 +298,7 @@ export async function run(page, h) {
   await h.shot('p17-tape-note');
   await h.tapKey('KeyE');
   await h.sleep(300);
+  assert(await pickNote('note7'), 'note7 not picked');
   f = await flags();
   assert(f.hasTape, 'tape not taken');
   assert(f.agenda >= 4, 'agenda not at 上头');
@@ -370,4 +390,5 @@ export async function run(page, h) {
   if (!endShown) throw new Error('ending overlay not shown');
   f = await flags();
   console.log('[verify] final:', JSON.stringify({ notes: f.notes, agenda: f.agenda, checkpoint: f.checkpoint }));
+  assert(f.notes >= 8, 'not all 8 notes picked, got ' + f.notes);
 }
