@@ -146,9 +146,23 @@ export async function run(page, h) {
       g.story.updateCaught(0.4);
       g.story.updateDeath(0.4);
     }
+    // 巡逻员挪到离玩家最远的巡逻路点：脚本传送落点无法像真玩家那样看位进门，
+    // 不挪的话大堂入口路点(-4,-46.4)会周期性压住传送点直接触发引座
+    const pp = g.player.pos;
     for (const id of ['waiterBanquet', 'waiterLobby', 'waiterEast', 'security']) {
       const w = g.byId[id];
-      if (w) { w.state = 'PATROL'; w.suspectMeter = 0; }
+      if (!w) continue;
+      w.state = 'PATROL'; w.suspectMeter = 0;
+      const wps = w.def.waypoints;
+      if (wps) {
+        let best = 0, bestD = -1;
+        for (let k = 0; k < wps.length; k++) {
+          const d = (wps[k][0] - pp.x) ** 2 + (wps[k][1] - pp.z) ** 2;
+          if (d > bestD) { bestD = d; best = k; }
+        }
+        w.pos.x = wps[best][0]; w.pos.z = wps[best][1];
+        w.wpIndex = best;
+      }
     }
     g.stealth.danger = 0;
     return { dead: g.player.dead, caught: !!g.story.caughtSeq };
