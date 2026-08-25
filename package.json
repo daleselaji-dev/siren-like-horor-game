@@ -19,6 +19,10 @@
     "appId": "com.fanchao.demo",
     "productName": "Fanchao",
     "compression": "maximum",
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
     "directories": {
       "output": "release"
     },
