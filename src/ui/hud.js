@@ -17,6 +17,12 @@ export class HUD {
       pauseNotes: document.getElementById('pause-notes'),
       death: document.getElementById('death-overlay'),
       deathSub: document.getElementById('death-sub'),
+      deathStats: document.getElementById('death-stats'),
+      resMeter: document.getElementById('resonance-meter'),
+      resFill: document.getElementById('resonance-fill'),
+      noiseRing: document.getElementById('noise-ring'),
+      cpToast: document.getElementById('checkpoint-toast'),
+      letterbox: document.getElementById('letterbox'),
       ending: document.getElementById('ending-overlay'),
       endingText: document.getElementById('ending-text'),
       endingCredit: document.getElementById('ending-credit'),
@@ -28,6 +34,16 @@ export class HUD {
     this.subActive = null;
     this.subTimer = 0;
     this.objTimer = 0;
+    this.cpTimer = 0;
+  }
+
+  /** 电影黑边（演出用） */
+  setLetterbox(on) { this.el.letterbox.classList.toggle('on', !!on); }
+
+  /** 检查点提示（左下角一闪） */
+  checkpointToast() {
+    this.el.cpToast.classList.add('show');
+    this.cpTimer = 2.6;
   }
 
   /** 字幕（顺序队列） speaker: null|'radio'|'song' */
@@ -71,8 +87,9 @@ export class HUD {
     }
   }
 
-  setDeath(on, text) {
+  setDeath(on, text, stats) {
     if (text) this.el.deathSub.textContent = text;
+    this.el.deathStats.textContent = stats ?? '';
     this.el.death.classList.toggle('show', on);
   }
 
@@ -112,12 +129,25 @@ export class HUD {
       this.objTimer -= dt;
       if (this.objTimer <= 0) this.el.objToast.classList.remove('show');
     }
+    // 检查点提示计时
+    if (this.cpTimer > 0) {
+      this.cpTimer -= dt;
+      if (this.cpTimer <= 0) this.el.cpToast.classList.remove('show');
+    }
     // 危险边缘
     if (state) {
       this.el.danger.style.opacity = Math.min(1, state.danger * 0.9).toFixed(2);
       this.el.resonance.style.opacity = Math.min(1, state.resonance * 1.1).toFixed(2);
       this.el.stealth.classList.toggle('show', !!state.crouching);
       this.el.drown.style.opacity = Math.min(1, (state.drown ?? 0)).toFixed(2);
+      // 共鸣计量：进入歌声范围才浮现
+      const res = state.resonance ?? 0;
+      this.el.resMeter.classList.toggle('show', res > 0.03);
+      this.el.resMeter.classList.toggle('high', res > 0.65);
+      this.el.resFill.style.height = `${Math.min(100, res * 100).toFixed(1)}%`;
+      // 噪音波纹：动静越大越明显
+      const noise = state.noise ?? 0;
+      this.el.noiseRing.style.opacity = noise > 0.02 ? Math.min(0.75, noise).toFixed(2) : '0';
     }
   }
 }

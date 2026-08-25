@@ -40,8 +40,9 @@ export class Humanoid {
     // ---- 头 ----
     const headMesh = mkMesh(new THREE.SphereGeometry(0.115, 10, 8), skin, 0, 0.1, 0, 1, 1.15, 1.05);
     this.head.add(headMesh);
-    // 喉部鼓起（灌满海水）
-    this.head.add(mkMesh(new THREE.SphereGeometry(0.055, 8, 6), skin, 0, -0.045, 0.055, 1, 1.3, 1));
+    // 喉部鼓起（灌满海水）——会缓慢地吞咽
+    this.throat = mkMesh(new THREE.SphereGeometry(0.055, 8, 6), skin, 0, -0.045, 0.055, 1, 1.3, 1);
+    this.head.add(this.throat);
     // 眼窝冷光
     const eyeGeo = new THREE.SphereGeometry(0.016, 6, 6);
     this.eyeL = mkMesh(eyeGeo, M.eyeGlow.clone(), -0.045, 0.115, 0.098);
@@ -119,6 +120,9 @@ export class Humanoid {
     // 动画状态
     this.phase = Math.random() * 10;
     this.alertShudder = 0;
+    this.lifeT = Math.random() * 100;  // 喉咙吞咽/火苗抖动的私有时钟
+    this.twitchT = 3 + Math.random() * 6; // 下一次颈部抽动
+    this.twitch = 0;
   }
 
   setEyeIntensity(v) {
@@ -135,6 +139,29 @@ export class Humanoid {
   animate(mode, dt, speed = 1) {
     const P = this.phase;
     const lerp = (o, k, v, r = 8) => { o[k] += (v - o[k]) * Math.min(1, dt * r); };
+
+    // ---- 常驻生命体征（不管在做什么都在发生） ----
+    this.lifeT += dt;
+    // 喉咙每隔几秒鼓动一次——里面的水在动
+    const gulp = Math.max(0, Math.sin(this.lifeT * 0.9)) ** 6;
+    this.throat.scale.set(1 + gulp * 0.35, 1.3 + gulp * 0.28, 1 + gulp * 0.35);
+    // 提灯火苗在风里抖
+    if (this.lanternLight) {
+      this.lanternLight.intensity = 7 * (0.82 + Math.sin(this.lifeT * 9.1) * 0.1 + Math.sin(this.lifeT * 17.3) * 0.08);
+    }
+    // 颈部偶发抽动：像被人从水底拽了一下
+    this.twitchT -= dt;
+    if (this.twitchT <= 0) {
+      this.twitchT = 4 + Math.random() * 8;
+      this.twitch = 0.35 + Math.random() * 0.3;
+      this.twitchSide = Math.random() < 0.5 ? -1 : 1;
+    }
+    if (this.twitch > 0) {
+      this.twitch = Math.max(0, this.twitch - dt * 2.4);
+      this.head.rotation.z = Math.sin(this.twitch * Math.PI) * 0.22 * this.twitchSide;
+    } else {
+      this.head.rotation.z *= Math.max(0, 1 - dt * 8);
+    }
 
     switch (mode) {
       case 'work_net': {
@@ -232,6 +259,25 @@ export class Humanoid {
         lerp(this.legL.hip.rotation, 'x', 0, 10);
         lerp(this.legR.hip.rotation, 'x', 0, 10);
         lerp(this.pelvis.position, 'y', 0.98, 10);
+        break;
+      }
+      case 'grab': {
+        // 近身抓住：整个人扑过来，双手掐向你的喉咙，头凑到你脸前
+        this.phase += dt * 6;
+        lerp(this.torso.rotation, 'x', 0.72, 12);
+        lerp(this.neck.rotation, 'x', -0.75, 12);
+        lerp(this.armL.shoulder.rotation, 'x', -1.72 + Math.sin(P * 3) * 0.05, 14);
+        lerp(this.armR.shoulder.rotation, 'x', -1.72 - Math.sin(P * 3) * 0.05, 14);
+        lerp(this.armL.shoulder.rotation, 'z', 0.30, 12);
+        lerp(this.armR.shoulder.rotation, 'z', -0.30, 12);
+        lerp(this.armL.elbow.rotation, 'x', -0.55, 14);
+        lerp(this.armR.elbow.rotation, 'x', -0.55, 14);
+        lerp(this.pelvis.position, 'y', 1.0, 10);
+        lerp(this.legL.hip.rotation, 'x', -0.25, 10);
+        lerp(this.legR.hip.rotation, 'x', 0.18, 10);
+        // 掐住时全身高频痉挛
+        this.alertShudder += dt * 46;
+        this.torso.rotation.z = Math.sin(this.alertShudder) * 0.035;
         break;
       }
       case 'sing': {

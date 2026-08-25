@@ -2,6 +2,8 @@
 export async function run(page, h) {
   await page.click('#title-start');
   await h.sleep(1500);
+  await h.tapKey('Space'); // 跳过开场运镜
+  await h.sleep(400);
 
   // fps 采样（lowspec）
   const fps = await page.evaluate(() => new Promise((res) => {

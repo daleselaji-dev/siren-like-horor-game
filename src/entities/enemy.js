@@ -56,6 +56,10 @@ export class Enemy {
     this.moveBlocked = 0;
     this.avoidSide = 1;
     this.stuckJiggle = 0;
+    this.grabbing = false;      // 抓住玩家演出中
+    this.gurgleT = 0;           // 追击喉音计时
+    this.searchLook = 0;        // 搜索张望计时
+    this.searchRing = 0;        // 搜索圈数（越搜越大）
 
     // 参数
     this.fov = (def.fov ?? 75) * Math.PI / 180;
@@ -88,6 +92,10 @@ export class Enemy {
     this.suspectMeter = 0;
     this.moveBlocked = 0;
     this.stuckJiggle = 0;
+    this.grabbing = false;
+    this.searchLook = 0;
+    this.searchRing = 0;
+    this.searchTarget = null;
     this.syncBody(0);
   }
 
@@ -182,6 +190,18 @@ export class Enemy {
     if (!this.enabled) return;
     this.stateTimer += dt;
 
+    // ---- 抓住演出：贴上来，掐住，别的什么都不做 ----
+    if (this.grabbing) {
+      this.faceToward(player.pos.x, player.pos.z, dt, 14);
+      const d = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
+      if (d > 0.62) this.moveToward(player.pos.x, player.pos.z, 2.2, dt);
+      this._eye = 4;
+      this.body.setEyeIntensity(4);
+      this.body.animate('grab', dt, 1);
+      this.syncBody(dt);
+      return;
+    }
+
     const sight = this.kind === 'singer' ? 0 : this.senseSight(player, ctx.envSightFactor);
     this.visibilityOfPlayer = sight;
     const heard = this.kind === 'singer' ? false : this.senseHearing(player);
@@ -260,26 +280,41 @@ export class Enemy {
           this.loseTimer += dt;
         }
         this.moveToward(this.lastSeenPos.x, this.lastSeenPos.z, this.chaseSpeed, dt);
+        // 追击喉音：灌满水的喉咙一路"咕咚"着追上来
+        this.gurgleT -= dt;
+        if (this.gurgleT <= 0) {
+          this.gurgleT = 1.8 + Math.random() * 1.6;
+          audio?.chaseGurgle?.(distToPlayer);
+        }
         // 抓住玩家
         if (distToPlayer < 1.15 && !player.dead) ctx.onCaught(this);
         // 丢失目标
-        if (this.loseTimer > 5.5) { this.state = 'SEARCH'; this.stateTimer = 0; }
+        if (this.loseTimer > 5.5) {
+          this.state = 'SEARCH'; this.stateTimer = 0;
+          this.searchTotal = 0; this.searchRing = 0; this.searchLook = 0;
+          this.searchTarget = null;
+        }
         break;
       }
       case 'SEARCH': {
-        anim = 'walk'; animSpeed = 0.7;
-        // 在最后目击点附近徘徊
-        if (!this.searchTarget || this.stateTimer > 3) {
-          this.stateTimer = 0;
-          this.searchTarget = {
-            x: this.lastSeenPos.x + (Math.random() - 0.5) * 10,
-            z: this.lastSeenPos.z + (Math.random() - 0.5) * 10,
-          };
-        }
-        this.moveToward(this.searchTarget.x, this.searchTarget.z, this.walkSpeed * 1.15, dt);
+        // 执着的筛查：围着最后目击点一圈圈找，走到点上就站定张望
         this.searchTotal = (this.searchTotal ?? 0) + dt;
+        if (!this.searchTarget) this.pickSearchPoint();
+        if (this.searchLook > 0) {
+          this.searchLook -= dt;
+          anim = 'idle';
+          this.yaw += Math.sin(this.stateTimer * 1.35) * dt * 1.15; // 缓慢左右扫头
+          if (this.searchLook <= 0) this.pickSearchPoint();
+        } else {
+          anim = 'walk'; animSpeed = 0.75;
+          const left = this.moveToward(this.searchTarget.x, this.searchTarget.z, this.walkSpeed * 1.2, dt);
+          if (left < 0.5 || this.stateTimer > 6) {
+            this.searchLook = 1.3 + Math.random() * 1.4;
+            this.stateTimer = 0;
+          }
+        }
         if (sight > 0.2) this.enterAlert(player, audio, ctx.onAlerted);
-        else if (this.searchTotal > 9) {
+        else if (this.searchTotal > 16) {
           this.searchTotal = 0;
           this.state = this.kind === 'patrol' ? 'PATROL' : 'RETURN';
         }
@@ -314,6 +349,18 @@ export class Enemy {
 
     this.body.animate(anim, dt, animSpeed);
     this.syncBody(dt);
+  }
+
+  /** 搜索点：绕最后目击点螺旋外扩 */
+  pickSearchPoint() {
+    this.searchRing += 1;
+    const a = Math.random() * Math.PI * 2;
+    const r = 2.5 + this.searchRing * (1.4 + Math.random() * 1.4);
+    this.searchTarget = {
+      x: this.lastSeenPos.x + Math.sin(a) * r,
+      z: this.lastSeenPos.z + Math.cos(a) * r,
+    };
+    this.stateTimer = 0;
   }
 
   enterSuspect(atPos, audio, distToPlayer, player) {

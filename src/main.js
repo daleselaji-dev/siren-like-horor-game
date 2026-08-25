@@ -13,6 +13,7 @@ import { SightjackSystem } from './systems/sightjack.js';
 import { StealthSystem } from './systems/stealth.js';
 import { Story, NOTES } from './systems/story.js';
 import { HUD } from './ui/hud.js';
+import { TitleSea } from './ui/title.js';
 
 // ---------------- 装配 ----------------
 // ?lowspec=1 → 低画质模式（无头验证 / 低配机器）：关阴影与 Bloom、降分辨率
@@ -108,7 +109,7 @@ const game = {
   closeNote() {
     hud.hideNote();
     game.state = 'PLAY';
-    if (!player.dead && !story.flags.ended) player.frozen = false;
+    if (!player.dead && !story.flags.ended && !story.introSeq) player.frozen = false;
   },
   onEnded() { game.state = 'ENDED'; },
 };
@@ -117,18 +118,20 @@ game.story = story;
 
 // ---------------- 标题 → 开始 ----------------
 const titleScreen = document.getElementById('title-screen');
+const titleSea = new TitleSea(document.getElementById('title-sea'));
+titleSea.start();
+requestAnimationFrame(() => titleScreen.classList.add('ready')); // 触发字幕显现动画
 document.getElementById('title-start').addEventListener('click', () => {
   if (game.state !== 'TITLE') return;
   audio.init();
   audio.update(0, { playerPos: player.pos, danger: 0, chase: 0, songBase: 0.14 });
   titleScreen.classList.add('fading');
-  setTimeout(() => titleScreen.classList.add('hidden'), 2300);
+  setTimeout(() => { titleScreen.classList.add('hidden'); titleSea.stop(); }, 2700);
   hud.fade(false);
   hud.setCrosshair(true);
   game.state = 'PLAY';
-  player.frozen = false;
   input.requestLock();
-  story.beginIntro();
+  story.beginIntro(); // 运镜期间玩家保持锁定，由 introSeq 释放
 });
 engine.renderer.domElement.addEventListener('click', () => {
   if (game.state === 'PLAY') input.requestLock();
@@ -162,6 +165,16 @@ function handleInput(dt) {
     return;
   }
   if (game.state !== 'PLAY' || player.dead || story.flags.ended) return;
+
+  // 开场运镜：任意动作键跳过
+  if (story.introSeq) {
+    if (['KeyE', 'Space', 'Enter', 'KeyQ'].some((k) => input.justPressed(k))) {
+      story.endIntro();
+      hud.subtitle('（已跳过开场）', 1.5);
+    }
+    return;
+  }
+  if (story.caughtSeq) return; // 被抓演出中
 
   // 视奸
   const sjKey = input.justPressed('KeyQ') || input.justPressed('Tab');
@@ -219,7 +232,7 @@ function loop() {
       envSightFactor: stealth.envSightFactor,
       noiseEvents: [...stealth.noiseEvents, ...(player.noiseLevel > 0 ? [] : [])],
       onCaught: (enemy) => {
-        story.kill('溺', `${enemy.label}把你按进了水里。—— 回到检查点`);
+        story.beginCaught(enemy); // 近身抓住演出 → 溺毙
       },
       onAlerted: (enemy) => {
         // 呼喊惊动附近同伴
@@ -244,9 +257,18 @@ function loop() {
     sky.update(dt, player.pos);
     world.updateFx(elapsed);
 
+    // 远处无声闪电 → 后处理闪光；数秒后隔海传来一声闷雷
+    engine.finalPass.uniforms.uFlash.value = sky.flash;
+    if (sky.thunderQueued) {
+      sky.thunderQueued = 0;
+      audio.thunderDistant(2.5 + Math.random() * 2);
+    }
+
     // 音频
     audio.update(dt, {
       playerPos: player.pos,
+      playerYaw: player.yaw,
+      crouching: player.crouching,
       danger: stealth.danger,
       chase: stealth.chaseCount,
       songBase: story.flags.ended ? 0.4 : story.flags.bloodTide ? 0.1 : elapsed < 60 ? 0.1 : 0.03,
@@ -273,6 +295,7 @@ function loop() {
     resonance: stealth.resonance,
     crouching: player.crouching && game.state === 'PLAY',
     drown: story.drownView ?? 0,
+    noise: player.dead ? 0 : player.noiseLevel / 14,
   });
 
   engine.render(elapsed);

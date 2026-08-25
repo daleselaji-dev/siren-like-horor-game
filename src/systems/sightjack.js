@@ -21,12 +21,14 @@ export class SightjackSystem {
     // DOM
     this.overlay = document.getElementById('sightjack-overlay');
     this.labelEl = document.getElementById('sj-label');
+    this.signalEl = document.getElementById('sj-signal');
     this.staticCanvas = document.getElementById('sj-static');
     this.staticCtx = this.staticCanvas.getContext('2d');
     this.staticCanvas.width = 320;
     this.staticCanvas.height = 180;
 
     this._headPos = new THREE.Vector3();
+    this.breathT = 0;       // 载体呼吸相位（借来的肺）
   }
 
   /** 收集附近信道（按距离排序） */
@@ -101,11 +103,17 @@ export class SightjackSystem {
   update(dt, elapsed) {
     if (!this.active || !this.current) return;
 
-    // 相机跟随载体头部（平滑）
+    // 相机跟随载体头部（平滑）+ 借来的肺在呼吸
+    this.breathT += dt * (this.current.kind === 'dog' ? 3.4 : this.current.kind === 'birds' ? 0 : 1.15);
+    const breathe = Math.sin(this.breathT * 2.2);
     this.current.viewPos(this._headPos);
+    this._headPos.y += breathe * 0.014;
     const { yaw, pitch } = this.current.viewYawPitch();
     this.camera.position.lerp(this._headPos, Math.min(1, dt * 10));
-    const qTarget = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
+    const qTarget = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      pitch + breathe * 0.006,
+      yaw + Math.sin(this.breathT * 0.7) * 0.008,
+      Math.sin(this.breathT * 1.1) * 0.006, 'YXZ'));
     this.camera.quaternion.slerp(qTarget, Math.min(1, dt * 6));
     this.engine.setCamera(this.camera);
 
@@ -116,14 +124,19 @@ export class SightjackSystem {
     const intensity = Math.min(1, base + this.staticBurst);
     this.drawStatic(intensity, elapsed);
 
-    // 标签
+    // 标签 + 信号强度条
     const name = this.current.label ?? '？？？';
     this.labelEl.textContent =
       `信道 ${this.index + 1}/${Math.max(1, this.channels.length)} — ${name}`;
+    const bars = Math.max(1, Math.min(5, Math.round((1 - dist / RANGE) * 5)));
+    const flick = this.staticBurst > 0.4 && Math.random() < 0.5 ? -1 : 0;
+    this.signalEl.textContent =
+      '信号 ' + '▮'.repeat(Math.max(1, bars + flick)) + '▯'.repeat(5 - Math.max(1, bars + flick));
 
-    // 后处理脉冲（心跳）
+    // 后处理脉冲（心跳）+ 借眼畸变：别人的眼眶不合你的脸
     this.engine.finalPass.uniforms.uPulse.value = 0.6 + this.staticBurst * 0.5;
     this.engine.finalPass.uniforms.uAberration.value = 0.003 + this.staticBurst * 0.004;
+    this.engine.finalPass.uniforms.uDistort.value = 0.16 + this.staticBurst * 0.22 + breathe * 0.008;
 
     // 强制视奸倒计时
     if (this.forced) {
@@ -140,6 +153,7 @@ export class SightjackSystem {
   restorePost() {
     this.engine.finalPass.uniforms.uPulse.value = 0;
     this.engine.finalPass.uniforms.uAberration.value = 0.0009;
+    this.engine.finalPass.uniforms.uDistort.value = 0;
   }
 
   drawStatic(intensity, t) {
@@ -160,6 +174,20 @@ export class SightjackSystem {
       const i4 = (band * w + x) * 4;
       d[i4] = d[i4 + 1] = d[i4 + 2] = 255;
       d[i4 + 3] = 120;
+    }
+    // 信号撕裂条：强噪点时整行搬移
+    if (intensity > 0.35) {
+      const tears = 1 + ((Math.random() * 2) | 0);
+      for (let k = 0; k < tears; k++) {
+        const y = (Math.random() * h) | 0;
+        const shift = ((Math.random() - 0.5) * 30) | 0;
+        for (let x = 0; x < w; x++) {
+          const sx = (x + shift + w) % w;
+          const di = (y * w + x) * 4, si = (y * w + sx) * 4;
+          d[di] = d[si]; d[di + 1] = d[si + 1]; d[di + 2] = d[si + 2];
+          d[di + 3] = 200;
+        }
+      }
     }
     ctx.putImageData(img, 0, 0);
     this.staticCanvas.style.opacity = (0.1 + intensity * 0.5).toFixed(2);

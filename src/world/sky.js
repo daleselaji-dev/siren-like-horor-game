@@ -1,4 +1,4 @@
-// 天空穹顶（青灰渐变着色器）+ 全局光照 + 雾 + 大气粒子（盐雾漂浮物）
+// 天空穹顶（分形云层着色器）+ 全局光照 + 雾 + 盐雾粒子 + 贴地雾卡 + 远处无声闪电
 import * as THREE from 'three';
 
 export class Sky {
@@ -8,10 +8,17 @@ export class Sky {
     this._bloodTarget = 0;
     this.time = 0;
 
+    // 闪电：远处的、没有雷声跟上来的那种
+    this.flash = 0;             // 0..1 供后处理读取
+    this.flashTimer = 22 + Math.random() * 20;
+    this.flashSeq = null;       // { t, strikes:[延迟…] }
+    this.thunderQueued = 0;     // >0 时 main 循环触发一次远雷
+
     // ---- 穹顶 ----
     this.uniforms = {
       uBlood: { value: 0 },
       uTime: { value: 0 },
+      uFlash: { value: 0 },
     };
     const skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
@@ -30,20 +37,55 @@ export class Sky {
       fragmentShader: /* glsl */`
         uniform float uBlood;
         uniform float uTime;
+        uniform float uFlash;
         varying vec3 vDir;
+
+        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+        float vnoise(vec2 p) {
+          vec2 i = floor(p), f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          float a = hash(i), b = hash(i + vec2(1.0, 0.0));
+          float c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));
+          return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
+        float fbm(vec2 p) {
+          float v = 0.0, amp = 0.5;
+          for (int o = 0; o < 4; o++) { v += vnoise(p) * amp; p *= 2.13; amp *= 0.5; }
+          return v;
+        }
+
         void main() {
           float h = clamp(vDir.y, -0.1, 1.0);
           // 青灰阴天：地平线亮灰 → 顶部铅蓝
           vec3 horizon = mix(vec3(0.52, 0.56, 0.57), vec3(0.30, 0.16, 0.19), uBlood);
           vec3 zenith  = mix(vec3(0.16, 0.20, 0.24), vec3(0.10, 0.05, 0.10), uBlood);
           vec3 col = mix(horizon, zenith, pow(max(h, 0.0), 0.55));
+
           // 隔湿布的白斑太阳
           vec3 sunDir = normalize(vec3(-0.4, 0.35, -0.6));
           float sun = pow(max(dot(normalize(vDir), sunDir), 0.0), 18.0);
           col += vec3(0.20, 0.19, 0.17) * sun * (1.0 - uBlood * 0.8);
-          // 低空流云（简单噪声带）
-          float band = sin(vDir.x * 6.0 + uTime * 0.02) * sin(vDir.z * 5.0 - uTime * 0.013);
-          col += band * 0.02 * (1.0 - h);
+
+          // 分形云层：投影到天顶平面上缓慢推移，低垂、压顶
+          if (h > 0.02) {
+            vec2 cp = vDir.xz / (vDir.y + 0.22);
+            float drift = uTime * (0.006 + uBlood * 0.010);
+            float n = fbm(cp * 1.35 + vec2(drift, drift * 0.6));
+            float n2 = fbm(cp * 3.1 - vec2(drift * 1.7, drift));
+            float cloud = smoothstep(0.42, 0.78, n * 0.72 + n2 * 0.28);
+            // 云底更暗，云隙微亮；血潮后云翻成瘀紫
+            vec3 cloudDark = mix(vec3(0.115, 0.145, 0.170), vec3(0.115, 0.05, 0.085), uBlood);
+            vec3 cloudLit  = mix(vec3(0.30, 0.335, 0.35),  vec3(0.24, 0.10, 0.13),  uBlood);
+            vec3 cloudCol = mix(cloudLit, cloudDark, smoothstep(0.35, 0.95, n));
+            float fade = smoothstep(0.02, 0.24, h);           // 地平线附近云被雾吃掉
+            col = mix(col, cloudCol, cloud * fade * 0.85);
+            // 闪电照亮云底
+            col += uFlash * cloud * fade * vec3(0.5, 0.55, 0.66);
+          }
+
+          // 闪电抬亮地平线
+          col += uFlash * vec3(0.30, 0.33, 0.40) * (1.0 - smoothstep(0.0, 0.45, h));
+
           gl_FragColor = vec4(col, 1.0);
         }
       `,
@@ -89,6 +131,37 @@ export class Sky {
       depthWrite: false, sizeAttenuation: true,
     }));
     scene.add(this.motes);
+
+    // ---- 贴地雾卡：低伏在滩涂与谷地上缓慢爬行的湿雾 ----
+    const fogTex = (() => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const cx = c.getContext('2d');
+      const g = cx.createRadialGradient(64, 64, 4, 64, 64, 62);
+      g.addColorStop(0, 'rgba(210,220,220,0.55)');
+      g.addColorStop(0.55, 'rgba(200,212,212,0.22)');
+      g.addColorStop(1, 'rgba(200,212,212,0)');
+      cx.fillStyle = g;
+      cx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(c);
+    })();
+    this.fogCards = [];
+    for (let i = 0; i < 12; i++) {
+      const mat = new THREE.SpriteMaterial({
+        map: fogTex, transparent: true, depthWrite: false,
+        opacity: 0.05 + Math.random() * 0.05, color: 0xb9c6c6,
+      });
+      const sp = new THREE.Sprite(mat);
+      const sc = 26 + Math.random() * 34;
+      sp.scale.set(sc, sc * 0.32, 1);
+      sp.position.set((Math.random() - 0.5) * 220, 1.2 + Math.random() * 1.8, (Math.random() - 0.5) * 240);
+      scene.add(sp);
+      this.fogCards.push({
+        sp, baseOp: mat.opacity,
+        vx: (Math.random() - 0.5) * 0.5, vz: (Math.random() - 0.5) * 0.5,
+        ph: Math.random() * 6.28,
+      });
+    }
   }
 
   /** 血潮气象切换 */
@@ -101,6 +174,27 @@ export class Sky {
     this.uniforms.uTime.value = this.time;
     this.blood += (this._bloodTarget - this.blood) * Math.min(1, dt * 0.06);
     this.uniforms.uBlood.value = this.blood;
+
+    // ---- 远处无声闪电（双闪） ----
+    this.flashTimer -= dt;
+    if (this.flashTimer <= 0 && !this.flashSeq) {
+      this.flashSeq = { t: 0, strikes: [0, 0.18 + Math.random() * 0.2] };
+      this.flashTimer = 26 + Math.random() * 34;
+      this.thunderQueued = 1; // 数秒后隔海传来的一声闷雷（由 main 触发）
+    }
+    if (this.flashSeq) {
+      this.flashSeq.t += dt;
+      let f = 0;
+      for (const st of this.flashSeq.strikes) {
+        const lt = this.flashSeq.t - st;
+        if (lt > 0) f = Math.max(f, Math.exp(-lt * 14) * 0.9);
+      }
+      this.flash = f * (1 - this.blood * 0.5);
+      if (this.flashSeq.t > 1.2) { this.flashSeq = null; this.flash = 0; }
+    } else {
+      this.flash = 0;
+    }
+    this.uniforms.uFlash.value = this.flash;
 
     // 雾密度/颜色随血潮变化
     const fog = this.scene.fog;
@@ -115,12 +209,27 @@ export class Sky {
     this.sun.intensity = 1.7 - this.blood * 0.95;
     this.sun.color.setRGB(0.73 + this.blood * 0.1, 0.77 - this.blood * 0.42, 0.78 - this.blood * 0.45);
     this.motes.material.opacity = 0.4 + this.blood * 0.25;
+    this.motes.material.color.setRGB(0.62 + this.blood * 0.18, 0.69 - this.blood * 0.25, 0.69 - this.blood * 0.28);
 
     // 穹顶与粒子跟随玩家（雾里看不出移动）
     if (playerPos) {
       this.dome.position.set(playerPos.x, 0, playerPos.z);
       this.sun.position.set(playerPos.x - 60, 80, playerPos.z - 90);
       this.sun.target.position.set(playerPos.x, 0, playerPos.z);
+
+      // 雾卡缓慢爬行，绕着玩家循环
+      for (const f of this.fogCards) {
+        f.sp.position.x += f.vx * dt;
+        f.sp.position.z += f.vz * dt;
+        f.sp.material.opacity = f.baseOp * (0.7 + Math.sin(this.time * 0.13 + f.ph) * 0.3) * (1 + this.blood * 0.6);
+        if (this.blood > 0.05) {
+          f.sp.material.color.setRGB(0.73, 0.62 - this.blood * 0.14, 0.62 - this.blood * 0.16);
+        }
+        const dx = f.sp.position.x - playerPos.x;
+        const dz = f.sp.position.z - playerPos.z;
+        if (Math.abs(dx) > 130) f.sp.position.x = playerPos.x - Math.sign(dx) * 128;
+        if (Math.abs(dz) > 140) f.sp.position.z = playerPos.z - Math.sign(dz) * 138;
+      }
     }
     this.motes.rotation.y += dt * 0.004;
   }

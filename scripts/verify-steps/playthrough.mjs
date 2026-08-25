@@ -13,6 +13,8 @@ export async function run(page, h) {
   await page.click('#title-start');
   await h.sleep(2000);
   await h.shot('p00-start');
+  await h.tapKey('Space'); // 跳过开场运镜
+  await h.sleep(500);
 
   // ---- 节拍1：礁滩 · 文书① ----
   await tp(77, 109, 0.5);

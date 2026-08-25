@@ -38,11 +38,13 @@ export class AudioEngine {
     this.buildSong();
     this.buildRadio();
     this.buildHeartbeat();
+    this.buildBreath();
 
     // 追逐鼓调度
     this.nextDrum = 0;
     this.chaseLevel = 0;
     this.bloodTide = 0;
+    this.breathPhase = 0;
   }
 
   mkGain(v, dest = this.master) {
@@ -171,13 +173,14 @@ export class AudioEngine {
     this.songEnv.gain.value = 0;
     this.songGain = ctx.createGain();     // 距离/剧情总量
     this.songGain.gain.value = 0.0;
+    this.songPan = ctx.createStereoPanner(); // 听声辨位：歌从哪边来
 
     this.songOsc.connect(this.songEnv);
     harm.connect(harmG).connect(this.songEnv);
     this.songEnv.connect(f1).connect(mix);
     this.songEnv.connect(f2).connect(mix);
     mix.connect(this.songGain);
-    this.songGain.connect(this.musGroup);
+    this.songGain.connect(this.songPan).connect(this.musGroup);
     // 大混响
     const send = ctx.createGain(); send.gain.value = 0.9;
     this.songGain.connect(send).connect(this.reverb);
@@ -236,9 +239,27 @@ export class AudioEngine {
     this.radioVoiceG = ctx.createGain(); this.radioVoiceG.gain.value = 0.0;
     voice.connect(vf).connect(this.radioVoiceG).connect(this.radioGain);
     this.radioVoice = voice;
-    this.radioGain.connect(this.ambGroup);
+    this.radioPan = ctx.createStereoPanner();
+    this.radioGain.connect(this.radioPan).connect(this.ambGroup);
     st.start(); voice.start();
     this.radioTalkT = 0;
+  }
+
+  // ---------------- 呼吸（潜行/危险时自己的肺） ----------------
+
+  buildBreath() {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = this.makeNoiseBuffer(4);
+    src.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 560; bp.Q.value = 0.9;
+    this.breathEnv = ctx.createGain();   // 吸/呼包络（每帧驱动）
+    this.breathEnv.gain.value = 0;
+    this.breathGain = ctx.createGain();  // 总量（潜行/危险控制）
+    this.breathGain.gain.value = 0;
+    src.connect(bp).connect(this.breathEnv).connect(this.breathGain).connect(this.sfxGroup);
+    src.start();
   }
 
   // ---------------- 心跳（视奸） ----------------
@@ -292,21 +313,31 @@ export class AudioEngine {
 
   // ---------------- SFX ----------------
 
-  footstep(intensity = 1, wet = false) {
+  /**
+   * 脚步：按地面材质分层合成
+   * surface: 'wet'(水洼溅) | 'sand'(闷沙擦) | 'stone'(石板叩) —— 兼容旧布尔(wet)
+   */
+  footstep(intensity = 1, surface = 'sand') {
     if (!this.started) return;
+    if (surface === true) surface = 'wet';
+    if (surface === false) surface = 'sand';
     const ctx = this.ctx;
     const t = ctx.currentTime;
+    const wet = surface === 'wet';
+    const stone = surface === 'stone';
+    // 主体：噪声踏地
     const src = ctx.createBufferSource();
     src.buffer = this.makeNoiseBuffer(0.2);
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = wet ? 2400 : 900 + Math.random() * 400;
+    lp.frequency.value = wet ? 2400 : stone ? 1600 + Math.random() * 500 : 750 + Math.random() * 300;
     const g = ctx.createGain();
-    g.gain.setValueAtTime(0.11 * intensity, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + (wet ? 0.22 : 0.13));
+    g.gain.setValueAtTime((stone ? 0.09 : 0.11) * intensity, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + (wet ? 0.22 : stone ? 0.09 : 0.15));
     src.connect(lp).connect(g).connect(this.sfxGroup);
     src.start(t); src.stop(t + 0.25);
     if (wet) {
+      // 水花
       const sp = ctx.createBufferSource();
       sp.buffer = this.makeNoiseBuffer(0.15);
       const bp = ctx.createBiquadFilter();
@@ -316,7 +347,112 @@ export class AudioEngine {
       g2.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
       sp.connect(bp).connect(g2).connect(this.sfxGroup);
       sp.start(t); sp.stop(t + 0.2);
+    } else if (stone) {
+      // 石板短促的"叩"——一记低频敲击
+      const k = ctx.createOscillator();
+      k.frequency.setValueAtTime(150 + Math.random() * 40, t);
+      k.frequency.exponentialRampToValueAtTime(70, t + 0.06);
+      const kg = ctx.createGain();
+      kg.gain.setValueAtTime(0.05 * intensity, t);
+      kg.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+      k.connect(kg).connect(this.sfxGroup);
+      k.start(t); k.stop(t + 0.09);
     }
+  }
+
+  /** 被抓刺音：一把攥住喉咙的瞬间 */
+  grabSting() {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    // 噪声拍击
+    const n = ctx.createBufferSource();
+    n.buffer = this.makeNoiseBuffer(0.3);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 480; bp.Q.value = 0.8;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.5, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.34);
+    n.connect(bp).connect(ng).connect(this.sfxGroup);
+    n.start(t); n.stop(t + 0.36);
+    // 小二度弦刺猛压
+    [392, 415.3, 830.6].forEach((fr, i) => {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth'; o.frequency.value = fr;
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(0.001, t + i * 0.02);
+      og.gain.exponentialRampToValueAtTime(0.14, t + 0.05 + i * 0.02);
+      og.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+      const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2400;
+      o.connect(f).connect(og).connect(this.musGroup);
+      og.connect(this.reverb);
+      o.start(t); o.stop(t + 1.5);
+    });
+    // 咽水
+    for (let i = 0; i < 5; i++) {
+      const o = ctx.createOscillator();
+      const f0 = 160 + Math.random() * 300;
+      o.frequency.setValueAtTime(f0, t + 0.1 + i * 0.09);
+      o.frequency.exponentialRampToValueAtTime(f0 * 1.7, t + 0.1 + i * 0.09 + 0.07);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t + 0.1 + i * 0.09);
+      g.gain.linearRampToValueAtTime(0.09, t + 0.1 + i * 0.09 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.1 + i * 0.09 + 0.09);
+      o.connect(g).connect(this.sfxGroup);
+      o.start(t + 0.1 + i * 0.09); o.stop(t + 0.1 + i * 0.09 + 0.11);
+    }
+  }
+
+  /** 追击喉音：一路"咕咚"着追上来 */
+  chaseGurgle(dist) {
+    if (!this.started) return;
+    const vol = Math.max(0, 1 - dist / 30) * 0.3;
+    if (vol <= 0.01) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(105, t);
+    o.frequency.linearRampToValueAtTime(60, t + 0.45);
+    const am = ctx.createOscillator(); am.frequency.value = 14;
+    const amG = ctx.createGain(); amG.gain.value = 0.6;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+    am.connect(amG).connect(g.gain);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 620;
+    o.connect(lp).connect(g).connect(this.sfxGroup);
+    o.start(t); am.start(t); o.stop(t + 0.6); am.stop(t + 0.6);
+  }
+
+  /** 隔海闷雷：闪电后数秒才到 */
+  thunderDistant(delay = 3) {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + delay;
+    const n = ctx.createBufferSource();
+    n.buffer = this.makeNoiseBuffer(3, true);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(140, t);
+    lp.frequency.exponentialRampToValueAtTime(60, t + 2.4);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.5);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 2.8);
+    n.connect(lp).connect(g).connect(this.ambGroup);
+    g.connect(this.reverb);
+    n.start(t); n.stop(t + 3);
+    // 底下垫一只下滑的次低频
+    const o = ctx.createOscillator();
+    o.frequency.setValueAtTime(52, t);
+    o.frequency.exponentialRampToValueAtTime(30, t + 2.2);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.001, t);
+    og.gain.exponentialRampToValueAtTime(0.08, t + 0.4);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 2.4);
+    o.connect(og).connect(this.ambGroup);
+    o.start(t); o.stop(t + 2.6);
   }
 
   /** 潮尸起疑：喉咙灌水声(低频含水颤音) */
@@ -564,21 +700,42 @@ export class AudioEngine {
       this.nextDrum = Math.max(this.nextDrum, now + 0.4);
     }
 
-    // 潮歌：按剧情/距离控制
+    // 立体声定位工具：源相对玩家面朝的左右
+    const panOf = (sx, sz) => {
+      if (st.playerYaw === undefined) return 0;
+      const dx = sx - st.playerPos.x, dz = sz - st.playerPos.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const yaw = st.playerYaw;
+      // 相机右向量 = (cos(yaw), -sin(yaw))
+      return Math.max(-1, Math.min(1, (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / len * 0.85));
+    };
+
+    // 潮歌：按剧情/距离控制 + 听声辨位
     this.scheduleSong(now);
     let songVol = st.songBase ?? 0;
     if (st.singer?.on) {
       const d = Math.hypot(st.singer.x - st.playerPos.x, st.singer.z - st.playerPos.z);
       songVol = Math.max(songVol, Math.min(0.55, Math.max(0, 1 - d / 55) * 0.7));
+      this.songPan.pan.setTargetAtTime(panOf(st.singer.x, st.singer.z), now, 0.25);
+    } else {
+      this.songPan.pan.setTargetAtTime(0, now, 0.5);
     }
     songVol += (st.resonance ?? 0) * 0.35;
     this.songGain.gain.setTargetAtTime(songVol, now, 0.6);
+
+    // 自己的呼吸：潜行时压着嗓子，危险时压不住
+    this.breathPhase += dt * (0.55 + st.danger * 0.9 + (st.resonance ?? 0) * 0.6) * Math.PI * 2 * 0.5;
+    const bEnv = Math.pow(0.5 + 0.5 * Math.sin(this.breathPhase), 2);
+    this.breathEnv.gain.setTargetAtTime(bEnv, now, 0.05);
+    const bVol = (st.crouching ? 0.05 : 0) + st.danger * 0.075;
+    this.breathGain.gain.setTargetAtTime(bVol, now, 0.4);
 
     // 电台
     if (st.radio?.on) {
       const d = Math.hypot(st.radio.x - st.playerPos.x, st.radio.z - st.playerPos.z);
       const v = Math.min(0.5, Math.max(0, 1 - d / 26) * 0.75);
       this.radioGain.gain.setTargetAtTime(v, now, 0.3);
+      this.radioPan.pan.setTargetAtTime(panOf(st.radio.x, st.radio.z), now, 0.25);
       // 断续讲话
       this.radioTalkT -= dt;
       if (this.radioTalkT <= 0) {

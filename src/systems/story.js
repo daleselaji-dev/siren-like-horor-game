@@ -176,6 +176,12 @@ export const NOTES = [
 // 石碑铭文（气氛互动，不计入文书）
 const STELE_TEXT = '碑文风化难辨，只余八字——「潮起还人　潮落收喉」';
 
+function angleWrap(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
 // ---------------- 主控 ----------------
 export class Story {
   constructor(game) {
@@ -192,6 +198,9 @@ export class Story {
     this.checkpoint = null;
     this.deathSeq = null;   // 死亡协程状态
     this.endSeq = null;
+    this.introSeq = null;   // 开场运镜
+    this.caughtSeq = null;  // 被抓演出
+    this.deathCount = 0;
     this.drownTimer = 0;
     this.ritual = { seq: [2, 0, 1], idx: 0, t: 0, phase: 'gaze' }; // 先北(2) 再南(0) 后中(1)
     this.time = 0;
@@ -613,6 +622,10 @@ export class Story {
     if (F.intro) return;
     F.intro = true;
     const hud = this.g.hud;
+    // 电影运镜：从天到眼——被冲上岸的人睁开眼睛
+    this.introSeq = { t: 0, dur: 9.5 };
+    hud.setLetterbox(true);
+    this.g.player.frozen = true;
     hud.subtitle('……沿海渔船请注意……阵风十一级……所有船只回港避风……', 5, 'radio');
     hud.subtitle('……重复……盐门村渡口……停航……停航……', 4.5, 'radio');
     hud.subtitle('渡船在礁上撞碎的时候，收音机还在念三年前的台风警报。', 5);
@@ -623,6 +636,41 @@ export class Story {
     }, 12000);
   }
 
+  updateIntro(dt) {
+    if (!this.introSeq) return;
+    const s = this.introSeq;
+    s.t += dt;
+    const g = this.g;
+    const p = g.player;
+    const cam = g.engine.camera;
+    const T = Math.min(1, s.t / s.dur);
+    const ease = T * T * (3 - 2 * T);
+    // 高处俯瞰礁滩 → 缓缓落回搁浅者的眼睛
+    const yaw = p.yaw + (1 - ease) * 2.3;
+    const pitch = -(1 - ease) * 0.6;
+    const back = (1 - ease) * 4.2;
+    const h = 1.62 + (1 - ease) * 9.5;
+    cam.position.set(
+      p.pos.x + Math.sin(yaw) * back,
+      p.pos.y + h,
+      p.pos.z + Math.cos(yaw) * back
+    );
+    cam.rotation.set(0, 0, 0);
+    cam.rotateY(yaw);
+    cam.rotateX(pitch);
+    // 湿透的人站不稳——轻微的摇晃随落地收敛
+    cam.rotateZ(Math.sin(s.t * 0.8) * 0.05 * (1 - ease));
+    if (T >= 1) this.endIntro();
+  }
+
+  endIntro() {
+    if (!this.introSeq) return;
+    this.introSeq = null;
+    this.g.hud.setLetterbox(false);
+    if (this.g.state === 'PLAY' && !this.g.player.dead) this.g.player.frozen = false;
+    this.g.player.syncCamera(0);
+  }
+
   // ---------- 检查点 ----------
   saveCheckpoint(name, x, z) {
     const p = this.g.player;
@@ -631,6 +679,7 @@ export class Story {
       x: x ?? p.pos.x, z: z ?? p.pos.z, yaw: p.yaw,
       y: x !== undefined ? undefined : p.pos.y, // 自定义坐标时按最高面解析
     };
+    if (this.time > 4) this.g.hud.checkpointToast();
   }
 
   respawn() {
@@ -648,10 +697,48 @@ export class Story {
     g.hud.fade(false);
   }
 
-  // ---------- 死亡 ----------
-  kill(reason, sub) {
-    if (this.g.player.dead || this.flags.ended) return;
+  // ---------- 被抓演出（近身掐喉） ----------
+  beginCaught(enemy) {
+    if (this.g.player.dead || this.flags.ended || this.caughtSeq) return;
     const g = this.g;
+    this.caughtSeq = { t: 0, enemy };
+    enemy.grabbing = true;
+    g.player.frozen = true;
+    g.sightjack.exit();
+    g.sightjack.restorePost();
+    g.audio.grabSting?.();
+    g.hud.prompt(null);
+  }
+
+  updateCaught(dt) {
+    if (!this.caughtSeq) return;
+    const s = this.caughtSeq;
+    s.t += dt;
+    const g = this.g;
+    const p = g.player;
+    const e = s.enemy;
+    // 视线被拽向那张凑过来的脸
+    const targetYaw = Math.atan2(-(e.pos.x - p.pos.x), -(e.pos.z - p.pos.z));
+    p.yaw += angleWrap(targetYaw - p.yaw) * Math.min(1, dt * 10);
+    p.pitch += (-0.08 - p.pitch) * Math.min(1, dt * 8);
+    p.syncCamera(dt);
+    // 挤压感：畸变 + 心跳 + 漫红一起收紧
+    const u = g.engine.finalPass.uniforms;
+    u.uPulse.value = Math.min(1.5, s.t * 2.2);
+    u.uDistort.value = Math.min(0.55, s.t * 0.5);
+    u.uRedShift.value = Math.min(0.55, s.t * 0.5);
+    if (s.t > 1.45) {
+      this.caughtSeq = null;
+      e.grabbing = false;
+      this.kill('溺', `${e.label}把你按进了水里。—— 回到检查点`);
+    }
+  }
+
+  // ---------- 死亡 ----------
+  kill(reason, sub, force = false) {
+    if ((this.g.player.dead && !force) || this.flags.ended) return;
+    const g = this.g;
+    this.deathCount++;
     g.player.dead = true;
     g.player.frozen = true;
     g.audio.drown();
@@ -661,7 +748,9 @@ export class Story {
     this.deathSeq = { t: 0, reason, sub };
     g.engine.finalPass.uniforms.uRedShift.value = 0.5;
     document.getElementById('death-text').textContent = reason ?? '溺';
-    g.hud.setDeath(true, sub ?? '潮水替你记住了这里 —— 正在回到检查点');
+    const m = Math.floor(this.time / 60);
+    const stats = `入村 ${m} 分 · 文书 ${this.notesFound.size}/8 · 第 ${this.deathCount} 次被收走`;
+    g.hud.setDeath(true, sub ?? '潮水替你记住了这里 —— 正在回到检查点', stats);
   }
 
   updateDeath(dt) {
@@ -675,7 +764,10 @@ export class Story {
     }
     if (t > 4.2) {
       this.deathSeq = null;
-      this.g.engine.finalPass.uniforms.uRedShift.value = this.flags.bloodTide ? 0.12 : 0;
+      const u = this.g.engine.finalPass.uniforms;
+      u.uRedShift.value = this.flags.bloodTide ? 0.12 : 0;
+      u.uDistort.value = 0;
+      u.uPulse.value = 0;
       this.respawn();
     }
   }
@@ -711,7 +803,8 @@ export class Story {
       g.hud.subtitle('歌词突然听清了。每一个字都是你的名字。', 4, 'song');
       g.sightjack.forceView(g.byId.singer, 3.2, () => {
         g.sightjack.exit();
-        this.kill('和', '你差点跟着唱出来。—— 回到检查点');
+        g.sightjack.restorePost();
+        this.kill('和', '你差点跟着唱出来。—— 回到检查点', true);
       });
     }
     // 首次共鸣警告
@@ -879,9 +972,11 @@ export class Story {
     this.time += dt;
     const g = this.g;
 
+    this.updateIntro(dt);
+    this.updateCaught(dt);
     this.updateDeath(dt);
     if (this.flags.ended) { this.updateEnding(dt); return; }
-    if (g.player.dead) return;
+    if (g.player.dead || this.caughtSeq) return;
 
     this.updateDrown(dt);
     this.updateRitual(dt);

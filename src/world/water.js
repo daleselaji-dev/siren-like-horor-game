@@ -28,21 +28,24 @@ export class Ocean {
       transparent: false,
     });
 
-    // 注入顶点微波 + 随时间滚动法线（第二层反向）
+    // 注入顶点微波 + 随时间滚动法线（第二层反向）+ 浪尖白沫 + 血潮微光
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = this.uniforms.uTime;
       shader.uniforms.uBlood = this.uniforms.uBlood;
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', `#include <common>\nuniform float uTime;`)
+        .replace('#include <common>', `#include <common>\nuniform float uTime;\nuniform float uBlood;\nvarying float vWave;`)
         .replace('#include <begin_vertex>', `
           #include <begin_vertex>
-          float wa = sin(position.x * 0.11 + uTime * 0.9) * 0.14
-                   + cos(position.z * 0.13 + uTime * 0.7) * 0.12
-                   + sin((position.x + position.z) * 0.05 + uTime * 0.45) * 0.2;
+          float chop = 1.0 + uBlood * 0.9;      // 血潮时浪更躁
+          float wa = sin(position.x * 0.11 + uTime * 0.9) * 0.14 * chop
+                   + cos(position.z * 0.13 + uTime * 0.7) * 0.12 * chop
+                   + sin((position.x + position.z) * 0.05 + uTime * 0.45) * 0.2
+                   + sin(position.x * 0.31 - uTime * 1.7) * 0.045 * chop;
           transformed.y += wa;
+          vWave = wa;
         `);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\nuniform float uTime;\nuniform float uBlood;`)
+        .replace('#include <common>', `#include <common>\nuniform float uTime;\nuniform float uBlood;\nvarying float vWave;`)
         .replace('#include <normal_fragment_maps>', `
           // 双层滚动法线
           vec3 mapN1 = texture2D( normalMap, vNormalMapUv + vec2(uTime*0.008, uTime*0.011) ).xyz * 2.0 - 1.0;
@@ -56,6 +59,17 @@ export class Ocean {
           // 血潮变色：暗红 + 轻微自发光感
           vec3 bloodCol = vec3(0.30, 0.045, 0.035);
           diffuseColor.rgb = mix(diffuseColor.rgb, bloodCol, uBlood);
+          // 浪尖碎沫：只有掀得最高的浪头翻出一线白（血潮翻出粉灰）
+          float capN = texture2D( normalMap, vNormalMapUv * 2.3 + vec2(uTime*0.017, -uTime*0.009) ).x;
+          float cap = smoothstep(0.30, 0.46, vWave) * smoothstep(0.45, 0.75, capN);
+          vec3 capCol = mix(vec3(0.62, 0.68, 0.66), vec3(0.55, 0.30, 0.28), uBlood);
+          diffuseColor.rgb = mix(diffuseColor.rgb, capCol, cap * 0.55);
+        `)
+        .replace('#include <emissivemap_fragment>', `
+          #include <emissivemap_fragment>
+          // 血潮：水体从内部透出的一点血光，随潮歌节律呼吸
+          float pulse = 0.5 + 0.5 * sin(uTime * 0.8);
+          totalEmissiveRadiance += vec3(0.10, 0.008, 0.006) * uBlood * (0.6 + pulse * 0.4);
         `);
     };
 
