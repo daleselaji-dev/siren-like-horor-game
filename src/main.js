@@ -8,7 +8,7 @@ import { buildVillage } from './world/village.js';
 import { Ocean } from './world/water.js';
 import { Sky } from './world/sky.js';
 import { Player } from './entities/player.js';
-import { Enemy, Dog, BirdFlock } from './entities/enemy.js';
+import { Enemy, Dog, BirdFlock, Watcher } from './entities/enemy.js';
 import { SightjackSystem } from './systems/sightjack.js';
 import { StealthSystem } from './systems/stealth.js';
 import { Story, NOTES } from './systems/story.js';
@@ -24,9 +24,9 @@ const input = new Input(engine.renderer.domElement);
 const audio = new AudioEngine();
 const hud = new HUD();
 
-const M = buildMaterials();
+const M = buildMaterials(LOWSPEC);
 const world = buildVillage(engine.scene, M);
-const ocean = new Ocean(engine.scene, M.textures);
+const ocean = new Ocean(engine.scene, M.textures, world);
 const sky = new Sky(engine.scene);
 world.waterLevel = () => ocean.level;
 
@@ -89,7 +89,13 @@ const enemyDefs = [
 const enemies = enemyDefs.map((d) => new Enemy(engine.scene, world, M, d));
 const dog = new Dog(engine.scene, world, M, { id: 'dog', label: '村犬', waypoints: P.dogWander });
 const birds = new BirdFlock(engine.scene, world, { id: 'birds', label: '海鸟群', center: [0, 0], radius: 46, height: 34 });
-const viewers = [...enemies, dog, birds]; // 视奸信道
+// 望海者：站在滩涂尽头的水里，面向海。血潮之后他们会转过身来。
+const watchers = [
+  new Watcher(engine.scene, world, M, { id: 'watcher1', x: 104, z: 131, yaw: 0.75, seed: 1101, cloth: 'grey' }),
+  new Watcher(engine.scene, world, M, { id: 'watcher2', x: 42, z: 125, yaw: 0.2, seed: 2202, cloth: 'navy' }),
+  new Watcher(engine.scene, world, M, { id: 'watcher3', x: 103, z: -95, yaw: 1.5, seed: 3303, cloth: 'grey' }),
+];
+const viewers = [...enemies, dog, birds, ...watchers]; // 视奸信道
 const byId = {};
 for (const e of enemies) byId[e.id] = e;
 
@@ -99,7 +105,7 @@ const stealth = new StealthSystem(world, player);
 
 const game = {
   scene: engine.scene, engine, world, player, hud, audio,
-  enemies, byId, viewers, sightjack, stealth, ocean, sky, M,
+  enemies, byId, viewers, watchers, sightjack, stealth, ocean, sky, M,
   state: 'TITLE', // TITLE | PLAY | NOTE | PAUSE | ENDED
   openNote(note) {
     hud.showNote(note);
@@ -247,6 +253,8 @@ function loop() {
     for (const e of enemies) e.update(ctx);
     dog.update(ctx);
     birds.update(ctx);
+    ctx.bloodTide = story.flags.bloodTide;
+    for (const w of watchers) w.update(ctx);
 
     // 系统
     stealth.update(dt, enemies, byId.singer);
@@ -290,6 +298,16 @@ function loop() {
     }
   }
 
+  // 威胁方向：被谁盯上了，从哪边来
+  let threat = null, threatLevel = 0;
+  if (!player.dead && (game.state === 'PLAY')) {
+    for (const e of enemies) {
+      if (!e.enabled || !e.state) continue;
+      const lvl = e.state === 'ALERT' ? 1 : e.state === 'SUSPECT' ? 0.4 + (e.suspectMeter ?? 0) * 0.35 : 0;
+      if (lvl > threatLevel) { threatLevel = lvl; threat = e; }
+    }
+  }
+
   // HUD
   hud.update(dt, {
     danger: player.dead ? 0 : stealth.danger,
@@ -297,6 +315,10 @@ function loop() {
     crouching: player.crouching && game.state === 'PLAY',
     drown: story.drownView ?? 0,
     noise: player.dead ? 0 : player.noiseLevel / 14,
+    threat: threat ? {
+      angle: -(Math.atan2(threat.pos.x - player.pos.x, threat.pos.z - player.pos.z) - (player.yaw + Math.PI)),
+      level: threatLevel,
+    } : null,
   });
 
   engine.render(elapsed);
@@ -306,6 +328,6 @@ loop();
 
 // 供无头验证注入
 window.__game = {
-  engine, player, world, ocean, sky, input, enemies, byId, dog, birds,
+  engine, player, world, ocean, sky, input, enemies, byId, dog, birds, watchers,
   sightjack, stealth, story, hud, audio, game,
 };

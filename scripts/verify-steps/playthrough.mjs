@@ -246,12 +246,18 @@ export async function run(page, h) {
   await waitStage(3, 20000);
   await h.sleep(2000);
   await h.shot('p16-forced-sightjack');
-  await waitStage(5, 30000);
+  await waitStage(5, 90000);
   await h.sleep(1500);
   await h.shot('p17-ending');
-  const endShown = await page.evaluate(() =>
-    document.getElementById('ending-overlay').classList.contains('show'));
+  // 遮罩淡入由演出阶段触发，低帧率下再多等一会儿
+  let endShown = false;
+  for (let i = 0; i < 20 && !endShown; i++) {
+    endShown = await page.evaluate(() =>
+      document.getElementById('ending-overlay').classList.contains('show'));
+    if (!endShown) await h.sleep(1000);
+  }
   console.log('[verify] ending overlay shown:', endShown);
+  if (!endShown) throw new Error('ending overlay not shown');
   const notesTotal = await page.evaluate(() => window.__game.story.notesFound.size);
   console.log('[verify] notes found in run:', notesTotal);
 }

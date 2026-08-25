@@ -21,6 +21,7 @@ export class HUD {
       resMeter: document.getElementById('resonance-meter'),
       resFill: document.getElementById('resonance-fill'),
       noiseRing: document.getElementById('noise-ring'),
+      threat: document.getElementById('threat-indicator'),
       cpToast: document.getElementById('checkpoint-toast'),
       letterbox: document.getElementById('letterbox'),
       ending: document.getElementById('ending-overlay'),
@@ -148,6 +149,15 @@ export class HUD {
       // 噪音波纹：动静越大越明显
       const noise = state.noise ?? 0;
       this.el.noiseRing.style.opacity = noise > 0.02 ? Math.min(0.75, noise).toFixed(2) : '0';
+      // 威胁方向弧
+      if (state.threat && state.threat.level > 0.05) {
+        const deg = (state.threat.angle * 180 / Math.PI).toFixed(1);
+        this.el.threat.style.opacity = Math.min(0.9, state.threat.level * 0.9).toFixed(2);
+        this.el.threat.style.transform = `rotate(${deg}deg)`;
+        this.el.threat.classList.toggle('alert', state.threat.level >= 0.99);
+      } else {
+        this.el.threat.style.opacity = '0';
+      }
     }
   }
 }

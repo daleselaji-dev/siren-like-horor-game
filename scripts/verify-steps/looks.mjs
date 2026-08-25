@@ -45,22 +45,51 @@ export async function run(page, h) {
   await look('l9-wreck', 30, -60, 37, -72);
   await look('l10-spawn-boat', 80, 108, 92, 122);
 
-  // 视奸海鸟（俯瞰全村）
+  // 望海者（滩尾站在水里的人）
+  await look('l12-watcher', 100, 127, 104, 131);
+
+  // 歌唱者（临时启用到近处拍一张特写）
   await page.evaluate(() => {
     const g = window.__game;
-    g.player.setPosition(2, 10, 0);
+    const s = g.byId.singer;
+    s.setEnabled(true);
+    s.pos.set(-2, 0, -8);
+    s.pos.y = g.world.heightAt(-2, -8);
+  });
+  await h.sleep(1200);
+  await look('l13-singer', -5, -5, -2, -8);
+  await page.evaluate(() => window.__game.byId.singer.setEnabled(false));
+
+  // 视奸海鸟（俯瞰全村）——站到空地上，避开巡逻线
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.player.setPosition(50, 20, 0);
   });
   await h.sleep(300);
   await h.tapKey('KeyQ');
   // 切到海鸟信道（多按几次）
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 10; i++) {
     const label = await page.evaluate(() => window.__game.sightjack.current?.label);
     if (label === '海鸟群') break;
     await h.tapKey('KeyQ');
     await h.sleep(200);
   }
-  await h.sleep(800);
+  await h.sleep(1600); // 等切台噪点脉冲消退
   await h.shot('l11-birdview');
   const ch = await page.evaluate(() => window.__game.sightjack.current?.label);
   console.log('[verify] bird channel:', ch);
+  await page.evaluate(() => window.__game.sightjack.exit());
+
+  // 血潮：红海 + 磷火 + 望海者转身面向村子
+  // （无头低帧率下渐变太慢，直接快进内部过渡值再拍）
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.story.beginBloodTide();
+    g.ocean.blood = 0.95;
+    g.ocean.level = 1.7;
+    g.sky.blood = 0.95;
+  });
+  await h.sleep(2500);
+  await look('l14-bloodtide-sea', 100, 127, 112, 140);
+  await look('l15-watcher-turned', 108, 136, 104, 131);
 }
