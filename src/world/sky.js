@@ -274,7 +274,9 @@ export class Sky {
         if (lt > 0) f = Math.max(f, Math.exp(-lt * 14) * 0.9);
       }
       this.flash = f * (1 - this.blood * 0.5);
-      if (this.flashSeq.t > 1.2) { this.flashSeq = null; this.flash = 0; this.boltMesh.visible = false; }
+      // 序列存活到最后一击之后 1.2s（开场运镜的第二组双闪排在 5s+）
+      const last = this.flashSeq.strikes[this.flashSeq.strikes.length - 1] ?? 0;
+      if (this.flashSeq.t > last + 1.2) { this.flashSeq = null; this.flash = 0; this.boltMesh.visible = false; }
     } else {
       this.flash = 0;
     }

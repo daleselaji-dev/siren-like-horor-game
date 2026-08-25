@@ -11,6 +11,7 @@
 //             理骨员(胶皮围裙长手套+永久歪头听缸)、浮客(脚尖离地)、回眸客(残影)
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+import { faceAnchor } from '../world/faces.js';
 
 // ---- 共享几何/材质缓存 ----
 const _geoCache = new Map();
@@ -154,15 +155,31 @@ function craniumGeo(variant, P, hd = false) {
       const nx = v.x / R, ny = v.y / R, nz = v.z / R;
       let x = v.x, y = v.y * faceLen, z = v.z;
       x *= headW;                          // 头侧收窄
-      if (nz < 0) z *= 1.05 + P.headW * 0.05; // 后脑饱满
-      else z *= 0.94;                      // 面部略平
-      // 下颌到下巴：前下方收拢（幂次曲线——收得柔和，下巴不变锥子）
+      if (nz < 0) {
+        // 颅骨不是球：耳后侧壁向枕部持续收窄（去「气球头」的关键一刀），
+        // 枕突鼓在上半，颈窝一侧向内塌
+        const bk = Math.min(1, -nz);
+        x *= 1 - bk * 0.1;
+        z *= 1.045 + P.headW * 0.04 - Math.max(0, -ny - 0.2) * bk * 0.18;
+      } else {
+        z *= 0.94;                         // 面部略平
+      }
+      // 顶结节以下侧壁微平：颞侧是「面」不是「弧」
+      x *= 1 - Math.exp(-((ny - 0.3) ** 2) * 5.5) * 0.04;
+      // 下颌到下巴：分两段折线收拢——折点即下颌角，颊面到颌缘有明确的转折
       if (ny < -0.12 && nz > -0.25) {
-        const t = Math.min(1, (-ny - 0.12) / 0.88) ** 1.35;
+        const tt = Math.min(1, (-ny - 0.12) / 0.88);
+        const t = tt < 0.34 ? tt * 0.5 : 0.17 + (tt - 0.34) * 1.258;
         x *= 1 - t * jawT;
         z = z * (1 - t * 0.2) + t * chinZ;
         y *= 1.03;
+        // 折线上沿一道咬肌棱（亮棱让折线在侧光里读得出来）
+        const crease = Math.exp(-((tt - 0.3) ** 2) * 110) * Math.min(1, Math.abs(nx) * 2.4) * Math.max(0, nz + 0.35);
+        x += Math.sign(nx) * crease * 0.0028;
       }
+      // 下颌角点（耳垂下前方的骨点）：侧面外凸出折线的「角」
+      const gon = Math.exp(-((ny + 0.42) ** 2) * 60 - ((Math.abs(nx) - 0.68) ** 2) * 26) * Math.max(0, nz * 0.8 + 0.4);
+      x += Math.sign(nx) * gon * 0.0045;
       const front = Math.max(0, nz);
       // 颧骨
       const cheek = Math.exp(-((ny + 0.06) ** 2) * 16 - ((Math.abs(nx) - 0.7) ** 2) * 20) * front;
@@ -200,21 +217,30 @@ function craniumGeo(variant, P, hd = false) {
   });
 }
 
+/** 照片脸的鼻件竖向校准量：把 3D 鼻底对齐到照片烘焙的鼻孔阴影线（消「双鼻影」） */
+function noseDyFor(P, photoKey) {
+  const a = photoKey ? faceAnchor(photoKey) : null;
+  if (!a) return 0;
+  const def = -0.0163 - P.noseL * 0.005; // 默认 3D 鼻孔线（相对颅心）
+  return Math.max(-0.012, Math.min(0.004, a.noseY - def));
+}
+
 /** 头部集合（头骨+鼻+耳，唇已独立成 lipsGeo）：皮肤材质一体网格，鼻耳全部由 P 参数化 */
-function headGeo(variant, P, hd = false) {
-  return G(`head_${variant}_${P.key}${hd ? '_hd' : ''}`, () => {
+function headGeo(variant, P, hd = false, photoKey = null) {
+  return G(`head_${variant}_${P.key}_${photoKey ?? 'x'}${hd ? '_hd' : ''}`, () => {
     const parts = [craniumGeo(variant, P, hd).clone()];
     const sd = hd ? 2 : 1; // 近距 LOD 下小件也翻倍段数
-    const noseLen = 0.85 + P.noseL * 0.55;
+    const dy = noseDyFor(P, photoKey); // 照片脸：鼻件整体下落到照片鼻影位
+    const noseLen = (0.85 + P.noseL * 0.55) * (1 - dy * 14); // 鼻底下移时鼻梁同步拉长
     const noseW = 0.8 + P.noseW * 0.5;
     // 鼻：鼻梁 + 鼻头 + 鼻翼（梁顶收进眉心，不顶出眉间包）
-    parts.push(xform(new THREE.SphereGeometry(0.012, 10 * sd, 8 * sd), 0, 0.016, 0.088 + P.noseL * 0.004, -0.24, 0, 0, 0.68 * noseW, 1.22 * noseLen, 0.85));
-    parts.push(xform(new THREE.SphereGeometry(0.0125, 10 * sd, 8 * sd), 0, -0.004 - P.noseL * 0.006, 0.094 + P.noseL * 0.005, 0, 0, 0, noseW, 0.8, 1));
-    parts.push(xform(new THREE.SphereGeometry(0.008, 8 * sd, 6 * sd), -0.0105 * noseW, -0.009 - P.noseL * 0.005, 0.089, 0, 0, 0, noseW, 0.85, 0.9));
-    parts.push(xform(new THREE.SphereGeometry(0.008, 8 * sd, 6 * sd), 0.0105 * noseW, -0.009 - P.noseL * 0.005, 0.089, 0, 0, 0, noseW, 0.85, 0.9));
+    parts.push(xform(new THREE.SphereGeometry(0.012, 10 * sd, 8 * sd), 0, 0.016 + dy * 0.4, 0.088 + P.noseL * 0.004, -0.24, 0, 0, 0.68 * noseW, 1.22 * noseLen, 0.85));
+    parts.push(xform(new THREE.SphereGeometry(0.0125, 10 * sd, 8 * sd), 0, -0.004 - P.noseL * 0.006 + dy, 0.094 + P.noseL * 0.005, 0, 0, 0, noseW, 0.8, 1));
+    parts.push(xform(new THREE.SphereGeometry(0.008, 8 * sd, 6 * sd), -0.0105 * noseW, -0.009 - P.noseL * 0.005 + dy, 0.089, 0, 0, 0, noseW, 0.85, 0.9));
+    parts.push(xform(new THREE.SphereGeometry(0.008, 8 * sd, 6 * sd), 0.0105 * noseW, -0.009 - P.noseL * 0.005 + dy, 0.089, 0, 0, 0, noseW, 0.85, 0.9));
     // 人中嵴（鼻底到上唇的两条浅棱——近景嘴部的解剖锚点）
-    parts.push(xform(new THREE.SphereGeometry(0.005, 6 * sd, 5 * sd), -0.0035, -0.023, 0.0885, 0, 0, 0, 0.55, 1.9, 0.4));
-    parts.push(xform(new THREE.SphereGeometry(0.005, 6 * sd, 5 * sd), 0.0035, -0.023, 0.0885, 0, 0, 0, 0.55, 1.9, 0.4));
+    parts.push(xform(new THREE.SphereGeometry(0.005, 6 * sd, 5 * sd), -0.0035, -0.023 + dy * 0.5, 0.0885, 0, 0, 0, 0.55, 1.9, 0.4));
+    parts.push(xform(new THREE.SphereGeometry(0.005, 6 * sd, 5 * sd), 0.0035, -0.023 + dy * 0.5, 0.0885, 0, 0, 0, 0.55, 1.9, 0.4));
     // 耳（带不对称：左右高低差半毫米——近景才读得出的活人证据）
     const earS = 0.28 + P.earS * 0.12;
     const earDy = (P.asym - 0.5) * 0.006;
@@ -297,21 +323,39 @@ function lipSeamGeo(P) {
   });
 }
 
+/** 发壳竖向沟槽：沿方位角叠三组正弦把壳面「犁」出发绺——高光断成条，破头盔感 */
+function hairGrooves(geo, amp = 1) {
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const rr = Math.hypot(x, z);
+    if (rr < 0.02) continue;
+    const az = Math.atan2(x, z);
+    const d = (Math.sin(az * 16) * 0.5 + Math.sin(az * 29 + 1.7) * 0.32 + Math.sin(az * 47 + 4.1) * 0.18)
+      * 0.0018 * amp;
+    const k = 1 + d / rr;
+    pos.setX(i, x * k);
+    pos.setZ(i, z * k);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 /** 发型（发际线必须露出额头——不能像头盔盖到眼睛） */
 function hairGeo(style = 'crop') {
   return G('hair_' + style, () => {
     const parts = [];
-    const cap = (scaleY = 1, lift = 0) => {
+    const cap = (scaleY = 1, lift = 0, r = 0.108) => {
       // 发际线抬高：壳体后移+后仰，额头必须露出来（不能像头盔盖到眉毛）
-      parts.push(xform(new THREE.SphereGeometry(0.108, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.44),
+      parts.push(xform(new THREE.SphereGeometry(r, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.44),
         0, 0.034 + lift, -0.02, 0.3, 0, 0, 0.89, scaleY, 0.99));
       // 后脑+颈窝补片（φ π..2π 是 -z 后半球）——缺了这块，背影读成光头戴小帽
-      parts.push(xform(new THREE.SphereGeometry(0.107, 18, 10, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
+      parts.push(xform(new THREE.SphereGeometry(r - 0.001, 18, 10, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
         0, 0.03 + lift, -0.012, 0.16, 0, 0, 0.9, scaleY * 1.02, 0.97));
     };
     switch (style) {
       case 'crop': { // 平头/寸头
-        cap(0.96);
+        cap(0.96, 0, 0.1065);
         break;
       }
       case 'back': { // 大背头（司仪）
@@ -320,15 +364,17 @@ function hairGeo(style = 'crop') {
         break;
       }
       case 'side': { // 三七分：整体壳微偏一侧（分头由轮廓不对称表达，不悬浮贴片）
-        parts.push(xform(new THREE.SphereGeometry(0.108, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.44),
+        parts.push(xform(new THREE.SphereGeometry(0.107, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.44),
           -0.008, 0.034, -0.02, 0.3, 0, -0.06, 0.9, 0.95, 0.99));
-        parts.push(xform(new THREE.SphereGeometry(0.107, 18, 10, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
+        parts.push(xform(new THREE.SphereGeometry(0.106, 18, 10, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
           0, 0.03, -0.012, 0.16, 0, 0, 0.9, 0.97, 0.97));
         break;
       }
-      case 'bun': { // 盘发髻（全福婆）
-        cap(0.92);
-        parts.push(xform(new THREE.SphereGeometry(0.042, 12, 9), 0, 0.028, -0.1, 0, 0, 0, 1, 0.85, 1));
+      case 'bun': { // 盘发髻（全福婆）：壳贴颅、向后拢，束发圈勒出髻根
+        cap(0.9, 0, 0.104);
+        parts.push(xform(new THREE.SphereGeometry(0.04, 14, 10), 0, 0.026, -0.099, 0, 0, 0, 1, 0.78, 0.95));
+        parts.push(xform((() => { const t = new THREE.TorusGeometry(0.028, 0.0055, 6, 14); return t; })(),
+          0, 0.028, -0.082, 0.35, 0, 0));
         break;
       }
       case 'perm': { // 烫发（2001 阿姨）
@@ -338,18 +384,32 @@ function hairGeo(style = 'crop') {
           parts.push(xform(new THREE.SphereGeometry(0.03, 8, 6),
             Math.cos(a) * rr * 0.8, 0.062 + Math.sin(i * 2.3) * 0.018, Math.sin(a) * rr * 0.68 - 0.014));
         }
-        cap(0.92);
+        cap(0.92, 0, 0.105);
         break;
       }
-      case 'long': { // 长直发（新娘/伴娘）
-        cap(0.98);
-        parts.push(xform(new THREE.BoxGeometry(0.15, 0.5, 0.04), 0, -0.14, -0.095, -0.06, 0, 0));
-        parts.push(xform(new THREE.BoxGeometry(0.03, 0.3, 0.03), -0.09, -0.06, 0.01, 0, 0, 0.08));
-        parts.push(xform(new THREE.BoxGeometry(0.03, 0.3, 0.03), 0.09, -0.06, 0.01, 0, 0, -0.08));
+      case 'long': { // 长直发（新娘/伴娘）：球壳下半直接拉伸成垂帘——贴颅、无缝、发梢微撇
+        cap(0.97, 0, 0.1055);
+        // φ 0.72π..2.28π = 后半球+两侧（前脸留开口）；θ 到 0.8π 提供可拉伸的下摆
+        const shell = new THREE.SphereGeometry(0.1075, 26, 18, Math.PI * 0.72, Math.PI * 1.56, 0, Math.PI * 0.8);
+        {
+          const sp = shell.attributes.position;
+          for (let i = 0; i < sp.count; i++) {
+            const sy = sp.getY(i);
+            if (sy < 0) {
+              // 耳线以下：竖向拉长成帘，微收腰再向发梢外撇
+              const t = Math.min(1, -sy / 0.088);
+              const flare = 1 - t * 0.16 + t * t * 0.24;
+              sp.setX(i, sp.getX(i) * flare);
+              sp.setZ(i, sp.getZ(i) * flare);
+              sp.setY(i, sy * (1 + t * 2.6));
+            }
+          }
+        }
+        parts.push(xform(shell, 0, 0.03, -0.008, 0.06, 0, 0, 1, 1, 0.95));
         break;
       }
     }
-    return merged(parts);
+    return hairGrooves(merged(parts), style === 'long' ? 1.4 : 1);
   });
 }
 
@@ -866,12 +926,39 @@ export class Humanoid {
         this.torso.add(cone);
       }
     } else {
-      // 颈用与脸同调的纯色材质（照片脸取样均值）——下颌到领口不再换一张皮
-      const neckMat = (D.photo && M.faceLids?.[D.photo]) ? pick(M.faceLids[D.photo]) : skin;
-      this.torso.add(mkMesh(G('neckC', () => new THREE.CapsuleGeometry(0.052, 0.08, 6, 14)), neckMat, 0, 0.615, 0.006));
-      // 喉结（男性；2 米内的活人证据）
+      // 颈裙：车削喉颈替代胶囊——上缘细、整圈藏进下颌腔内，向下外扩铺进领口/斜方肌；
+      // 顶点色把上缘压暗成「下颌接触阴影」，胶囊颈的横向接缝就此消失
+      const neckMat = (D.photo && M.faceNecks?.[D.photo]) ? pick(M.faceNecks[D.photo])
+        : pick(Mtl('neckV_' + skin.uuid, () => {
+          const m = skin.clone();
+          m.vertexColors = true;
+          return m;
+        }));
+      const nkG = G('neckSkirt', () => {
+        const prof = [
+          [0.0435, 0.105], [0.0455, 0.085], [0.046, 0.06], [0.0455, 0.035],
+          [0.047, 0.012], [0.051, -0.008], [0.058, -0.026], [0.07, -0.042], [0.088, -0.055],
+        ].map(([r, y2]) => new THREE.Vector2(r, y2));
+        const g2 = new THREE.LatheGeometry(prof, 18);
+        g2.scale(1, 1, 0.86); // 颈截面前后略薄
+        const pos2 = g2.attributes.position;
+        const col = new Float32Array(pos2.count * 3);
+        for (let i = 0; i < pos2.count; i++) {
+          const sh = 0.5 + Math.min(1, Math.max(0, (0.085 - pos2.getY(i)) / 0.1)) * 0.5;
+          col[i * 3] = sh; col[i * 3 + 1] = sh * 0.96; col[i * 3 + 2] = sh * 0.94;
+        }
+        g2.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        g2.computeVertexNormals();
+        return g2;
+      });
+      this.torso.add(mkMesh(nkG, neckMat, 0, 0.6, 0.005));
+      // 喉结（男性；2 米内的活人证据）——补白顶点色，否则顶点色材质把它染黑
       if (D.face === 'm' || D.face === 'gaunt' || D.face === 'old') {
-        this.torso.add(mkMesh(G('adam', () => new THREE.SphereGeometry(0.012, 8, 6)), neckMat, 0, 0.635, 0.052, 0.8, 1.35, 0.7));
+        this.torso.add(mkMesh(G('adam', () => {
+          const g2 = new THREE.SphereGeometry(0.012, 8, 6);
+          g2.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g2.attributes.position.count * 3).fill(0.92), 3));
+          return g2;
+        }), neckMat, 0, 0.635, 0.048, 0.8, 1.35, 0.7));
       }
     }
     // 锁骨（连衣裙领口露出）
@@ -927,56 +1014,72 @@ export class Humanoid {
     const headSkin = (photoKey && M.faceMats?.[photoKey]) ? pick(M.faceMats[photoKey]) : skin;
     const lidSkin = (photoKey && M.faceLids?.[photoKey]) ? pick(M.faceLids[photoKey]) : skin;
     this.skinMat = headSkin;
-    this.headMesh = mkMesh(headGeo(faceVariant, P), headSkin, 0, 0.115, 0);
+    this.photoKey = photoKey ?? null;
+    this.headMesh = mkMesh(headGeo(faceVariant, P, false, this.photoKey), headSkin, 0, 0.115, 0);
     this.head.add(this.headMesh);
     this.headHD = null;   // 2m 内惰性构建的高段数头模
     this._hd = false;
     this._lodT = Math.random() * 0.3;
     // 眼（湿润巩膜+瞳，可发潮光）：装进眼球枢轴组——扫视微动转的是「球」不是贴片
+    // 巩膜压暗压哑（活人的眼白从来不是白的），虹膜放大到接近睑裂高——东亚成人露白极少
     const scleraMat = pick(Mtl('scleraWet', () => new THREE.MeshPhysicalMaterial({
-      color: 0xd6cfc0, roughness: 0.12, envMapIntensity: 2.0,
-      clearcoat: 1.0, clearcoatRoughness: 0.06, // 泪膜：巩膜上真正的水层
+      color: 0xd0c6b4, roughness: 0.16, envMapIntensity: 1.55,
+      clearcoat: 1.0, clearcoatRoughness: 0.07, // 泪膜：巩膜上真正的水层
     })));
     this.eyeMat = Mtl('irisBase', () => new THREE.MeshStandardMaterial({
-      color: 0x231c16, roughness: 0.06, envMapIntensity: 2.4,
+      color: 0x1d1712, roughness: 0.06, envMapIntensity: 2.4,
       emissive: 0x4a6a70, emissiveIntensity: 0,
     })).clone();
     if (ghost) { this.eyeMat.transparent = true; this.eyeMat.opacity = 0.5; }
     const eyeG = G('eyeball', () => new THREE.SphereGeometry(0.0125, 12, 10));
-    const irisG = G('iris', () => new THREE.SphereGeometry(0.007, 10, 8));
+    const irisG = G('iris', () => new THREE.SphereGeometry(0.0088, 12, 9));
     // 虹膜环：瞳孔外一圈深褐（近景里眼睛有了「层」；东亚成人虹膜大、露白少）
-    const irisRingG = G('irisRing', () => new THREE.SphereGeometry(0.0096, 10, 8));
+    const irisRingG = G('irisRing', () => new THREE.SphereGeometry(0.0104, 12, 9));
     const irisRingMat = pick(Mtl('irisRing', () => new THREE.MeshStandardMaterial({
-      color: 0x4a3320, roughness: 0.25, envMapIntensity: 1.6,
+      color: 0x3d2a1a, roughness: 0.28, envMapIntensity: 1.5,
     })));
     const eyeXoff = 0.028 + P.eyeX * 0.009;
     const eyeYoff = 0.113 + (P.eyeH - 0.5) * 0.006; // 眼睛在头高一半处（婴儿化=眼太高）
     const eyeScl = 0.94 + P.eyeS * 0.18;
     this.eyeSclY = eyeScl;
     this.eyeXoff = eyeXoff;
-    // 眼球退进开孔的眼窝（z 0.08→0.0755）——球面在眶缘之内，不再浮在脸上
-    this.eyeGL = new THREE.Group(); this.eyeGL.position.set(-eyeXoff, eyeYoff, 0.0755);
-    this.eyeGR = new THREE.Group(); this.eyeGR.position.set(eyeXoff, eyeYoff, 0.0755);
+    // 眼球再退进眼窝一档（z 0.0755→0.0742）——球面藏在眶缘之内，不再鼓在脸上
+    this.eyeGL = new THREE.Group(); this.eyeGL.position.set(-eyeXoff, eyeYoff, 0.0742);
+    this.eyeGR = new THREE.Group(); this.eyeGR.position.set(eyeXoff, eyeYoff, 0.0742);
     this.eyeL = mkMesh(eyeG, scleraMat, 0, 0, 0, eyeScl, eyeScl, eyeScl);
     this.eyeR = mkMesh(eyeG, scleraMat, 0, 0, 0, eyeScl, eyeScl, eyeScl);
-    this.irisL = mkMesh(irisG, this.eyeMat, 0, 0, 0.0098 * eyeScl);
-    this.irisR = mkMesh(irisG, this.eyeMat, 0, 0, 0.0098 * eyeScl);
-    this.eyeGL.add(this.eyeL, this.irisL, mkMesh(irisRingG, irisRingMat, 0, 0, 0.0066 * eyeScl, 1, 1, 0.5));
-    this.eyeGR.add(this.eyeR, this.irisR, mkMesh(irisRingG, irisRingMat, 0, 0, 0.0066 * eyeScl, 1, 1, 0.5));
+    this.irisL = mkMesh(irisG, this.eyeMat, 0, 0, 0.0095 * eyeScl, eyeScl, eyeScl, 0.55 * eyeScl);
+    this.irisR = mkMesh(irisG, this.eyeMat, 0, 0, 0.0095 * eyeScl, eyeScl, eyeScl, 0.55 * eyeScl);
+    this.eyeGL.add(this.eyeL, this.irisL, mkMesh(irisRingG, irisRingMat, 0, 0, 0.0055 * eyeScl, eyeScl, eyeScl, 0.42 * eyeScl));
+    this.eyeGR.add(this.eyeR, this.irisR, mkMesh(irisRingG, irisRingMat, 0, 0, 0.0055 * eyeScl, eyeScl, eyeScl, 0.42 * eyeScl));
     this.head.add(this.eyeGL, this.eyeGR);
+    // 上睑接触阴影：罩在眼球前上缘的一圈软影带——眼球「压」在眼睑下面，不是并排摆着
+    {
+      const aoM = pick(Mtl('eyeAO', () => new THREE.MeshBasicMaterial({
+        color: 0x1a100a, transparent: true, opacity: 0.22, depthWrite: false,
+      })));
+      const aoG = G('eyeAOBand', () => new THREE.SphereGeometry(0.0129, 20, 6, 0, Math.PI * 2, 0.66, 0.22));
+      for (const s of [-1, 1]) {
+        const ao = mkMesh(aoG, aoM, s * eyeXoff, eyeYoff, 0.0742, eyeScl * 1.02, eyeScl * 1.02, eyeScl * 1.02);
+        ao.rotation.x = -0.5;
+        ao.renderOrder = 1;
+        ao.userData.noShadow = true;
+        this.head.add(ao);
+      }
+    }
     // 眼睑：左右独立下垂量——「哪只眼皮更沉」是每个人自己的事；眨眼转的就是这两片
     this.lidBaseL = -0.84 + P.droopL * 0.26;
     this.lidBaseR = -0.84 + P.droopR * 0.26;
-    this.lidL = mkMesh(lidGeo(), lidSkin, -eyeXoff, eyeYoff + 0.002, 0.0762, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
+    this.lidL = mkMesh(lidGeo(), lidSkin, -eyeXoff, eyeYoff + 0.002, 0.075, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
     this.lidL.rotation.x = this.lidBaseL;
-    this.lidR = mkMesh(lidGeo(), lidSkin, eyeXoff, eyeYoff + 0.002, 0.0762, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
+    this.lidR = mkMesh(lidGeo(), lidSkin, eyeXoff, eyeYoff + 0.002, 0.075, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
     this.lidR.rotation.x = this.lidBaseR;
     this.head.add(this.lidL, this.lidR);
     // 下睑：睑缘从下方包住眼球（几乎不动——眨眼是上睑的事；眯眼时上抬）
     this.lidLoBase = Math.PI - 0.52;
-    this.lidLoL = mkMesh(lidGeo(), lidSkin, -eyeXoff, eyeYoff - 0.0032, 0.0766, eyeScl * 1.05, eyeScl * 0.85, eyeScl * 1.05);
+    this.lidLoL = mkMesh(lidGeo(), lidSkin, -eyeXoff, eyeYoff - 0.0032, 0.0753, eyeScl * 1.05, eyeScl * 0.85, eyeScl * 1.05);
     this.lidLoL.rotation.x = this.lidLoBase;
-    this.lidLoR = mkMesh(lidGeo(), lidSkin, eyeXoff, eyeYoff - 0.0032, 0.0766, eyeScl * 1.05, eyeScl * 0.85, eyeScl * 1.05);
+    this.lidLoR = mkMesh(lidGeo(), lidSkin, eyeXoff, eyeYoff - 0.0032, 0.0753, eyeScl * 1.05, eyeScl * 0.85, eyeScl * 1.05);
     this.lidLoR.rotation.x = this.lidLoBase;
     this.head.add(this.lidLoL, this.lidLoR);
     // 睫毛：上睑缘 alpha 贴片（眼睛「嵌进眼眶」的暗接缝）
@@ -985,9 +1088,9 @@ export class Humanoid {
       depthWrite: false, side: THREE.DoubleSide, roughness: 0.8,
     })));
     if (M.textures?.lash) {
-      const lashL = mkMesh(lashGeo(), lashMat, -eyeXoff, eyeYoff + 0.0066, 0.0856, eyeScl, eyeScl, 1);
+      const lashL = mkMesh(lashGeo(), lashMat, -eyeXoff, eyeYoff + 0.0066, 0.0846, eyeScl, eyeScl, 1);
       lashL.rotation.x = -0.62;
-      const lashR = mkMesh(lashGeo(), lashMat, eyeXoff, eyeYoff + 0.0066, 0.0856, -eyeScl, eyeScl, 1);
+      const lashR = mkMesh(lashGeo(), lashMat, eyeXoff, eyeYoff + 0.0066, 0.0846, -eyeScl, eyeScl, 1);
       lashR.rotation.x = -0.62;
       this.head.add(lashL, lashR);
     }
@@ -1000,13 +1103,19 @@ export class Humanoid {
     const browGeoUse = M.textures?.brow ? browPatchGeo()
       : G('browBox', () => xform(new THREE.BoxGeometry(0.032, 0.0045, 0.006), 0, 0, 0));
     const browMatUse = M.textures?.brow ? browMat : hairMat;
-    this.browBaseY = [0.1332 + P.browTL * 0.005, 0.1332 + P.browTR * 0.005];
+    // 眉线落位：照片脸把 3D 眉压到照片眉的反投影线上（3D 眉叠在烘焙眉上=一副眉）；
+    // 程序脸也压回眶上缘——旧值高出眼线 2cm，正是「额头上第二副眉」的元凶
+    const anch = this.photoKey ? faceAnchor(this.photoKey) : null;
+    const browLine = anch ? Math.min(0.016, Math.max(0.002, anch.browY)) : 0.0105;
+    const browJit = anch ? 0.0015 : 0.004;
+    this.browBaseY = [0.115 + browLine + (P.browTL - 0.5) * browJit, 0.115 + browLine + (P.browTR - 0.5) * browJit];
+    const browZ = Math.min(0.0915, Math.max(0.0838, 0.0845 + (browLine - 0.006) * 0.55));
     this.browBaseX = [-eyeXoff - 0.002, eyeXoff + 0.002];
-    this.browBaseRZ = [0.04 + P.browTL * 0.1, -(0.04 + P.browTR * 0.1)];
-    this.browL = mkMesh(browGeoUse, browMatUse, this.browBaseX[0], this.browBaseY[0], 0.092);
-    this.browL.rotation.set(-0.32, 0, this.browBaseRZ[0]);
-    this.browR = mkMesh(browGeoUse, browMatUse, this.browBaseX[1], this.browBaseY[1], 0.092);
-    this.browR.rotation.set(-0.32, 0, this.browBaseRZ[1]);
+    this.browBaseRZ = [0.04 + P.browTL * 0.08, -(0.04 + P.browTR * 0.08)];
+    this.browL = mkMesh(browGeoUse, browMatUse, this.browBaseX[0], this.browBaseY[0], browZ);
+    this.browL.rotation.set(-0.35, 0, this.browBaseRZ[0]);
+    this.browR = mkMesh(browGeoUse, browMatUse, this.browBaseX[1], this.browBaseY[1], browZ);
+    this.browR.rotation.set(-0.35, 0, this.browBaseRZ[1]);
     this.browR.scale.x = -1; // 镜像贴图：两条眉共用一张毛流
     this.head.add(this.browL, this.browR);
     // 鼻孔开洞：鼻底两粒近黑内嵌球，开口斜朝下前——2m 内鼻子终于是「通气的」
@@ -1014,7 +1123,7 @@ export class Humanoid {
       const nostrilM = pick(Mtl('nostrilVoid', () => new THREE.MeshStandardMaterial({ color: 0x140c0a, roughness: 1 })));
       const nG = G('nostril', () => new THREE.SphereGeometry(0.0042, 8, 6));
       const noseW2 = 0.8 + P.noseW * 0.5;
-      const nY = 0.115 - 0.0163 - P.noseL * 0.005;
+      const nY = 0.115 - 0.0163 - P.noseL * 0.005 + noseDyFor(P, this.photoKey);
       for (const s of [-1, 1]) {
         const nm = mkMesh(nG, nostrilM, s * 0.0068 * noseW2, nY, 0.0872, 1.2 * noseW2, 0.6, 0.8);
         nm.rotation.x = 0.5;
@@ -1097,22 +1206,38 @@ export class Humanoid {
         return m;
       };
       if (!D.cap) {
-        // 前发际线：碎发搭上额头（长发/盘发另有形态）
+        // 前发际线：中央一片 + 左右两小片（更高更短——是发际线的过渡，不是刘海帘）
         if (hairStyle !== 'bun') {
-          addCard(hairCardGeo(0.075, 0.042, 5), strandM, 0, 0.052, 0.0805, -0.42, 0, (P.asym - 0.5) * 0.24);
+          addCard(hairCardGeo(0.07, 0.034, 5), wispM, 0, 0.058, 0.0785, -0.5, 0, (P.asym - 0.5) * 0.24);
+          addCard(hairCardGeo(0.042, 0.026, 6), strandM, -0.038, 0.06, 0.071, -0.52, -0.44, 0.14);
+          addCard(hairCardGeo(0.042, 0.026, 6), strandM, 0.038, 0.062, 0.071, -0.52, 0.44, -0.14);
+        } else {
+          // 盘发：发际线是「拢回去」的——两片低角度贴额扫向后（稀发丝，不压成刘海）
+          addCard(hairCardGeo(0.055, 0.026, 5), wispM, -0.024, 0.066, 0.073, -1.0, -0.3, 0.5);
+          addCard(hairCardGeo(0.055, 0.026, 5), wispM, 0.024, 0.066, 0.073, -1.0, 0.3, -0.5);
         }
-        // 鬓角（贴耳前，随不对称一高一低）
+        // 鬓角（贴耳前，随不对称一高一低）+ 耳后补片
         addCard(hairCardGeo(0.034, 0.05, 7), strandM, -0.072, 0.012, 0.035, -0.1, -1.18, 0.1);
         addCard(hairCardGeo(0.034, 0.05, 7), strandM, 0.072, 0.014, 0.035, -0.1, 1.18, -0.1);
-        // 颈窝碎发
+        addCard(hairCardGeo(0.03, 0.045, 6), strandM, -0.078, -0.01, -0.012, 0.05, -1.62, 0.12);
+        addCard(hairCardGeo(0.03, 0.045, 6), strandM, 0.078, -0.008, -0.012, 0.05, 1.62, -0.12);
+        // 颈窝碎发（两片错位）
         addCard(hairCardGeo(0.06, 0.055, 4), strandM, 0, -0.052, -0.078, 0.35, Math.PI, 0);
+        addCard(hairCardGeo(0.05, 0.05, 5), strandM, -0.024, -0.048, -0.072, 0.3, Math.PI - 0.5, 0.1);
         // 顶部逆光碎发（十字两片、根朝下立起）——轮廓上的几根「不听话」
         addCard(hairCardGeo(0.085, 0.05, 2), wispM, 0, 0.128, -0.012, 0, 0, Math.PI);
         addCard(hairCardGeo(0.085, 0.05, 2), wispM, 0, 0.128, -0.012, 0, Math.PI / 2, Math.PI);
         if (hairStyle === 'long') {
-          // 长发侧帘
-          addCard(hairCardGeo(0.05, 0.17, 3), strandM, -0.077, -0.06, 0.012, 0, -1.35, 0.05, 1.2);
-          addCard(hairCardGeo(0.05, 0.17, 3), strandM, 0.077, -0.06, 0.012, 0, 1.35, -0.05, 1.2);
+          // 长发侧帘（贴壳垂帘外皮）+ 后帘三片——壳面高光被发丝打碎
+          addCard(hairCardGeo(0.046, 0.2, 2), strandM, -0.096, -0.1, 0.006, 0.04, -1.5, 0.05);
+          addCard(hairCardGeo(0.046, 0.2, 2), strandM, 0.096, -0.098, 0.006, 0.04, 1.5, -0.05);
+          addCard(hairCardGeo(0.075, 0.25, 1.6), strandM, 0, -0.12, -0.112, 0.05, Math.PI, 0, 1.25);
+          addCard(hairCardGeo(0.06, 0.23, 2.2), strandM, -0.068, -0.11, -0.088, 0.04, Math.PI - 0.65, 0.06, 1.15);
+          addCard(hairCardGeo(0.06, 0.23, 2.2), strandM, 0.068, -0.108, -0.088, 0.04, Math.PI + 0.65, -0.06, 1.15);
+        }
+        if (hairStyle === 'bun') {
+          // 髻根碎发：盘不进去的那几根
+          addCard(hairCardGeo(0.04, 0.045, 4), wispM, 0, 0.005, -0.1, 0.5, Math.PI, 0);
         }
       } else {
         // 大檐帽下只露颈窝一撮
@@ -1336,7 +1461,7 @@ export class Humanoid {
     const d = this.head.getWorldPosition(_lodV).distanceTo(Humanoid.viewer);
     if (!this._hd && d < 2.1) {
       if (!this.headHD) {
-        this.headHD = new THREE.Mesh(headGeo(this.faceVariant, this.P, true), hdSkinVariant(this.skinMat));
+        this.headHD = new THREE.Mesh(headGeo(this.faceVariant, this.P, true, this.photoKey), hdSkinVariant(this.skinMat));
         this.headHD.position.copy(this.headMesh.position);
         this.headHD.castShadow = this.headMesh.castShadow;
         this.head.add(this.headHD);
@@ -1819,6 +1944,15 @@ export function bakeFigure(M, opts, pose) {
     // 丢弃属性不齐的（防 merge 失败）
     const ok = geos.filter((g) => g.attributes.position && g.attributes.normal);
     for (const g of ok) { if (g.attributes.uv === undefined) { const n = g.attributes.position.count; g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2)); } }
+    // 顶点色补齐（颈裙带 color，喉结等同材质小件没有——缺的补全白）
+    if (ok.some((g) => g.attributes.color)) {
+      for (const g of ok) {
+        if (!g.attributes.color) {
+          const n = g.attributes.position.count;
+          g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+        }
+      }
+    }
     const mg = BufferGeometryUtils.mergeGeometries(ok, false);
     if (!mg) continue;
     const mesh = new THREE.Mesh(mg, mat);

@@ -1150,12 +1150,13 @@ export class Story {
     if (F.intro) return;
     F.intro = true;
     const hud = this.g.hud;
-    this.introSeq = { t: 0, dur: 10.5 };
+    this.introSeq = { t: 0, dur: 12.0, thunder2: false };
     hud.setLetterbox(true);
     this.g.player.frozen = true;
-    // 开场一记无声闪电把雨夜整个照亮（闷雷隔几秒才从海上过来）
-    this.g.sky.flashSeq = { t: 0, strikes: [0.5, 0.72, 4.2] };
+    // 三拍运镜的光雷谱：开场首闪（远雷慢半拍）；5.4s 双闪烧出牌坊剪影（近雷同拍压下）
+    this.g.sky.flashSeq = { t: 0, strikes: [0.6, 0.85, 5.4, 5.62] };
     this.g.sky.thunderQueued = 1;
+    this.g.sky._boltAz = -1.7; // 闪电裂纹立在牌坊背后的西天——剪影要有光源
     this.g.sky.boltMesh.visible = true;
     hud.subtitle('二〇〇一年，秋。蚀湾。雨没有停过。', 4);
     hud.subtitle('……喜宴实况转播……南方大酒店……全镇同贺……', 5, 'radio');
@@ -1164,7 +1165,7 @@ export class Story {
     setTimeout(() => this.g.audio.doorCreak(), 1200); // 车门合拢
     setTimeout(() => {
       hud.objective('从站台长椅上取回行李');
-    }, 11500);
+    }, 13000);
   }
 
   updateIntro(dt) {
@@ -1174,24 +1175,58 @@ export class Story {
     const g = this.g;
     const p = g.player;
     const cam = g.engine.camera;
-    if (s.t > 2.2) this.busGo = true; // 末班车掉头回县城
-    const T = Math.min(1, s.t / s.dur);
-    const ease = T * T * (3 - 2 * T);
-    // 从「望着末班车尾灯」摇回第一人称——车往东走，人往西看
-    const yaw = p.yaw + (1 - ease) * -2.3;
-    const pitch = -(1 - ease) * 0.5;
-    const back = (1 - ease) * 4.0;
-    const h = 1.62 + (1 - ease) * 7.5;
-    cam.position.set(
-      p.pos.x + Math.sin(yaw) * back,
-      p.pos.y + h,
-      p.pos.z + Math.cos(yaw) * back
-    );
-    cam.rotation.set(0, 0, 0);
-    cam.rotateY(yaw);
-    cam.rotateX(pitch);
-    cam.rotateZ(Math.sin(s.t * 0.8) * 0.05 * (1 - ease));
-    if (T >= 1) this.endIntro();
+    const gnd = (x, z) => g.world.heightAt(x, z);
+    const ss = (a, b, t) => {
+      t = Math.min(1, Math.max(0, (t - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    };
+    const lv = (a, b, t) => a + (b - a) * t;
+    if (s.t > 1.6) this.busGo = true; // 末班车掉头回县城
+    // 门 3 冲击拍：镜头咬住牌坊剪影的同一瞬，近雷压顶（与 5.4s 双闪同步）
+    if (!s.thunder2 && s.t >= 5.3) {
+      s.thunder2 = true;
+      g.audio.thunderDistant(0.12);
+    }
+    let px, py, pz, tx, ty, tz, roll = 0;
+    if (s.t < 5.0) {
+      // 【一拍 · 低机位仰拍】蹲在湿沥青上：大巴车身压着镜头驶离，
+      // 车灯锥扎进雨里，尾灯两点红缩进雾里
+      const u = ss(0, 5.0, s.t);
+      px = 61.6 - u * 1.1;
+      pz = 0.9 + u * 0.5;
+      py = gnd(px, pz) + 0.36;
+      const bus = g.world.dynamic.bus;
+      const bx = bus ? bus.position.x : 64.5;
+      tx = bx + 2.0;
+      ty = gnd(64.5, -1.3) + 2.3 + u * 0.5;
+      tz = -1.3;
+      roll = Math.sin(s.t * 0.7) * 0.028;
+    } else if (s.t < 8.4) {
+      // 【二拍 · 牌坊剪影】仰角咬住「蚀湾」牌坊——双闪把瓦顶石柱烧成剪影，雷声同拍
+      const u = ss(5.0, 8.4, s.t);
+      px = 55.0 - u * 2.2;
+      pz = 1.7 - u * 0.5;
+      py = gnd(px, pz) + 0.5 + u * 0.55;
+      tx = 44;
+      ty = gnd(44, 0) + 4.7 - u * 1.2;
+      tz = 0;
+    } else {
+      // 【三拍 · 落回眼睛】从眼前两米倒退着落回眼窝，接第一人称
+      const u = ss(8.4, s.dur, s.t);
+      const ex = p.pos.x, ez = p.pos.z, ey = p.pos.y + 1.62;
+      const fdx = -Math.sin(p.yaw), fdz = -Math.cos(p.yaw);
+      const back = (1 - u) * 2.2;
+      px = ex + fdx * back;
+      pz = ez + fdz * back;
+      py = ey + (1 - u) * 0.22;
+      tx = ex + fdx * 9;
+      ty = lv(ey - 0.4, ey, u);
+      tz = ez + fdz * 9;
+    }
+    cam.position.set(px, py, pz);
+    cam.lookAt(tx, ty, tz);
+    if (roll) cam.rotation.z += roll;
+    if (s.t >= s.dur) this.endIntro();
   }
 
   endIntro() {

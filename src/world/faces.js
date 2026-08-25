@@ -19,39 +19,64 @@ const MOUTH_Y = -0.0405, MOUTH_Z = 0.0862;            // 口裂中心
 const R0 = 0.098;                                     // 前脸平均半径
 
 // 每张脸的照片标定（画面比例 0..1）：眼线 y / 左右瞳 x / 嘴线 y / 下巴 y
+// browY=眉中线 / noseY=鼻底孔线——3D 眉贴片与鼻件按此逐脸落位（消双眉/双鼻影残留）
 // （由人工读图标定；照片要求正面、平光、中性表情）
 const FACE_DEFS = {
   m: {
     url: urlMYoung, base: 'skin',
     eyeY: 0.433, eyeLX: 0.397, eyeRX: 0.620, mouthY: 0.708, chinY: 0.862,
+    browY: 0.372, noseY: 0.593,
     mat: { envInt: 0.6, cc: 0.3, ccRough: 0.32, normalScale: 0.85, poreScale: 0.9 },
   },
   f: {
     url: urlFYoung, base: 'skin',
     eyeY: 0.449, eyeLX: 0.400, eyeRX: 0.614, mouthY: 0.711, chinY: 0.845,
+    browY: 0.378, noseY: 0.607,
     mat: { envInt: 0.6, cc: 0.32, ccRough: 0.3, normalScale: 0.75, poreScale: 0.8 },
   },
   oldm: {
     url: urlMOld, base: 'skinOld',
     eyeY: 0.458, eyeLX: 0.386, eyeRX: 0.615, mouthY: 0.748, chinY: 0.878,
+    browY: 0.398, noseY: 0.628,
     mat: { envInt: 0.55, cc: 0.16, ccRough: 0.5, normalScale: 1.15, poreScale: 1.25 },
   },
   oldf: {
     url: urlFOld, base: 'skinOld',
     eyeY: 0.419, eyeLX: 0.388, eyeRX: 0.607, mouthY: 0.678, chinY: 0.792,
+    browY: 0.345, noseY: 0.563,
     mat: { envInt: 0.55, cc: 0.18, ccRough: 0.48, normalScale: 1.1, poreScale: 1.2 },
   },
   pale: {
     url: urlPale, base: 'skin',
     eyeY: 0.400, eyeLX: 0.407, eyeRX: 0.598, mouthY: 0.635, chinY: 0.714,
+    browY: 0.352, noseY: 0.545,
     mat: { envInt: 0.9, cc: 0.48, ccRough: 0.24, normalScale: 0.9, poreScale: 0.8 },
   },
   chalk: {
     url: urlChalk, base: 'skinOld',
     eyeY: 0.427, eyeLX: 0.400, eyeRX: 0.611, mouthY: 0.700, chinY: 0.812,
+    browY: 0.388, noseY: 0.600,
     mat: { envInt: 0.4, cc: 0.05, ccRough: 0.7, normalScale: 1.25, poreScale: 1.4 },
   },
 };
+
+// —— 逐脸五官锚点（相对颅心，米）：把照片的眉线/鼻底线反投影回头模球面 ——
+// 3D 眉贴片、鼻件按这个 y 落位，才能和烘焙进皮的照片眉/鼻影重合成一副五官。
+const _anchors = {};
+export function faceAnchor(key) {
+  const D = FACE_DEFS[key];
+  if (!D) return null;
+  if (_anchors[key]) return _anchors[key];
+  const S = 1024;
+  const eyeY3 = R0 * (EYE_Y / Math.hypot(EYE_X, EYE_Y, EYE_Z));
+  const mouthY3 = R0 * (MOUTH_Y / Math.hypot(MOUTH_Y, MOUTH_Z));
+  const sy = ((D.mouthY - D.eyeY) * S) / (eyeY3 - mouthY3);
+  const cy = D.eyeY * S + eyeY3 * sy;
+  return (_anchors[key] = {
+    browY: (cy - D.browY * S) / sy,
+    noseY: (cy - D.noseY * S) / sy,
+  });
+}
 
 function sstep(a, b, t) {
   t = Math.min(1, Math.max(0, (t - a) / (b - a)));
@@ -65,7 +90,7 @@ function sstep(a, b, t) {
  * M.faceLipMats[key] 唇材质（烘焙后取照片唇色）
  */
 export function buildFaceMaterials(M, T) {
-  M.faceMats = {}; M.faceLids = {}; M.faceLipMats = {};
+  M.faceMats = {}; M.faceLids = {}; M.faceLipMats = {}; M.faceNecks = {};
   M._faceBake = [];
   for (const [key, D] of Object.entries(FACE_DEFS)) {
     const baseTex = T[D.base] ?? T.skin;
@@ -103,6 +128,12 @@ export function buildFaceMaterials(M, T) {
     M.faceLids[key] = new THREE.MeshPhysicalMaterial({
       color: 0xc9997c, roughness: 0.62, envMapIntensity: D.mat.envInt,
       clearcoat: D.mat.cc * 0.7, clearcoatRoughness: D.mat.ccRough + 0.1,
+    });
+    // 颈裙材质：同调但比脸低半档（喉颈永远比颊面暗），开顶点色给下颌接触阴影用
+    M.faceNecks[key] = new THREE.MeshPhysicalMaterial({
+      color: 0xb98b70, roughness: 0.74, envMapIntensity: D.mat.envInt * 0.7,
+      clearcoat: D.mat.cc * 0.4, clearcoatRoughness: D.mat.ccRough + 0.2,
+      vertexColors: true,
     });
     // 唇：湿润高光
     M.faceLipMats[key] = new THREE.MeshPhysicalMaterial({
@@ -187,6 +218,8 @@ function compositeFace(M, job, img) {
   // 照片像素是 sRGB——setRGB 必须声明色彩空间，否则被当线性值放亮（颈白脸黄的元凶）
   M.faceLids[key].color.setRGB(skinAvg[0] / 255 * 0.92, skinAvg[1] / 255 * 0.9, skinAvg[2] / 255 * 0.9, THREE.SRGBColorSpace);
   M.faceLipMats[key].color.setRGB(lipAvg[0] / 255, lipAvg[1] / 255, lipAvg[2] / 255, THREE.SRGBColorSpace);
+  // 颈：取照片下颊/颌缘均值再压一档——室内光里喉颈吃不到主光
+  M.faceNecks[key].color.setRGB(skinAvg[0] / 255 * 0.78, skinAvg[1] / 255 * 0.74, skinAvg[2] / 255 * 0.73, THREE.SRGBColorSpace);
 
   // 底皮均值（色调匹配：底皮乘到照片肤色）
   const base = xd.getImageData(0, 0, S, S);
