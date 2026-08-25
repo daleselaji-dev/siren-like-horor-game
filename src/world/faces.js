@@ -114,12 +114,56 @@ export function buildFaceMaterials(M, T) {
     nTex.anisotropy = 8;
     nTex.flipY = false;
 
+    // 皮脂分区粗糙度：底皮油区图上再压出 T 区油光（鼻尖/鼻梁/额心/颧骨/下巴亮，
+    // 颊侧颌缘偏哑）——高光不再整脸一层匀「塑料壳」，而是走在皮脂分布上
+    const cr = document.createElement('canvas');
+    cr.width = cr.height = 512;
+    const xr = cr.getContext('2d');
+    xr.drawImage(baseTex.roughnessMap.image, 0, 0, 512, 512);
+    const oil = (u, v, ru, rv, a) => {
+      // 粗糙度图暗=光滑（油亮）：椭圆软斑向下压
+      xr.save();
+      xr.translate(u * 512, v * 512);
+      xr.scale(1, rv / ru);
+      const gr = xr.createRadialGradient(0, 0, 0, 0, 0, ru * 512);
+      gr.addColorStop(0, `rgba(30,30,30,${a})`);
+      gr.addColorStop(1, 'rgba(30,30,30,0)');
+      xr.fillStyle = gr;
+      xr.fillRect(-ru * 512, -ru * 512, ru * 1024, ru * 1024); // 缩放空间内等边覆盖
+      xr.restore();
+    };
+    // 头皮球面 UV：前脸 u=0.5；v 由极角而来（额≈0.42 / 眼≈0.5 / 鼻底≈0.55 / 口≈0.58）
+    const oilK = key === 'chalk' ? 0.3 : key.startsWith('old') ? 0.55 : 1.0; // 干皮油区弱
+    oil(0.5, 0.525, 0.045, 0.1, 0.5 * oilK);            // 鼻梁—鼻尖（最油）
+    oil(0.5, 0.415, 0.095, 0.055, 0.34 * oilK);         // 额心
+    oil(0.385, 0.53, 0.05, 0.038, 0.3 * oilK);          // 颧骨左
+    oil(0.615, 0.53, 0.05, 0.038, 0.3 * oilK);          // 颧骨右
+    oil(0.5, 0.625, 0.038, 0.03, 0.28 * oilK);          // 下巴
+    // 颊侧/颌缘反向提亮（更粗糙偏哑）：油区之外皮面是干的
+    for (const [mu, mv] of [[0.32, 0.58], [0.68, 0.58]]) {
+      xr.save();
+      xr.translate(mu * 512, mv * 512);
+      xr.scale(1, 0.055 / 0.07);
+      const gm = xr.createRadialGradient(0, 0, 0, 0, 0, 0.07 * 512);
+      gm.addColorStop(0, 'rgba(235,235,235,0.22)');
+      gm.addColorStop(1, 'rgba(235,235,235,0)');
+      xr.fillStyle = gm;
+      xr.fillRect(-64, -82, 128, 164);
+      xr.restore();
+    }
+    const rTex = new THREE.CanvasTexture(cr);
+    rTex.wrapS = rTex.wrapT = THREE.RepeatWrapping;
+    rTex.flipY = false;
+    rTex.anisotropy = 8;
+
     const m = new THREE.MeshPhysicalMaterial({
-      map: mapTex, normalMap: nTex, roughnessMap: baseTex.roughnessMap,
+      map: mapTex, normalMap: nTex, roughnessMap: rTex,
       roughness: 1.0, metalness: 0.0,
       normalScale: new THREE.Vector2(D.mat.normalScale, D.mat.normalScale),
       envMapIntensity: D.mat.envInt,
       clearcoat: D.mat.cc, clearcoatRoughness: D.mat.ccRough,
+      // 绒毛边缘光（peach fuzz）：皮面掠射一层软散射——正是塑料没有的那层
+      sheen: 0.3, sheenRoughness: 0.55, sheenColor: new THREE.Color(0xffe2d0),
     });
     m.clearcoatNormalMap = T.skinPoreN;
     m.clearcoatNormalScale = new THREE.Vector2(D.mat.poreScale, D.mat.poreScale);
@@ -128,11 +172,14 @@ export function buildFaceMaterials(M, T) {
     M.faceLids[key] = new THREE.MeshPhysicalMaterial({
       color: 0xc9997c, roughness: 0.62, envMapIntensity: D.mat.envInt,
       clearcoat: D.mat.cc * 0.7, clearcoatRoughness: D.mat.ccRough + 0.1,
+      sheen: 0.25, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffe2d0),
     });
-    // 颈裙材质：同调但比脸低半档（喉颈永远比颊面暗），开顶点色给下颌接触阴影用
+    // 颈裙材质：与脸皮同源取色、只降明度不动色相（烘焙后统一乘暗），
+    // 开顶点色给下颌接触阴影用
     M.faceNecks[key] = new THREE.MeshPhysicalMaterial({
-      color: 0xb98b70, roughness: 0.74, envMapIntensity: D.mat.envInt * 0.7,
+      color: 0xa17b63, roughness: 0.74, envMapIntensity: D.mat.envInt * 0.7,
       clearcoat: D.mat.cc * 0.4, clearcoatRoughness: D.mat.ccRough + 0.2,
+      sheen: 0.22, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffe2d0),
       vertexColors: true,
     });
     // 唇：湿润高光
@@ -218,8 +265,9 @@ function compositeFace(M, job, img) {
   // 照片像素是 sRGB——setRGB 必须声明色彩空间，否则被当线性值放亮（颈白脸黄的元凶）
   M.faceLids[key].color.setRGB(skinAvg[0] / 255 * 0.92, skinAvg[1] / 255 * 0.9, skinAvg[2] / 255 * 0.9, THREE.SRGBColorSpace);
   M.faceLipMats[key].color.setRGB(lipAvg[0] / 255, lipAvg[1] / 255, lipAvg[2] / 255, THREE.SRGBColorSpace);
-  // 颈：取照片下颊/颌缘均值再压一档——室内光里喉颈吃不到主光
-  M.faceNecks[key].color.setRGB(skinAvg[0] / 255 * 0.78, skinAvg[1] / 255 * 0.74, skinAvg[2] / 255 * 0.73, THREE.SRGBColorSpace);
+  // 颈与脸皮同源：同一份颊部取色、RGB 同乘 0.82——只降明度不动色相
+  //（此前 0.78/0.74/0.73 的不等乘把颈推向灰红，正是「换头接缝」的色相元凶）
+  M.faceNecks[key].color.setRGB(skinAvg[0] / 255 * 0.82, skinAvg[1] / 255 * 0.82, skinAvg[2] / 255 * 0.82, THREE.SRGBColorSpace);
 
   // 底皮均值（色调匹配：底皮乘到照片肤色）
   const base = xd.getImageData(0, 0, S, S);

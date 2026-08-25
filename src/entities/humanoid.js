@@ -128,6 +128,109 @@ function faceParamsFrom(seed) {
 }
 
 // ================= 头部雕刻 =================
+const SKULL_R = 0.105;
+/**
+ * 颅骨变形域（颅骨/发壳/帽体共用）：返回 fn(nx,ny,nz,out)——
+ * 输入单位方向，输出该方向上雕刻后的颅骨表面点（半径 SKULL_R 处）。
+ * 发壳/帽体的顶点按 (r/R) 径向倍率过同一域（conformSkull），
+ * 与颅骨逐种子共形——头顶不再是罩在窄颅上的悬浮圆拱。
+ */
+function makeSkullField(variant, P) {
+  const R = SKULL_R;
+  const old = variant === 'old' || variant === 'gaunt';
+  const fem = variant === 'f';
+  const headW = (fem ? 0.87 : 0.85) + P.headW * 0.05;
+  const faceLen = 0.96 + P.faceLen * 0.06;
+  const jawT = (fem ? 0.28 : 0.23) + P.jaw * 0.09;
+  const chinZ = 0.018 + P.chin * 0.016;
+  const cheekAmp = 0.003 + P.cheek * 0.007 + (old ? 0.003 : 0);
+  const hollowAmp = (old ? 0.007 : 0.001) + P.hollow * 0.006;
+  const browAmp = (fem ? 0.002 : 0.004) + P.brow * 0.005;
+  const eyeNX = 0.3 + P.eyeX * 0.14;   // 眼窝横位
+  const asymAmp = P.asym * 0.005;
+  return (nx, ny, nz, out) => {
+    let x = nx * R, y = ny * R * faceLen, z = nz * R;
+    x *= headW;                          // 头侧收窄
+    if (nz < 0) {
+      // 颅骨不是球：耳后侧壁向枕部持续收窄（去「气球头」的关键一刀），
+      // 枕突鼓在上半，颈窝一侧向内塌
+      const bk = Math.min(1, -nz);
+      x *= 1 - bk * 0.1;
+      z *= 1.045 + P.headW * 0.04 - Math.max(0, -ny - 0.2) * bk * 0.18;
+    } else {
+      z *= 0.94;                         // 面部略平
+    }
+    // 顶结节以下侧壁微平：颞侧是「面」不是「弧」
+    x *= 1 - Math.exp(-((ny - 0.3) ** 2) * 5.5) * 0.04;
+    // 下颌到下巴：分两段折线收拢——折点即下颌角，颊面到颌缘有明确的转折
+    if (ny < -0.12 && nz > -0.25) {
+      const tt = Math.min(1, (-ny - 0.12) / 0.88);
+      const t = tt < 0.34 ? tt * 0.5 : 0.17 + (tt - 0.34) * 1.258;
+      x *= 1 - t * jawT;
+      z = z * (1 - t * 0.2) + t * chinZ;
+      y *= 1.03;
+      // 折线上沿一道咬肌棱（亮棱让折线在侧光里读得出来）
+      const crease = Math.exp(-((tt - 0.3) ** 2) * 110) * Math.min(1, Math.abs(nx) * 2.4) * Math.max(0, nz + 0.35);
+      x += Math.sign(nx) * crease * 0.0028;
+    }
+    // 下颌角点（耳垂下前方的骨点）：侧面外凸出折线的「角」
+    const gon = Math.exp(-((ny + 0.42) ** 2) * 60 - ((Math.abs(nx) - 0.68) ** 2) * 26) * Math.max(0, nz * 0.8 + 0.4);
+    x += Math.sign(nx) * gon * 0.0045;
+    const front = Math.max(0, nz);
+    // 颧骨
+    const cheek = Math.exp(-((ny + 0.06) ** 2) * 16 - ((Math.abs(nx) - 0.7) ** 2) * 20) * front;
+    x += Math.sign(nx) * cheek * cheekAmp;
+    // 颊部凹陷（老年/失水/瘦脸）
+    const hollow = Math.exp(-((ny + 0.22) ** 2) * 22 - ((Math.abs(nx) - 0.45) ** 2) * 30) * front;
+    x -= Math.sign(nx) * hollow * hollowAmp;
+    z -= hollow * hollowAmp * 0.6;
+    // 眉弓
+    z += Math.exp(-((ny - 0.2) ** 2) * 55) * front * browAmp;
+    // 眼窝开孔（真拓扑读感）：窄椭圆深腔让眼球「嵌进去」+ 眶缘一圈微凸包住眼球
+    const sockE = Math.exp(-((ny - 0.02) ** 2) * 210 - ((Math.abs(nx) - eyeNX) ** 2) * 130) * front;
+    z -= sockE * (old ? 0.02 : 0.017);
+    const rimE = Math.exp(-((ny - 0.02) ** 2) * 60 - ((Math.abs(nx) - eyeNX) ** 2) * 40) * front;
+    z -= (rimE - sockE * 0.9) * (old ? 0.0075 : 0.006); // 宽高斯减窄高斯=环形眶缘
+    // 口周隆起（口轮匝肌的「吻部」）：唇从鼓起的面上长出来，不再是贴片接缝
+    z += Math.exp(-((ny + 0.385) ** 2) * 60 - (nx ** 2) * 26) * front * 0.0052;
+    // 太阳穴微凹
+    x -= Math.sign(nx) * Math.exp(-((ny - 0.25) ** 2) * 30 - ((Math.abs(nx) - 0.85) ** 2) * 40) * 0.004;
+    // 法令纹（老年更深）
+    z -= Math.exp(-((Math.abs(nx) - 0.24) ** 2) * 140 - ((ny + 0.3) ** 2) * 34) * front * (old ? 0.0042 : 0.0014);
+    // 不对称翘曲：整张脸沿 x 做低频偏移——没有一张活人的脸是镜像对称的
+    x += front * asymAmp * Math.sin(ny * 2.6 + P.asymPh * 6.28) * R;
+    z += front * asymAmp * 0.35 * Math.cos(ny * 3.1 + P.asymPh * 4.1) * R * Math.sign(nx);
+    out.x = x; out.y = y; out.z = z;
+  };
+}
+
+/** 发壳/帽体过颅骨变形域：顶点方向查域面点，按 (r/R) 径向倍率共形贴颅。
+ *  fadeLow: 垂帘下摆听重力不听头骨——耳线以下渐次脱离变形域。
+ *  weight: 共形强度（硬质帽体 <1，保留自身版型）。 */
+const _sf = { x: 0, y: 0, z: 0 };
+function conformSkull(geo, variant, P, opts = {}) {
+  const f = makeSkullField(variant, P);
+  const w0 = opts.weight ?? 1;
+  const inflate = opts.inflate ?? 1; // 外扩倍率：发壳有厚度，贴颅但不贴皮
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const r = Math.hypot(x, y, z);
+    if (r < 1e-5) continue;
+    const nx = x / r, ny = y / r, nz = z / r;
+    let w = w0;
+    if (opts.fadeLow && ny < -0.25) w *= Math.max(0, 1 - (-ny - 0.25) / 0.45);
+    if (w <= 0) continue;
+    f(nx, ny, nz, _sf);
+    const k = (r / SKULL_R) * inflate;
+    pos.setX(i, x + (_sf.x * k - x) * w);
+    pos.setY(i, y + (_sf.y * k - y) * w);
+    pos.setZ(i, z + (_sf.z * k - z) * w);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 /**
  * 雕刻头骨：从细分球体位移出真实头形（36×28 段，近景不见棱；hd=84×60 近距 LOD）
  * variant: 'm' 男 | 'f' 女(圆润) | 'old' 老年(消瘦) | 'gaunt' 深压失水(酒店员工)
@@ -135,75 +238,16 @@ function faceParamsFrom(seed) {
  */
 function craniumGeo(variant, P, hd = false) {
   return G(`cranium_${variant}_${P.key}${hd ? '_hd' : ''}`, () => {
-    const R = 0.105;
+    const R = SKULL_R;
     const g = new THREE.SphereGeometry(R, hd ? 84 : 36, hd ? 60 : 28);
     const pos = g.attributes.position;
     const v = new THREE.Vector3();
-    const old = variant === 'old' || variant === 'gaunt';
-    const fem = variant === 'f';
-    const headW = (fem ? 0.87 : 0.85) + P.headW * 0.05;
-    const faceLen = 0.96 + P.faceLen * 0.06;
-    const jawT = (fem ? 0.28 : 0.23) + P.jaw * 0.09;
-    const chinZ = 0.018 + P.chin * 0.016;
-    const cheekAmp = 0.003 + P.cheek * 0.007 + (old ? 0.003 : 0);
-    const hollowAmp = (old ? 0.007 : 0.001) + P.hollow * 0.006;
-    const browAmp = (fem ? 0.002 : 0.004) + P.brow * 0.005;
-    const eyeNX = 0.3 + P.eyeX * 0.14;   // 眼窝横位
-    const asymAmp = P.asym * 0.005;
+    const field = makeSkullField(variant, P);
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i);
       const nx = v.x / R, ny = v.y / R, nz = v.z / R;
-      let x = v.x, y = v.y * faceLen, z = v.z;
-      x *= headW;                          // 头侧收窄
-      if (nz < 0) {
-        // 颅骨不是球：耳后侧壁向枕部持续收窄（去「气球头」的关键一刀），
-        // 枕突鼓在上半，颈窝一侧向内塌
-        const bk = Math.min(1, -nz);
-        x *= 1 - bk * 0.1;
-        z *= 1.045 + P.headW * 0.04 - Math.max(0, -ny - 0.2) * bk * 0.18;
-      } else {
-        z *= 0.94;                         // 面部略平
-      }
-      // 顶结节以下侧壁微平：颞侧是「面」不是「弧」
-      x *= 1 - Math.exp(-((ny - 0.3) ** 2) * 5.5) * 0.04;
-      // 下颌到下巴：分两段折线收拢——折点即下颌角，颊面到颌缘有明确的转折
-      if (ny < -0.12 && nz > -0.25) {
-        const tt = Math.min(1, (-ny - 0.12) / 0.88);
-        const t = tt < 0.34 ? tt * 0.5 : 0.17 + (tt - 0.34) * 1.258;
-        x *= 1 - t * jawT;
-        z = z * (1 - t * 0.2) + t * chinZ;
-        y *= 1.03;
-        // 折线上沿一道咬肌棱（亮棱让折线在侧光里读得出来）
-        const crease = Math.exp(-((tt - 0.3) ** 2) * 110) * Math.min(1, Math.abs(nx) * 2.4) * Math.max(0, nz + 0.35);
-        x += Math.sign(nx) * crease * 0.0028;
-      }
-      // 下颌角点（耳垂下前方的骨点）：侧面外凸出折线的「角」
-      const gon = Math.exp(-((ny + 0.42) ** 2) * 60 - ((Math.abs(nx) - 0.68) ** 2) * 26) * Math.max(0, nz * 0.8 + 0.4);
-      x += Math.sign(nx) * gon * 0.0045;
-      const front = Math.max(0, nz);
-      // 颧骨
-      const cheek = Math.exp(-((ny + 0.06) ** 2) * 16 - ((Math.abs(nx) - 0.7) ** 2) * 20) * front;
-      x += Math.sign(nx) * cheek * cheekAmp;
-      // 颊部凹陷（老年/失水/瘦脸）
-      const hollow = Math.exp(-((ny + 0.22) ** 2) * 22 - ((Math.abs(nx) - 0.45) ** 2) * 30) * front;
-      x -= Math.sign(nx) * hollow * hollowAmp;
-      z -= hollow * hollowAmp * 0.6;
-      // 眉弓
-      z += Math.exp(-((ny - 0.2) ** 2) * 55) * front * browAmp;
-      // 眼窝开孔（真拓扑读感）：窄椭圆深腔让眼球「嵌进去」+ 眶缘一圈微凸包住眼球
-      const sockE = Math.exp(-((ny - 0.02) ** 2) * 210 - ((Math.abs(nx) - eyeNX) ** 2) * 130) * front;
-      z -= sockE * (old ? 0.02 : 0.017);
-      const rimE = Math.exp(-((ny - 0.02) ** 2) * 60 - ((Math.abs(nx) - eyeNX) ** 2) * 40) * front;
-      z -= (rimE - sockE * 0.9) * (old ? 0.0075 : 0.006); // 宽高斯减窄高斯=环形眶缘
-      // 口周隆起（口轮匝肌的「吻部」）：唇从鼓起的面上长出来，不再是贴片接缝
-      z += Math.exp(-((ny + 0.385) ** 2) * 60 - (nx ** 2) * 26) * front * 0.0052;
-      // 太阳穴微凹
-      x -= Math.sign(nx) * Math.exp(-((ny - 0.25) ** 2) * 30 - ((Math.abs(nx) - 0.85) ** 2) * 40) * 0.004;
-      // 法令纹（老年更深）
-      z -= Math.exp(-((Math.abs(nx) - 0.24) ** 2) * 140 - ((ny + 0.3) ** 2) * 34) * front * (old ? 0.0042 : 0.0014);
-      // 不对称翘曲：整张脸沿 x 做低频偏移——没有一张活人的脸是镜像对称的
-      x += front * asymAmp * Math.sin(ny * 2.6 + P.asymPh * 6.28) * R;
-      z += front * asymAmp * 0.35 * Math.cos(ny * 3.1 + P.asymPh * 4.1) * R * Math.sign(nx);
+      field(nx, ny, nz, _sf);
+      let { x, y, z } = _sf;
       if (hd) {
         // 高段数下叠皮下微起伏（±0.4mm 三角噪声）：真皮不是完美曲面，
         // 高光在近景里必须「走」在轻微不平的面上才不读成蜡
@@ -273,14 +317,17 @@ function browPatchGeo() {
   });
 }
 
-/** 睫毛贴片：贴上睑缘的小弯条 */
+/** 睫毛几何：沿睑缘的窄弯带——弧向 14 段绕眼球球面回卷，两端随睑缘弧下落
+ *  收进内外眦（配合贴图端点 alpha 渐隐，内眦不再留贴片尖角黑斑）。 */
 function lashGeo() {
-  return G('lash', () => {
-    const g = new THREE.PlaneGeometry(0.028, 0.011, 8, 1);
+  return G('lashBand', () => {
+    const g = new THREE.PlaneGeometry(0.03, 0.0068, 14, 1);
     const pos = g.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
-      pos.setZ(i, -x * x * 9);     // 贴眼球弧
+      const t = x / 0.015;                       // -1(内眦)..1(外眦)
+      pos.setZ(i, -t * t * 0.0062);              // 绕眼球弧（两端向眼眶回卷藏边）
+      pos.setY(i, pos.getY(i) - t * t * 0.0026); // 睑缘弧：中央高、两眦低
     }
     g.computeVertexNormals();
     return g;
@@ -341,17 +388,21 @@ function hairGrooves(geo, amp = 1) {
   return geo;
 }
 
-/** 发型（发际线必须露出额头——不能像头盔盖到眼睛） */
-function hairGeo(style = 'crop') {
-  return G('hair_' + style, () => {
+/** 发型（发际线必须露出额头——不能像头盔盖到眼睛）。
+ *  壳体不再手工横向压扁：merge 后整体过颅骨变形域（conformSkull）——
+ *  发壳随该种子的窄颅/颞侧平面/枕部收窄逐向贴合，壳檐在鬓角/枕骨处收进。 */
+function hairGeo(style = 'crop', variant = 'm', P = null) {
+  const FP = P ?? faceParamsFrom(1);
+  return G(`hair_${style}_${variant}_${FP.key}`, () => {
     const parts = [];
     const cap = (scaleY = 1, lift = 0, r = 0.108) => {
-      // 发际线抬高：壳体后移+后仰，额头必须露出来（不能像头盔盖到眉毛）
-      parts.push(xform(new THREE.SphereGeometry(r, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.44),
-        0, 0.034 + lift, -0.02, 0.3, 0, 0, 0.89, scaleY, 0.99));
+      // 发际线抬高：壳体后移+后仰，额头必须露出来（不能像头盔盖到眉毛）；
+      // 壳弧加深到 0.5π——共形贴颅后壳檐要能包住鬓角，不悬在颅顶
+      parts.push(xform(new THREE.SphereGeometry(r, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5),
+        0, 0.03 + lift, -0.018, 0.3, 0, 0, 1.0, scaleY, 1.02));
       // 后脑+颈窝补片（φ π..2π 是 -z 后半球）——缺了这块，背影读成光头戴小帽
       parts.push(xform(new THREE.SphereGeometry(r - 0.001, 18, 10, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
-        0, 0.03 + lift, -0.012, 0.16, 0, 0, 0.9, scaleY * 1.02, 0.97));
+        0, 0.03 + lift, -0.012, 0.16, 0, 0, 1.0, scaleY * 1.02, 1.0));
     };
     switch (style) {
       case 'crop': { // 平头/寸头
@@ -360,14 +411,14 @@ function hairGeo(style = 'crop') {
       }
       case 'back': { // 大背头（司仪）
         cap(1.02, 0.006);
-        parts.push(xform(new THREE.SphereGeometry(0.07, 12, 8), 0, 0.06, -0.075, 0.3, 0, 0, 1.1, 0.8, 1.1));
+        parts.push(xform(new THREE.SphereGeometry(0.07, 12, 8), 0, 0.06, -0.075, 0.3, 0, 0, 1.16, 0.8, 1.1));
         break;
       }
       case 'side': { // 三七分：整体壳微偏一侧（分头由轮廓不对称表达，不悬浮贴片）
-        parts.push(xform(new THREE.SphereGeometry(0.107, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.44),
-          -0.008, 0.034, -0.02, 0.3, 0, -0.06, 0.9, 0.95, 0.99));
+        parts.push(xform(new THREE.SphereGeometry(0.107, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5),
+          -0.008, 0.03, -0.018, 0.3, 0, -0.06, 1.0, 0.95, 1.02));
         parts.push(xform(new THREE.SphereGeometry(0.106, 18, 10, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
-          0, 0.03, -0.012, 0.16, 0, 0, 0.9, 0.97, 0.97));
+          0, 0.03, -0.012, 0.16, 0, 0, 1.0, 0.97, 1.0));
         break;
       }
       case 'bun': { // 盘发髻（全福婆）：壳贴颅、向后拢，束发圈勒出髻根
@@ -382,7 +433,7 @@ function hairGeo(style = 'crop') {
           const a = (i / 14) * Math.PI * 2;
           const rr = 0.082 + (i % 3) * 0.008;
           parts.push(xform(new THREE.SphereGeometry(0.03, 8, 6),
-            Math.cos(a) * rr * 0.8, 0.062 + Math.sin(i * 2.3) * 0.018, Math.sin(a) * rr * 0.68 - 0.014));
+            Math.cos(a) * rr * 0.88, 0.062 + Math.sin(i * 2.3) * 0.018, Math.sin(a) * rr * 0.7 - 0.014));
         }
         cap(0.92, 0, 0.105);
         break;
@@ -405,11 +456,13 @@ function hairGeo(style = 'crop') {
             }
           }
         }
-        parts.push(xform(shell, 0, 0.03, -0.008, 0.06, 0, 0, 1, 1, 0.95));
+        parts.push(xform(shell, 0, 0.03, -0.008, 0.06, 0, 0, 1, 1, 0.97));
         break;
       }
     }
-    return hairGrooves(merged(parts), style === 'long' ? 1.4 : 1);
+    // 先犁发绺再过变形域：沟槽随壳面一起贴颅；外扩 2%——发是盖在头皮上的「层」
+    return conformSkull(hairGrooves(merged(parts), style === 'long' ? 1.4 : 1),
+      variant, FP, { fadeLow: style === 'long', inflate: 1.02 });
   });
 }
 
@@ -427,16 +480,43 @@ function hairCardGeo(w, h, curve = 5) {
   });
 }
 
-/** 大檐帽（岗亭员）：帽冠 + 帽墙 + 帽檐 */
-function peakedCapGeo() {
-  return G('peakedCap', () => merged([
+/** 大檐帽（岗亭员）：帽冠 + 帽墙 + 帽檐——帽体过颅骨变形域（0.7 权重保版型），
+ *  帽墙随鬓角/枕骨收进，不再是扣在窄颅上的正圆筒 */
+function peakedCapGeo(variant = 'gaunt', P = null) {
+  const FP = P ?? faceParamsFrom(1);
+  return G(`peakedCap_${variant}_${FP.key}`, () => conformSkull(merged([
     // 帽冠（前倾扁球）
     xform(new THREE.SphereGeometry(0.115, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), 0, 0.085, -0.005, 0.1, 0, 0, 1.0, 0.62, 1.05),
     // 帽墙
     xform(new THREE.CylinderGeometry(0.112, 0.116, 0.05, 20, 1, true), 0, 0.062, -0.005),
     // 帽檐（前伸的扁弧）
     xform(new THREE.CylinderGeometry(0.12, 0.12, 0.009, 16, 1, false, -Math.PI * 0.32, Math.PI * 0.64), 0, 0.048, 0.012, -0.12, 0, 0, 1, 1, 1.15),
-  ]));
+  ]), variant, FP, { weight: 0.7 }));
+}
+
+/** 长发前帘（新娘/长发客）：垂在颊侧的曲面发帘——横向 10 段绕颊弧内扣、
+ *  纵向 6 段供垂坠弯；前缘向脸内收（帘是「拢」在脸侧的，不是一块悬板）。
+ *  枢轴在帘顶（挂点），配合锯齿 alpha 贴图与 animate 里的微摆。 */
+function hairCurtainGeo(w = 0.052, h = 0.22) {
+  return G(`hairCurtain_${w}_${h}`, () => {
+    const g = new THREE.PlaneGeometry(w, h, 10, 6);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i);
+      const tx = x / (w * 0.5);          // -1(后缘)..1(前缘)
+      const ty = 0.5 - y / h;            // 0 顶 → 1 梢
+      // 绕颊圆弧（半径≈4cm）+ 前缘随颊面向内扣拢
+      let z = -tx * tx * 0.014 - Math.max(0, tx) * Math.sin(Math.min(1, ty * 1.6) * Math.PI) * 0.007;
+      // 垂坠：中段贴颊、梢部微离（下摆有自己的弧线，不是直板）
+      z += ty * ty * 0.006 - Math.sin(ty * Math.PI) * 0.003;
+      pos.setZ(i, z);
+      // 帘身向梢部微收（发束向下拢紧）
+      pos.setX(i, x * (1 - ty * 0.12));
+    }
+    g.translate(0, -h / 2, 0);           // 枢轴移到帘顶：微摆绕挂点转
+    g.computeVertexNormals();
+    return g;
+  });
 }
 
 // ================= 躯干（服装车削） =================
@@ -944,8 +1024,9 @@ export class Humanoid {
         const pos2 = g2.attributes.position;
         const col = new Float32Array(pos2.count * 3);
         for (let i = 0; i < pos2.count; i++) {
+          // 下颌接触阴影只降明度不动色相——RGB 同乘，颈色与脸皮同源
           const sh = 0.5 + Math.min(1, Math.max(0, (0.085 - pos2.getY(i)) / 0.1)) * 0.5;
-          col[i * 3] = sh; col[i * 3 + 1] = sh * 0.96; col[i * 3 + 2] = sh * 0.94;
+          col[i * 3] = sh; col[i * 3 + 1] = sh; col[i * 3 + 2] = sh;
         }
         g2.setAttribute('color', new THREE.BufferAttribute(col, 3));
         g2.computeVertexNormals();
@@ -1082,15 +1163,15 @@ export class Humanoid {
     this.lidLoR = mkMesh(lidGeo(), lidSkin, eyeXoff, eyeYoff - 0.0032, 0.0753, eyeScl * 1.05, eyeScl * 0.85, eyeScl * 1.05);
     this.lidLoR.rotation.x = this.lidLoBase;
     this.head.add(this.lidLoL, this.lidLoR);
-    // 睫毛：上睑缘 alpha 贴片（眼睛「嵌进眼眶」的暗接缝）
+    // 睫毛：上睑缘窄弯带（贴图两端 alpha 渐隐——内外眦无贴片尖角）
     const lashMat = pick(Mtl('lashM', () => new THREE.MeshStandardMaterial({
-      map: M.textures?.lash, color: 0x171310, transparent: true, alphaTest: 0.12,
+      map: M.textures?.lash, color: 0x171310, transparent: true, alphaTest: 0.1,
       depthWrite: false, side: THREE.DoubleSide, roughness: 0.8,
     })));
     if (M.textures?.lash) {
-      const lashL = mkMesh(lashGeo(), lashMat, -eyeXoff, eyeYoff + 0.0066, 0.0846, eyeScl, eyeScl, 1);
+      const lashL = mkMesh(lashGeo(), lashMat, -eyeXoff, eyeYoff + 0.0062, 0.0842, eyeScl, eyeScl, 1);
       lashL.rotation.x = -0.62;
-      const lashR = mkMesh(lashGeo(), lashMat, eyeXoff, eyeYoff + 0.0066, 0.0846, -eyeScl, eyeScl, 1);
+      const lashR = mkMesh(lashGeo(), lashMat, eyeXoff, eyeYoff + 0.0062, 0.0842, -eyeScl, eyeScl, 1);
       lashR.rotation.x = -0.62;
       this.head.add(lashL, lashR);
     }
@@ -1182,10 +1263,10 @@ export class Humanoid {
         0, -0.0022, 0));
       this.head.add(this.mouthG);
     }
-    // 发（角色可有发型池：同角色不同人不同头）
+    // 发（角色可有发型池：同角色不同人不同头）——发壳与该种子的颅骨共形
     const hairStyle = D.hairChoices ? D.hairChoices[seed % D.hairChoices.length] : D.hair;
     if (hairStyle && !D.cap) {
-      this.head.add(mkMesh(hairGeo(hairStyle), hairMat, 0, 0.115, 0));
+      this.head.add(mkMesh(hairGeo(hairStyle, faceVariant, P), hairMat, 0, 0.115, 0));
     }
     // 发丝卡片：发际线/鬓角/颈窝贴 alpha 发丝 + 顶部逆光碎发——壳发边缘不再是「头盔口」
     if (M.textures?.hairStrand && !ghost) {
@@ -1228,9 +1309,23 @@ export class Humanoid {
         addCard(hairCardGeo(0.085, 0.05, 2), wispM, 0, 0.128, -0.012, 0, 0, Math.PI);
         addCard(hairCardGeo(0.085, 0.05, 2), wispM, 0, 0.128, -0.012, 0, Math.PI / 2, Math.PI);
         if (hairStyle === 'long') {
-          // 长发侧帘（贴壳垂帘外皮）+ 后帘三片——壳面高光被发丝打碎
-          addCard(hairCardGeo(0.046, 0.2, 2), strandM, -0.096, -0.1, 0.006, 0.04, -1.5, 0.05);
-          addCard(hairCardGeo(0.046, 0.2, 2), strandM, 0.096, -0.098, 0.006, 0.04, 1.5, -0.05);
+          // 前帘：颊侧曲面发帘（横向 10 段绕颊内扣 + 锯齿 alpha 收梢 + 微摆）
+          const curtM = Mtl('hairCurtainM_' + hairHex.toString(16), () => new THREE.MeshStandardMaterial({
+            map: M.textures.hairCurtain ?? M.textures.hairStrand, color: hairHex,
+            transparent: true, alphaTest: 0.08, depthWrite: false,
+            side: THREE.DoubleSide, roughness: 0.58, envMapIntensity: 0.7,
+          }));
+          this.hairCurtains = [];
+          for (const s of [-1, 1]) {
+            const cur = mkMesh(hairCurtainGeo(0.052, 0.22), curtM, s * 0.09, 0.115 + 0.008, 0.014);
+            cur.rotation.set(0.05, s * 1.32, s * -0.05);
+            cur.castShadow = false;
+            cur.userData.baseRZ = s * -0.05;
+            cur.userData.swayPh = s < 0 ? 0 : 1.9; // 两帘错拍
+            this.head.add(cur);
+            this.hairCurtains.push(cur);
+          }
+          // 后帘三片——壳面高光被发丝打碎
           addCard(hairCardGeo(0.075, 0.25, 1.6), strandM, 0, -0.12, -0.112, 0.05, Math.PI, 0, 1.25);
           addCard(hairCardGeo(0.06, 0.23, 2.2), strandM, -0.068, -0.11, -0.088, 0.04, Math.PI - 0.65, 0.06, 1.15);
           addCard(hairCardGeo(0.06, 0.23, 2.2), strandM, 0.068, -0.108, -0.088, 0.04, Math.PI + 0.65, -0.06, 1.15);
@@ -1245,9 +1340,9 @@ export class Humanoid {
       }
     }
     if (D.cap) {
-      // 大檐帽 + 帽徽；帽下露一圈寸发
-      this.head.add(mkMesh(hairGeo('crop'), hairMat, 0, 0.112, 0, 1, 0.9, 1));
-      this.head.add(mkMesh(peakedCapGeo(), torsoMat, 0, 0.125, 0));
+      // 大檐帽 + 帽徽；帽下露一圈寸发（帽体/寸发都过该种子的颅骨变形域）
+      this.head.add(mkMesh(hairGeo('crop', faceVariant, P), hairMat, 0, 0.112, 0, 1, 0.9, 1));
+      this.head.add(mkMesh(peakedCapGeo(faceVariant, P), torsoMat, 0, 0.125, 0));
       this.head.add(mkMesh(G('capBadge', () => new THREE.SphereGeometry(0.011, 8, 6)),
         pick(Mtl('uniformBrass', () => new THREE.MeshStandardMaterial({ color: 0xb09244, roughness: 0.4, metalness: 0.6 }))),
         0, 0.19, 0.112, 1, 1, 0.5));
@@ -1497,6 +1592,14 @@ export class Humanoid {
     // 呼吸（侍应/岗亭员/理骨员刻意几乎不呼吸——空间耐压证据）
     const breath = this.conveyor ? 0.002 : 0.011;
     this.torsoMesh.scale.z = this.torsoScl.z * (1 + Math.sin(this.lifeT * 1.7) * breath);
+    // 长发前帘微摆：垂发有自己的惯性（双频错拍；纹丝不动的发帘一眼读成假发套）
+    if (this.hairCurtains) {
+      for (const cur of this.hairCurtains) {
+        const ph = cur.userData.swayPh;
+        cur.rotation.z = cur.userData.baseRZ
+          + Math.sin(this.lifeT * 1.5 + ph) * 0.02 + Math.sin(this.lifeT * 2.7 + ph * 2.3) * 0.01;
+      }
+    }
     // ---- 被盯感（死魂曲式）：3.5m 内且在其面前时，眼球锁定观察者 ----
     // 冻结脸的酒店员工也追——脸不动、只有两颗眼球跟着你，比整脸转过来更瘆
     _gzV.copy(Humanoid.viewer);

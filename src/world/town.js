@@ -634,6 +634,8 @@ export function buildTown(scene, M) {
     }
 
     // —— 末班车（开场演出：把你放下，然后掉头回县城）——
+    // 仰拍级细节：轮拱/轮毂/保险杠/雨刮/后视镜/弧顶 + 轮位接地阴影与底盘暗带——
+    // 低机位镜头里它得是一台「压着路」的铁皮车，不是一摞悬浮的盒子
     {
       const bus = new THREE.Group();
       const mkBox = (mat, x, y, z, sx, sy, sz) => {
@@ -647,11 +649,70 @@ export function buildTown(scene, M) {
       mkBox(M.clothRed, 0, 1.05, 0, 8.42, 0.22, 2.36);               // 红腰线
       mkBox(M.crtGlass, 0, 1.95, 0, 7.2, 0.62, 2.36);                // 窗带
       mkBox(M.crtGlass, 4.16, 1.9, 0, 0.1, 0.8, 1.9);                // 前挡
+      // 弧顶：客车顶是拱不是平板（低机位仰拍时的关键轮廓线）
+      {
+        const dome = new THREE.Mesh(new THREE.CylinderGeometry(1.14, 1.14, 8.15, 18, 1), M.plaster);
+        dome.rotation.z = Math.PI / 2;    // 轴转到车长方向
+        dome.scale.set(0.24, 1, 1);       // 局部 x（旋转后=世界竖直）压扁成浅拱
+        dome.position.set(0, 2.36, 0);
+        bus.add(dome);
+      }
+      // 前后保险杠（钢面、比车身探出半拳）
+      mkBox(M.steel, 4.28, 0.58, 0, 0.16, 0.26, 2.42);
+      mkBox(M.steel, -4.28, 0.58, 0, 0.16, 0.26, 2.42);
+      mkBox(plateMat('浙C·20114', { w: 192, h: 48, bg: '#1e3a8a', fg: '#f0f0e8', font: 0.6 }),
+        4.37, 0.58, 0, 0.04, 0.14, 0.5);                             // 前牌照
+      // 雨刮 ×2：停在前挡下缘、微斜（雨夜里它刚停摆）
+      for (const wz2 of [-0.55, 0.25]) {
+        const arm = mkBox(M.ironDark, 4.23, 1.62, wz2, 0.025, 0.42, 0.035);
+        arm.rotation.x = wz2 < 0 ? 0.45 : 0.38;
+        arm.rotation.z = -0.12;
+      }
+      // 后视镜（外探的「耳朵」——低角度剪影的辨识件）
+      for (const s of [-1, 1]) {
+        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.34, 6), M.ironDark);
+        rod.position.set(4.05, 2.06, s * 1.32);
+        rod.rotation.x = s * 0.9;
+        bus.add(rod);
+        mkBox(M.crtGlass, 4.02, 2.2, s * 1.44, 0.05, 0.24, 0.15);
+      }
+      // 轮组：轮胎（加大接地）+ 钢轮毂 + 轮拱罩 + 轮窝暗腔
+      const wellM = new THREE.MeshBasicMaterial({ color: 0x050607 });
+      const shadM = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
       for (const [wx, wz] of [[-2.9, -1.05], [2.9, -1.05], [-2.9, 1.05], [2.9, 1.05]]) {
-        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.3, 12), M.ironDark);
+        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.3, 16), M.ironDark);
         w.rotation.x = Math.PI / 2;
         w.position.set(wx, 0.44, wz);
         bus.add(w);
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.32, 10), M.steel);
+        hub.rotation.x = Math.PI / 2;
+        hub.position.set(wx, 0.44, wz);
+        bus.add(hub);
+        // 轮窝暗腔：轮子是从「洞」里长出来的，不是贴在裙边上的
+        mkBox(wellM, wx, 0.62, wz, 1.06, 0.5, 0.3);
+        // 轮拱罩：半环钢壳压在轮上（θ π/2..3π/2 → 旋转后为上半拱）
+        const arch = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.54, 0.54, 0.34, 12, 1, true, Math.PI / 2, Math.PI), M.ironDark);
+        arch.rotation.x = Math.PI / 2;
+        arch.position.set(wx, 0.44, wz);
+        bus.add(arch);
+        // 车轮接地阴影：轮底一片压实的暗椭圆（车重读在这四块黑上）
+        const patch = new THREE.Mesh(new THREE.CircleGeometry(0.5, 14), shadM);
+        patch.rotation.x = -Math.PI / 2;
+        patch.scale.set(1, 0.62, 1);
+        patch.position.set(wx, -0.008, wz);
+        patch.renderOrder = 2;
+        bus.add(patch);
+      }
+      // 底盘暗带：车腹下一整条软阴影（消「悬浮盒」的最后一味药）
+      {
+        const under = new THREE.Mesh(new THREE.PlaneGeometry(8.0, 2.0), new THREE.MeshBasicMaterial({
+          color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false,
+        }));
+        under.rotation.x = -Math.PI / 2;
+        under.position.set(0, -0.004, 0);
+        under.renderOrder = 1;
+        bus.add(under);
       }
       // 尾灯（朝西——离站时你只看得见这两点红）
       const tl = new THREE.MeshBasicMaterial({ color: 0xff2a20 });

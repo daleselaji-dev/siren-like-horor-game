@@ -750,7 +750,8 @@ export function browStrokesTexture(w = 256, h = 64) {
   return c;
 }
 
-/** 睫毛贴片：根部密合的暗线 + 一排向外上翘的细毛（上睑缘） */
+/** 睫毛贴片：根部密合的暗线 + 一排向外上翘的细毛（上睑缘）。
+ *  两端 alpha 渐隐——弯带端头淡出进内外眦，不留贴片尖角黑斑。 */
 export function lashStrokesTexture(w = 128, h = 48) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -763,20 +764,74 @@ export function lashStrokesTexture(w = 128, h = 48) {
   x.moveTo(w * 0.03, h * 0.86);
   x.quadraticCurveTo(w * 0.5, h * 0.72, w * 0.97, h * 0.88);
   x.stroke();
-  // 逐根睫毛：从睑缘向上外掠
+  // 逐根睫毛：从睑缘向上外掠（两眦端的毛短而稀——端头是「收」不是「切」）
   for (let i = 0; i < 30; i++) {
     const t = i / 29 + (rand() - 0.5) * 0.02;
     const bx = (0.05 + t * 0.9) * w;
     const by = h * (0.85 - Math.sin(t * Math.PI) * 0.1);
-    const len = h * (0.34 + rand() * 0.3) * (0.6 + Math.sin(t * Math.PI) * 0.5);
+    const end = Math.min(1, Math.min(t, 1 - t) * 6);               // 端头收梢
+    const len = h * (0.34 + rand() * 0.3) * (0.6 + Math.sin(t * Math.PI) * 0.5) * (0.4 + end * 0.6);
     const outw = (t - 0.35) * 0.9 + (rand() - 0.5) * 0.3;          // 外侧的毛向外撇
-    x.strokeStyle = `rgba(210,200,192,${0.35 + rand() * 0.45})`;
+    x.strokeStyle = `rgba(210,200,192,${(0.35 + rand() * 0.45) * (0.5 + end * 0.5)})`;
     x.lineWidth = 0.8 + rand() * 0.8;
     x.beginPath();
     x.moveTo(bx, by);
     x.quadraticCurveTo(bx + outw * len * 0.4, by - len * 0.7, bx + outw * len, by - len);
     x.stroke();
   }
+  // 端点 alpha 渐隐：睑缘带与睫毛的 alpha 一并乘上两端淡出——
+  // 弯带端头「溶」进内外眦皮面（内眦贴片尖角黑斑的根治）
+  const fade = x.createLinearGradient(0, 0, w, 0);
+  fade.addColorStop(0, 'rgba(0,0,0,0)');
+  fade.addColorStop(0.13, 'rgba(0,0,0,1)');
+  fade.addColorStop(0.87, 'rgba(0,0,0,1)');
+  fade.addColorStop(1, 'rgba(0,0,0,0)');
+  x.globalCompositeOperation = 'destination-in';
+  x.fillStyle = fade;
+  x.fillRect(0, 0, w, h);
+  x.globalCompositeOperation = 'source-over';
+  return c;
+}
+
+/** 长发前帘贴图：上段多股重叠近实底，下 1/3 分股参差收梢——
+ *  梢部锯齿 alpha（每股末端变细变淡 + 整体梢端渐隐），发帘下摆不再是一条直切线。 */
+export function hairCurtainTexture(w = 160, h = 256, seed = 9911) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  const rand = mulberry32(seed);
+  x.lineCap = 'round';
+  for (let i = 0; i < 130; i++) {
+    const bx = (0.03 + rand() * 0.94) * w;
+    const len = h * (0.66 + rand() * 0.36);      // 股末参差 → 锯齿下摆
+    const sway = (rand() - 0.5) * w * 0.12;
+    const shade = 190 + (rand() * 50) | 0;
+    const a = 0.45 + rand() * 0.5;
+    const lw = 1.3 + rand() * 2.6;
+    // 主股
+    x.strokeStyle = `rgba(${shade},${shade - 4},${shade - 8},${a.toFixed(2)})`;
+    x.lineWidth = lw;
+    x.beginPath();
+    x.moveTo(bx, -2);
+    x.bezierCurveTo(bx + sway * 0.25, len * 0.4, bx + sway * 0.7, len * 0.72, bx + sway * 0.92, len * 0.82);
+    x.stroke();
+    // 收梢：末端变细变淡（锯齿是「梢」不是「切口」）
+    x.strokeStyle = `rgba(${shade},${shade - 4},${shade - 8},${(a * 0.55).toFixed(2)})`;
+    x.lineWidth = lw * 0.42;
+    x.beginPath();
+    x.moveTo(bx + sway * 0.92, len * 0.82);
+    x.quadraticCurveTo(bx + sway * 0.98, len * 0.92, bx + sway, len);
+    x.stroke();
+  }
+  // 梢端整体渐隐：0.72h 起 alpha 走低——下摆在锯齿之上再叠一层「散」
+  const fade = x.createLinearGradient(0, h * 0.7, 0, h);
+  fade.addColorStop(0, 'rgba(0,0,0,1)');
+  fade.addColorStop(0.75, 'rgba(0,0,0,0.72)');
+  fade.addColorStop(1, 'rgba(0,0,0,0.3)');
+  x.globalCompositeOperation = 'destination-in';
+  x.fillStyle = fade;
+  x.fillRect(0, 0, w, h);
+  x.globalCompositeOperation = 'source-over';
   return c;
 }
 
@@ -1321,6 +1376,7 @@ export function buildTextureSet(lowspec = false) {
   set.lash = toTex(lashStrokesTexture(), { aniso, clamp: true });
   set.hairStrand = toTex(hairStrandsTexture(192, 128, 6161, false), { aniso, clamp: true });
   set.hairWisp = toTex(hairStrandsTexture(192, 128, 7273, true), { aniso, clamp: true });
+  set.hairCurtain = toTex(hairCurtainTexture(), { aniso, clamp: true });
   set.waterNormal = waterNormalTexture(99, lowspec ? 256 : 512);
   set.net = netTexture();
   set.lantern = lanternTexture('潮');

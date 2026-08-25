@@ -24,6 +24,7 @@ export function buildMaterials(lowspec = false) {
   //   底层 normalMap = 皮肤宏观（皱纹/斑驳/粗毛孔，烘进 skinTexture 高度场）
   //   清漆层 clearcoatNormalMap = 细胞噪声毛孔微法线（平铺 3.5x）——油光膜顺毛孔破碎
   //   clearcoat = 菲涅尔油光层：掠射角一条活人的「皮脂高光」，正视几乎不亮
+  //   sheen = 绒毛边缘散射（peach fuzz）：轮廓掠射处一层暖软光——塑料恰恰没有这层
   const skinPhys = (tex, o = {}) => {
     const m = new THREE.MeshPhysicalMaterial({
       map: tex?.map, normalMap: tex?.normalMap, roughnessMap: tex?.roughnessMap,
@@ -33,6 +34,8 @@ export function buildMaterials(lowspec = false) {
       envMapIntensity: o.envInt ?? 0.7,
       clearcoat: o.cc ?? 0.3,
       clearcoatRoughness: o.ccRough ?? 0.34,
+      sheen: o.sheen ?? 0.28, sheenRoughness: 0.55,
+      sheenColor: new THREE.Color(o.sheenColor ?? 0xffe2d0),
     });
     m.clearcoatNormalMap = T.skinPoreN;
     m.clearcoatNormalScale = new THREE.Vector2(o.poreScale ?? 0.9, o.poreScale ?? 0.9);
