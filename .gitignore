@@ -1,5 +1,6 @@
 node_modules/
 dist/
+release/
 verify/*.png
 verify/*.jpg
 !verify/keep/
