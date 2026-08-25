@@ -1,6 +1,6 @@
 {
   "name": "salt-tide",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "咸潮 SALT TIDE — 中式民俗海洋恐怖 · 类《死魂曲》第一人称潜行 Demo",
   "main": "desktop/main.cjs",
   "scripts": {
