@@ -455,6 +455,100 @@ export class AudioEngine {
     o.start(t); o.stop(t + 2.6);
   }
 
+  /** 近身喉音：常态劳作时喉咙里的水在轻轻倒腾——只有走得够近才听得见 */
+  corpseHum(dist) {
+    if (!this.started) return;
+    const vol = Math.max(0, 1 - dist / 10) * 0.14;
+    if (vol <= 0.008) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(72 + Math.random() * 14, t);
+    o.frequency.linearRampToValueAtTime(56, t + 1.1);
+    const am = ctx.createOscillator(); am.frequency.value = 8 + Math.random() * 4;
+    const amG = ctx.createGain(); amG.gain.value = 0.55;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
+    am.connect(amG).connect(g.gain);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 360;
+    o.connect(lp).connect(g).connect(this.sfxGroup);
+    g.connect(this.reverb);
+    o.start(t); am.start(t); o.stop(t + 1.4); am.stop(t + 1.4);
+    // 一粒气泡冒上来
+    const b = ctx.createOscillator();
+    const f0 = 240 + Math.random() * 220;
+    const bt = t + 0.4 + Math.random() * 0.4;
+    b.frequency.setValueAtTime(f0, bt);
+    b.frequency.exponentialRampToValueAtTime(f0 * 1.9, bt + 0.08);
+    const bg = ctx.createGain();
+    bg.gain.setValueAtTime(0, bt);
+    bg.gain.linearRampToValueAtTime(vol * 0.5, bt + 0.02);
+    bg.gain.exponentialRampToValueAtTime(0.001, bt + 0.1);
+    b.connect(bg).connect(this.sfxGroup);
+    b.start(bt); b.stop(bt + 0.12);
+  }
+
+  /** 掐喉进水：被按住之后，喉咙里的咕噜声换成了你自己的 */
+  chokeGurgle() {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    // 含水的挣扎低鸣
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(48, t + 0.9);
+    const am = ctx.createOscillator(); am.frequency.value = 16;
+    const amG = ctx.createGain(); amG.gain.value = 0.7;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.22, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+    am.connect(amG).connect(g.gain);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+    o.connect(lp).connect(g).connect(this.sfxGroup);
+    o.start(t); am.start(t); o.stop(t + 1.1); am.stop(t + 1.1);
+    // 一串越冒越急的气泡
+    for (let i = 0; i < 5; i++) {
+      const bt = t + 0.12 + i * (0.14 - i * 0.012);
+      const b = ctx.createOscillator();
+      const f0 = 220 + Math.random() * 260;
+      b.frequency.setValueAtTime(f0, bt);
+      b.frequency.exponentialRampToValueAtTime(f0 * 2.1, bt + 0.07);
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(0, bt);
+      bg.gain.linearRampToValueAtTime(0.09, bt + 0.015);
+      bg.gain.exponentialRampToValueAtTime(0.001, bt + 0.09);
+      b.connect(bg).connect(this.sfxGroup);
+      b.start(bt); b.stop(bt + 0.1);
+    }
+  }
+
+  /** 苇丛沙沙：苇秆擦过身体的干燥碎响（amt: 蹲走 0.5 / 直走 1） */
+  reedRustle(amt = 1) {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.makeNoiseBuffer(0.4);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(3200 + Math.random() * 1400, t);
+    bp.frequency.linearRampToValueAtTime(2200, t + 0.3);
+    bp.Q.value = 0.9;
+    const g = ctx.createGain();
+    const vol = 0.05 * amt;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.04);
+    g.gain.linearRampToValueAtTime(vol * 0.4, t + 0.16);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+    src.connect(bp).connect(g).connect(this.sfxGroup);
+    src.start(t); src.stop(t + 0.42);
+  }
+
   /** 潮尸起疑：喉咙灌水声(低频含水颤音) */
   suspect(dist) {
     if (!this.started) return;

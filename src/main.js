@@ -220,6 +220,7 @@ function handleInput(dt) {
 // ---------------- 主循环 ----------------
 const clock = new THREE.Clock();
 let elapsed = 0;
+let reedRustleT = 0; // 苇丛沙沙声节流
 
 function loop() {
   requestAnimationFrame(loop);
@@ -236,7 +237,8 @@ function loop() {
     // 敌人 AI
     const ctx = {
       player, dt, audio,
-      envSightFactor: stealth.envSightFactor,
+      // 芦苇隐蔽直接折进环境视觉系数：蹲满时敌人视距缩到约 1/3
+      envSightFactor: stealth.envSightFactor * (1 - stealth.concealment * 0.65),
       noiseEvents: [...stealth.noiseEvents, ...(player.noiseLevel > 0 ? [] : [])],
       onCaught: (enemy) => {
         story.beginCaught(enemy); // 近身抓住演出 → 溺毙
@@ -292,6 +294,12 @@ function loop() {
       const u = engine.finalPass.uniforms.uRedShift;
       u.value += (target - u.value) * Math.min(1, dt * 2);
     }
+    // 镜头水痕：血潮的浪雾扑上镜片没人擦；涉水/溺水时拉满
+    {
+      const uw = engine.finalPass.uniforms.uWet;
+      const target = Math.max(story.drownView ?? 0, story.flags.bloodTide ? 0.45 : 0);
+      uw.value += (target - uw.value) * Math.min(1, dt * (target > uw.value ? 2.5 : 0.35));
+    }
     // 视奸心跳复位
     if (!sightjack.active) {
       engine.finalPass.uniforms.uPulse.value *= Math.max(0, 1 - dt * 3);
@@ -308,11 +316,26 @@ function loop() {
     }
   }
 
+  // 苇丛隐蔽教学（一次性）
+  if (game.state === 'PLAY' && !story.introSeq && stealth.inReeds > 0.5 && !game._reedTip) {
+    game._reedTip = true;
+    hud.subtitle('苇丛能藏人。蹲下去，别动。', 3.5);
+  }
+  // 苇丛沙沙：走动时苇秆擦过身体（也会把自己吓一跳）
+  if (game.state === 'PLAY' && stealth.inReeds > 0.35 && player.moveAmt > 0.2) {
+    reedRustleT -= dt * (0.6 + player.moveAmt);
+    if (reedRustleT <= 0) {
+      reedRustleT = 0.5 + Math.random() * 0.5;
+      audio.reedRustle?.(player.crouching ? 0.5 : 1);
+    }
+  }
+
   // HUD
   hud.update(dt, {
     danger: player.dead ? 0 : stealth.danger,
     resonance: stealth.resonance,
     crouching: player.crouching && game.state === 'PLAY',
+    conceal: stealth.concealment,
     drown: story.drownView ?? 0,
     noise: player.dead ? 0 : player.noiseLevel / 14,
     threat: threat ? {

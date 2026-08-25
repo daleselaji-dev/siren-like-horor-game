@@ -1,7 +1,9 @@
-// 程序化人形 v2：分层骨架(Group 枢轴) + 程序动画
+// 程序化人形 v3：分层骨架(Group 枢轴) + 程序动画
 // 潮尸剪影规范（美术圣经）：微驼、头略垂、臂下沉、喉部鼓起、眼窝一点冷光
-// v2 细节：肿胀灌水的躯干、手掌与蜷曲手指、可开合下颌、湿发贴头、盐结晶痂、
-//          破渔网披、赤足、每具尸体独有的跛行步态与体形差异
+// v3 细节：肿胀灌水的躯干、手掌与蜷曲手指、可开合下颌、湿发贴头、盐结晶痂、
+//          破渔网披、赤足、每具尸体独有的跛行步态与体形差异；
+//          耳廓/眉弓/颧骨/锁骨/脊椎结节/肘膝关节骨点、皮肤藤壶簇、
+//          垂挂的湿海藻——泡了三年的身体，海在他们身上安了家
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -75,6 +77,49 @@ function saltClusterGeo() {
   });
 }
 
+/** 藤壶簇：一小片扁圆丘（皮肤上长出的礁） */
+function barnacleClusterGeo() {
+  return G('barnacleCluster', () => {
+    const parts = [];
+    const spots = [[0, 0, 0.02], [0.026, 0.012, 0.014], [-0.02, 0.018, 0.012], [0.01, -0.024, 0.016], [-0.028, -0.012, 0.01]];
+    for (const [x, y, s] of spots) {
+      const c = new THREE.CylinderGeometry(s * 0.5, s, s * 0.9, 6);
+      parts.push(xform(c, x, s * 0.4, y, 0, x * 20, y * 20));
+    }
+    return BufferGeometryUtils.mergeGeometries(parts, false);
+  });
+}
+
+/** 湿海藻缕：一条微弯的窄带 */
+function kelpStrandGeo() {
+  return G('kelpStrand', () => {
+    const parts = [];
+    let y = 0, z = 0, bend = 0;
+    for (let i = 0; i < 4; i++) {
+      const seg = new THREE.BoxGeometry(0.028, 0.075, 0.006);
+      bend += 0.14;
+      parts.push(xform(seg, 0, y - 0.034, z, bend, 0, 0.05));
+      y -= 0.068; z += 0.012 + i * 0.004;
+    }
+    return BufferGeometryUtils.mergeGeometries(parts, false);
+  });
+}
+
+/** 脊椎结节：沿背弓一列凸起（隔着湿衣也顶得出来） */
+function spineKnobsGeo() {
+  return G('spineKnobs', () => {
+    const parts = [];
+    for (let i = 0; i < 5; i++) {
+      const t = i / 4;
+      parts.push(xform(
+        new THREE.SphereGeometry(0.024 - t * 0.005, 6, 5),
+        0, 0.5 - t * 0.34, -0.155 - Math.sin(t * Math.PI) * 0.045
+      ));
+    }
+    return BufferGeometryUtils.mergeGeometries(parts, false);
+  });
+}
+
 export class Humanoid {
   /**
    * @param M 材质库
@@ -117,18 +162,28 @@ export class Humanoid {
     };
 
     // ---- 躯干：胸 + 灌水的肚腹 + 背弓 ----
-    this.torso.add(mkMesh(G('chest', () => new THREE.CylinderGeometry(0.155, 0.205, 0.6, 9)), cloth, 0, 0.29, 0));
+    this.torso.add(mkMesh(G('chest', () => new THREE.CylinderGeometry(0.155, 0.205, 0.6, 12)), cloth, 0, 0.29, 0));
     // 肿胀的腹（水在里面）——会随喉咙一起微微鼓动
     const bloat = 0.9 + rnd() * (isSinger ? 0 : 0.5);
-    this.belly = mkMesh(G('belly', () => new THREE.SphereGeometry(0.19, 10, 8)), cloth, 0, 0.06, 0.045, bloat, bloat * 0.85, bloat * 0.9);
+    this.belly = mkMesh(G('belly', () => new THREE.SphereGeometry(0.19, 14, 10)), cloth, 0, 0.06, 0.045, bloat, bloat * 0.85, bloat * 0.9);
     this.torso.add(this.belly);
     // 背弓（驼起来的那一块）
-    this.torso.add(mkMesh(G('hump', () => new THREE.SphereGeometry(0.14, 9, 7)), cloth, 0, 0.42, -0.1, 1.15, 0.85, 0.8));
+    this.torso.add(mkMesh(G('hump', () => new THREE.SphereGeometry(0.14, 12, 9)), cloth, 0, 0.42, -0.1, 1.15, 0.85, 0.8));
     // 肩
     this.torso.add(mkMesh(G('shoulder', () => new THREE.SphereGeometry(0.1, 8, 6)), cloth, -0.21, 0.52 + this.gait.droop * 0.05, 0));
     this.torso.add(mkMesh(G('shoulder', () => new THREE.SphereGeometry(0.1, 8, 6)), cloth, 0.21, 0.52 - this.gait.droop * 0.05, 0));
     // 衣领
     this.torso.add(mkMesh(G('collar', () => new THREE.CylinderGeometry(0.1, 0.13, 0.09, 8)), cloth, 0, 0.57, 0));
+    // 锁骨（领口上方两道斜棱，皮肤外露——溺水者的骨相先出来）
+    const clavGeo = G('clavicle', () => new THREE.CylinderGeometry(0.012, 0.015, 0.14, 5));
+    const clavL = mkMesh(clavGeo, skin, -0.075, 0.555, 0.065);
+    clavL.rotation.set(0.25, 0, 1.28);
+    this.torso.add(clavL);
+    const clavR = mkMesh(clavGeo, skin, 0.075, 0.555, 0.065);
+    clavR.rotation.set(0.25, 0, -1.28);
+    this.torso.add(clavR);
+    // 脊椎结节：驼起的背上一列顶出来的骨点
+    if (!isSinger) this.torso.add(mkMesh(spineKnobsGeo(), cloth, 0, 0, 0));
     // 下摆/裤
     this.pelvis.add(mkMesh(G('hem', () => new THREE.CylinderGeometry(0.2, 0.235, 0.26, 9)), cloth, 0, 0.0, 0));
     // 草绳腰带
@@ -151,8 +206,25 @@ export class Humanoid {
     }
 
     // ---- 头 ----
-    const headMesh = mkMesh(G('skull', () => new THREE.SphereGeometry(0.115, 12, 9)), skin, 0, 0.115, 0, 1, 1.14, 1.02);
+    const headMesh = mkMesh(G('skull', () => new THREE.SphereGeometry(0.115, 18, 14)), skin, 0, 0.115, 0, 1, 1.14, 1.02);
     this.head.add(headMesh);
+    // 耳廓（泡胀外翻的软骨）
+    const earGeo = G('ear', () => new THREE.SphereGeometry(0.03, 7, 6));
+    const earL = mkMesh(earGeo, skin, -0.112, 0.115, -0.008, 0.42, 1.15, 0.8);
+    earL.rotation.y = -0.35;
+    this.head.add(earL);
+    const earR = mkMesh(earGeo, skin, 0.112, 0.115, -0.008, 0.42, 1.15, 0.8);
+    earR.rotation.y = 0.35;
+    this.head.add(earR);
+    // 眉弓（压住眼窝的一道骨棱——尸相是从骨头显出来的）
+    const browGeo = G('brow', () => new THREE.BoxGeometry(0.115, 0.02, 0.032));
+    const brow = mkMesh(browGeo, skin, 0, 0.158, 0.092);
+    brow.rotation.x = 0.35;
+    this.head.add(brow);
+    // 颧骨（两侧顶起）
+    const cheekGeo = G('cheek', () => new THREE.SphereGeometry(0.028, 7, 6));
+    this.head.add(mkMesh(cheekGeo, skin, -0.062, 0.09, 0.074, 1.1, 0.85, 0.9));
+    this.head.add(mkMesh(cheekGeo, skin, 0.062, 0.09, 0.074, 1.1, 0.85, 0.9));
     // 下颌（可开合：追击嘶吼/歌唱）
     this.jaw = new THREE.Group();
     this.jaw.position.set(0, 0.045, 0.015);
@@ -193,6 +265,23 @@ export class Humanoid {
         c.rotation.set(rnd() * 0.6 - 0.9, rnd() * 6.28, 0);
         this.torso.add(c);
       }
+      // 藤壶簇：颈侧/后颈——皮肤当了三年礁石
+      if (rnd() < 0.8) {
+        const bn = mkMesh(barnacleClusterGeo(), M.salt,
+          (rnd() - 0.5) * 0.1, -0.028, -0.02 - rnd() * 0.03, 0.9, 0.9, 0.9);
+        bn.rotation.set(-1.1, rnd() * 6.28, 0);
+        this.head.add(bn);
+      }
+      // 湿海藻缕：从肩缝/腰带里垂下来（M.kelp 可能未建——兜底用发色）
+      const kelpMat = M.kelp ?? M.hair;
+      const nKelp = 1 + (rnd() * 3 | 0);
+      for (let i = 0; i < nKelp; i++) {
+        const k = mkMesh(kelpStrandGeo(), kelpMat,
+          (rnd() - 0.5) * 0.4, 0.44 - rnd() * 0.3, (rnd() < 0.5 ? -1 : 1) * (0.12 + rnd() * 0.06));
+        k.rotation.set((rnd() - 0.5) * 0.4, rnd() * 6.28, (rnd() - 0.5) * 0.5);
+        k.userData.noShadow = true;
+        this.torso.add(k);
+      }
     }
 
     // ---- 手臂（肩枢轴→上臂→肘枢轴→前臂+手掌手指）----
@@ -204,8 +293,12 @@ export class Humanoid {
       const elbow = new THREE.Group();
       elbow.position.y = -0.3;
       shoulder.add(elbow);
+      // 肘骨点（衣袖尽头顶出来的关节）
+      elbow.add(mkMesh(G('elbowKnob', () => new THREE.SphereGeometry(0.05, 7, 6)), skin, 0, -0.005, -0.012, 1, 0.9, 1.05));
       // 泡胀的前臂（皮肤）
-      elbow.add(mkMesh(G('foreArm', () => new THREE.CylinderGeometry(0.05, 0.056, 0.26, 7)), skin, 0, -0.13, 0));
+      elbow.add(mkMesh(G('foreArm', () => new THREE.CylinderGeometry(0.05, 0.056, 0.26, 9)), skin, 0, -0.13, 0));
+      // 腕骨（细一圈的收口）
+      elbow.add(mkMesh(G('wrist', () => new THREE.CylinderGeometry(0.036, 0.04, 0.05, 7)), skin, 0, -0.27, 0));
       // 手：掌+指（180°Y 旋转做左右）
       const hand = mkMesh(handGeo(), skin, 0, -0.26, 0.004);
       if (side < 0) hand.rotation.y = Math.PI;
@@ -224,9 +317,13 @@ export class Humanoid {
       const knee = new THREE.Group();
       knee.position.y = -0.42;
       hip.add(knee);
+      // 膝盖骨点
+      knee.add(mkMesh(G('kneeKnob', () => new THREE.SphereGeometry(0.055, 7, 6)), skin, 0, 0.0, 0.018, 1, 0.85, 1));
       // 卷起的裤脚
       knee.add(mkMesh(G('cuff', () => new THREE.CylinderGeometry(0.068, 0.072, 0.1, 7)), cloth, 0, -0.05, 0));
-      knee.add(mkMesh(G('shin', () => new THREE.CylinderGeometry(0.05, 0.044, 0.42, 7)), skin, 0, -0.22, 0));
+      knee.add(mkMesh(G('shin', () => new THREE.CylinderGeometry(0.05, 0.044, 0.42, 9)), skin, 0, -0.22, 0));
+      // 踝骨
+      knee.add(mkMesh(G('ankle', () => new THREE.SphereGeometry(0.036, 6, 5)), skin, 0, -0.43, -0.01));
       knee.add(mkMesh(footGeo(), skin, 0, -0.45, 0.03));
       return { hip, knee };
     };
@@ -235,12 +332,21 @@ export class Humanoid {
 
     // ---- 歌唱者红裙：垂到脚面的整片红 ----
     if (isSinger) {
-      const robe = mkMesh(G('robe', () => new THREE.CylinderGeometry(0.21, 0.36, 1.0, 12, 1, true)), cloth, 0, -0.44, 0);
+      const robe = mkMesh(G('robe', () => new THREE.CylinderGeometry(0.21, 0.36, 1.0, 16, 3, true)), cloth, 0, -0.44, 0);
       robe.material = cloth;
       this.pelvis.add(robe);
       // 宽袖
       this.armL.shoulder.add(mkMesh(G('sleeve', () => new THREE.CylinderGeometry(0.055, 0.11, 0.34, 8, 1, true)), cloth, 0, -0.18, 0));
       this.armR.shoulder.add(mkMesh(G('sleeve', () => new THREE.CylinderGeometry(0.055, 0.11, 0.34, 8, 1, true)), cloth, 0, -0.18, 0));
+      // 束腰红带 + 垂穗——全图唯一被打理过的衣装
+      const sash = mkMesh(G('sash', () => new THREE.TorusGeometry(0.2, 0.028, 6, 14)), cloth, 0, 0.14, 0);
+      sash.rotation.x = Math.PI / 2;
+      this.pelvis.add(sash);
+      this.pelvis.add(mkMesh(G('sashTail', () => new THREE.BoxGeometry(0.05, 0.46, 0.012)), cloth, 0.07, -0.12, 0.19));
+      // 鬓发：两缕垂到胸前的直发框住脸
+      const sideHairGeo = G('sideHair', () => new THREE.BoxGeometry(0.032, 0.42, 0.045));
+      this.head.add(mkMesh(sideHairGeo, M.hair, -0.1, -0.08, 0.035));
+      this.head.add(mkMesh(sideHairGeo, M.hair, 0.1, -0.08, 0.035));
     }
 
     // ---- 手持物 ----

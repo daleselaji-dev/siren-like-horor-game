@@ -229,6 +229,16 @@ export class Enemy {
     const heard = this.kind === 'singer' ? false : this.senseHearing(player);
     const distToPlayer = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
 
+    // 近身喉音：走得够近才听得见——他们喉咙里的水从来没有停过
+    if (this.kind !== 'singer' && distToPlayer < 9 &&
+        (this.state === 'WORK' || this.state === 'PATROL' || this.state === 'PAUSE')) {
+      this.humT = (this.humT ?? 1.5 + Math.random() * 3) - dt;
+      if (this.humT <= 0) {
+        this.humT = 5 + Math.random() * 5;
+        audio?.corpseHum?.(distToPlayer);
+      }
+    }
+
     // 外部噪音事件
     let noiseAt = null;
     for (const n of ctx.noiseEvents) {
@@ -445,7 +455,8 @@ export class Dog {
     this.enabled = true;
     this.visibilityOfPlayer = 0;
 
-    const fur = new THREE.MeshStandardMaterial({ color: 0x4a423a, roughness: 0.95 });
+    // 淋了三年不干的湿毛
+    const fur = new THREE.MeshStandardMaterial({ color: 0x453e36, roughness: 0.68, envMapIntensity: 0.8 });
     this.group = new THREE.Group();
     const mk = (geo, x, y, z, sx = 1, sy = 1, sz = 1) => {
       const m = new THREE.Mesh(geo, fur);
@@ -454,16 +465,28 @@ export class Dog {
       return m;
     };
     mk(new THREE.BoxGeometry(0.22, 0.24, 0.62), 0, 0.38, 0);
+    // 瘦到贴皮的肋线（两侧各三道浅棱）
+    for (let i = 0; i < 3; i++) {
+      mk(new THREE.BoxGeometry(0.015, 0.16, 0.03), -0.115, 0.37, 0.1 - i * 0.11);
+      mk(new THREE.BoxGeometry(0.015, 0.16, 0.03), 0.115, 0.37, 0.1 - i * 0.11);
+    }
     this.headM = mk(new THREE.BoxGeometry(0.16, 0.16, 0.22), 0, 0.52, 0.36);
-    mk(new THREE.BoxGeometry(0.05, 0.09, 0.05), -0.05, 0.64, 0.32);
-    mk(new THREE.BoxGeometry(0.05, 0.09, 0.05), 0.05, 0.64, 0.32);
+    // 吻部 + 鼻头
+    mk(new THREE.BoxGeometry(0.09, 0.08, 0.14), 0, 0.485, 0.5);
+    mk(new THREE.BoxGeometry(0.045, 0.035, 0.03), 0, 0.5, 0.575);
+    // 湿塌的垂耳
+    const earL = mk(new THREE.BoxGeometry(0.045, 0.12, 0.035), -0.085, 0.57, 0.3);
+    earL.rotation.z = 0.55;
+    const earR = mk(new THREE.BoxGeometry(0.045, 0.12, 0.035), 0.085, 0.57, 0.3);
+    earR.rotation.z = -0.55;
     this.legs = [
       mk(new THREE.BoxGeometry(0.06, 0.3, 0.06), -0.08, 0.15, 0.22),
       mk(new THREE.BoxGeometry(0.06, 0.3, 0.06), 0.08, 0.15, 0.22),
       mk(new THREE.BoxGeometry(0.06, 0.3, 0.06), -0.08, 0.15, -0.22),
       mk(new THREE.BoxGeometry(0.06, 0.3, 0.06), 0.08, 0.15, -0.22),
     ];
-    this.tail = mk(new THREE.BoxGeometry(0.045, 0.045, 0.3), 0, 0.46, -0.42);
+    this.tail = mk(new THREE.BoxGeometry(0.045, 0.045, 0.3), 0, 0.42, -0.42);
+    this.tail.rotation.x = 0.6; // 湿透的尾巴垂着，不摇
     // 狗眼也有一点冷光——它也被腌住了
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 6), M.eyeGlow);
     eye.position.set(-0.04, 0.54, 0.47); this.group.add(eye);
@@ -562,6 +585,17 @@ export class Watcher {
       this.targetYaw = this.yaw + Math.PI;
     }
     this.yaw += angleWrap(this.targetYaw - this.yaw) * Math.min(1, dt * 0.5);
+    // 靠得太近会听见：他站着的这几年，喉咙一直在咽
+    if (ctx.player) {
+      const d = Math.hypot(ctx.player.pos.x - this.pos.x, ctx.player.pos.z - this.pos.z);
+      if (d < 7) {
+        this.humT = (this.humT ?? 1.5) - dt;
+        if (this.humT <= 0) {
+          this.humT = 7 + Math.random() * 6;
+          ctx.audio?.corpseHum?.(d);
+        }
+      }
+    }
     this.body.animate('watch', dt, 1);
     this.body.group.rotation.y = this.yaw;
   }

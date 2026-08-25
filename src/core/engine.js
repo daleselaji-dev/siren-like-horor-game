@@ -1,4 +1,4 @@
-// 渲染引擎：WebGL2 渲染器 + ACES 色调映射 + 后处理链（Bloom → 暗角/颗粒/色差/调色）
+// 渲染引擎：WebGL2 渲染器 + ACES 色调映射 + 后处理链（Bloom → 暗角/颗粒/色差/调色/片门抖动/镜头水痕）
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -20,6 +20,7 @@ const FinalShader = {
     uPulse: { value: 0.0 },         // 心跳脉冲(视奸/共鸣)
     uDistort: { value: 0.0 },       // 桶形畸变(借来的眼睛不合自己的眼眶)
     uFlash: { value: 0.0 },         // 远处无声闪电
+    uWet: { value: 0.0 },           // 镜头水痕(浪雾扑上镜片没人擦)
     uTint: { value: new THREE.Vector3(1, 1, 1) }, // 借眼色偏(每种载体的眼睛看到的世界不一样)
   },
   vertexShader: /* glsl */`
@@ -28,7 +29,7 @@ const FinalShader = {
   `,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
-    uniform float uTime, uGrain, uVignette, uAberration, uDesat, uLift, uRedShift, uPulse, uDistort, uFlash;
+    uniform float uTime, uGrain, uVignette, uAberration, uDesat, uLift, uRedShift, uPulse, uDistort, uFlash, uWet;
     uniform vec3 uTint;
     varying vec2 vUv;
 
@@ -36,6 +37,26 @@ const FinalShader = {
 
     void main() {
       vec2 uv = vUv;
+
+      // 片门抖动：放映机走片的亚像素浮动（24 格/秒换一次相位）——
+      // "被潮水腌过的胶片"不只有颗粒，它整个画框都没坐稳
+      float fr = floor(uTime * 24.0);
+      vec2 weave = (vec2(hash(vec2(fr, 1.7)), hash(vec2(fr, 9.1))) - 0.5) * 0.0011;
+      weave.y *= 1.7;
+      uv += weave;
+
+      // 镜头水痕：几列顺着镜片往下爬的水，轻微折射拖尾（血潮/溺水时出现）
+      float wetR = 0.0;
+      if (uWet > 0.003) {
+        float laneX = vUv.x * 22.0;
+        float laneId = floor(laneX);
+        float lr = hash(vec2(laneId, 7.31));
+        float run = fract(vUv.y * (0.55 + lr * 0.8) + uTime * (0.03 + lr * 0.05) + lr * 9.0);
+        float side = 1.0 - abs(fract(laneX) - 0.5) * 2.0;
+        wetR = pow(run, 6.0) * step(0.55, lr) * smoothstep(0.2, 0.9, side) * uWet;
+        uv.y -= wetR * 0.014;
+      }
+
       vec2 c = uv - 0.5;
       float r2 = dot(c, c);
 
@@ -79,6 +100,9 @@ const FinalShader = {
       // 暗角
       float vig = 1.0 - uVignette * r2 * (1.3 + uPulse);
       col *= clamp(vig, 0.0, 1.0);
+
+      // 水痕高光：水线边缘接住一点天光
+      col += wetR * 0.05 * vec3(0.72, 0.78, 0.80);
 
       // 胶片颗粒（暗部更粗）
       float g = hash(vUv * (uTime * 60.0 + 1.0)) - 0.5;
