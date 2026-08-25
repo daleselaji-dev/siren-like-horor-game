@@ -844,6 +844,9 @@ export function buildHotel(ctx) {
     colliders.push({ minX: hx + 17, maxX: hx + 27, minZ: hz + 8.56, maxZ: hz + 8.76, minY: hb, maxY: hb + 2.7, noSightBlock: true });
     box(M.aquaGlass, 22, 1.35, 10.94, 10, 2.5, 0.06);
     colliders.push({ minX: hx + 17, maxX: hx + 27, minZ: hz + 10.84, maxZ: hz + 11.04, minY: hb, maxY: hb + 2.7, noSightBlock: true });
+    // 连廊应急灯：一支惨白的管子，照出玻璃上自己的影
+    box(M.fluorescent, 22, 2.58, 9.8, 1.2, 0.05, 0.13);
+    addLight(0xdfe8d8, 5, 8, 22, 2.3, 9.8, 0.9);
     // 售票厅 x 27..39, z -3..11
     box(M.terrazzo, 33, 0.02, 4, 11.9, 0.05, 13.9);
     addPatch(hx + 33, hz + 4, 0, 11.9, 13.9, hb, hb);
@@ -875,6 +878,11 @@ export function buildHotel(ctx) {
       B.add(GEO.cone, M.sediment, hx + px2, hb + 0.8 + (i % 3) * 0.5, hz - 2.44, i, 0.8, 1.6 + (i % 3), 0.5);
     }
     addLight(0x2a5a5a, 8, 12, 33, 3.2, -1.5, 0.35);
+    // 停业的馆只留两支应急荧光：够看清闸机与展缸轮廓
+    for (const [px2, pz2] of [[30, 7], [34.5, 2.5]]) {
+      box(M.fluorescent, px2, 4.52, pz2, 1.3, 0.05, 0.14);
+      addLight(0xcfdcd4, 6, 10, px2, 4.1, pz2, 1.1);
+    }
     // 值班室（西南角）：母带柜
     wallZ(PLA, -3, 1.5, 36, 0, 2.6, [{ from: -0.5, to: 0.7, top: 2.05 }]);
     wallX(PLA, 36, 39, 1.5, 0, 2.6);

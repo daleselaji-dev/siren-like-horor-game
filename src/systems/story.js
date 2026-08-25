@@ -294,16 +294,19 @@ export class Story {
     const hb = HI.origin.y;
 
     // —— 宴会厅满员（正常态·敬酒前）：每桌 5 客围坐 ——
+    // 凳子在 hotel.js 摆在 a=(k/8)·2π、r=1.05 的 cos/sin 圆上——人要坐到凳子上
     const roles = ['guest_m', 'guest_f', 'guest_m2', 'guest_m', 'guest_f'];
     const defs = [];
     let seed = 40001;
     for (const t of D.banquetTables) {
       for (let k = 0; k < 5; k++) {
-        const a = (k / 5) * Math.PI * 2 + 0.4;
+        const a = ((k * 2 + (seed % 2)) / 8) * Math.PI * 2; // 隔凳而坐，桌桌错位
+        const sx = t.x + Math.cos(a) * 1.03;
+        const sz = t.z + Math.sin(a) * 1.03;
         defs.push({
           role: roles[k % roles.length], seed: seed++, pose: 'sit', phase: k * 1.3,
-          x: t.x + Math.sin(a) * 1.06, y: hb + 0.02, z: t.z + Math.cos(a) * 1.06,
-          ry: a + Math.PI,
+          x: sx, y: hb + 0.02, z: sz,
+          ry: Math.atan2(t.x - sx, t.z - sz), // 面朝桌心
         });
       }
     }

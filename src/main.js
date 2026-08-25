@@ -298,6 +298,28 @@ function handleInput(dt) {
   }
 }
 
+// ---------------- 灯光预算 ----------------
+// 前向渲染下每盏点光源都参与全部片元计算——小镇灯笼+酒店灯箱加起来 40+ 盏会把
+// 低端 GPU（尤其 SwiftShader 无头验证）拖到个位数帧。只保留离相机最近的 N 盏可见；
+// 数量恒定，three.js 不会反复重编译着色器。
+const allPointLights = [
+  ...world.lights,
+  ...(world.dynamic.hotelLights ?? []).map((h) => h.pl),
+];
+const LIGHT_BUDGET = Math.min(LOWSPEC ? 10 : 16, allPointLights.length);
+let lightBudgetT = 0;
+function updateLightBudget(dt, camPos) {
+  lightBudgetT -= dt;
+  if (lightBudgetT > 0) return;
+  lightBudgetT = 0.3;
+  for (const pl of allPointLights) {
+    const dx = pl.position.x - camPos.x, dy = pl.position.y - camPos.y, dz = pl.position.z - camPos.z;
+    pl._d2 = dx * dx + dy * dy + dz * dz;
+  }
+  allPointLights.sort((a, b) => a._d2 - b._d2);
+  for (let i = 0; i < allPointLights.length; i++) allPointLights[i].visible = i < LIGHT_BUDGET;
+}
+
 // ---------------- 主循环 ----------------
 const clock = new THREE.Clock();
 let elapsed = 0;
@@ -352,6 +374,7 @@ function loop() {
     ocean.update(dt);
     sky.update(dt, player.pos);
     world.updateFx(elapsed);
+    updateLightBudget(dt, engine.camera.position);
 
     // 远处无声闪电 → 后处理闪光；数秒后隔海传来一声闷雷
     engine.finalPass.uniforms.uFlash.value = sky.flash;
@@ -416,6 +439,6 @@ loop();
 // 供无头验证注入
 window.__game = {
   engine, player, world, ocean, sky, input, enemies, byId, dog, birds, watchers,
-  floaters, gaze, guest, crt, agenda,
+  floaters, gaze, guest, crt, agenda, M,
   sightjack, stealth, story, hud, audio, game,
 };

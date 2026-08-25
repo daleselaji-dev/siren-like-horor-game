@@ -1,4 +1,4 @@
-// 《咸潮》桌面壳：Electron 加载 Vite 构建产物（dist/），零网络依赖、离线可玩
+// 《返潮》桌面壳：Electron 加载 Vite 构建产物（dist/），零网络依赖、离线可玩
 const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 
@@ -10,7 +10,7 @@ function createWindow() {
     minHeight: 540,
     backgroundColor: '#04060a',
     autoHideMenuBar: true,
-    title: '咸潮 SALT TIDE',
+    title: '返潮 FANCHAO',
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

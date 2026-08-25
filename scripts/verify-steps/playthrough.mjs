@@ -1,14 +1,30 @@
-// 全流程通关验证：按 20 分钟节拍表把主线走一遍（用传送加速位移，交互全部真实按键）
+// 《返潮》全流程通关验证：八节拍主线（传送加速位移，交互全部真实按键）
+// 滩涂喜帖 → 堤门视奸钥匙 → 公告/广播 → 酒店807上头 → CRT教学 → 敬酒渗漏
+// → 保卫科钥匙(点名) → 总闸破像 → 海洋馆母带 → 807播带 → 全福婆 → 囍匾大破像 → 灯塔终局
 export async function run(page, h) {
   const flags = () => page.evaluate(() => {
     const s = window.__game.story;
-    return { ...s.flags, notes: [...s.notesFound], checkpoint: s.checkpoint.name };
+    return { ...s.flags, notes: s.notesFound.size, checkpoint: s.checkpoint.name, agenda: window.__game.agenda.stage };
   });
-  // yHint：多层结构（如灯塔内部/顶部）中指定期望楼层的参考高度
   const tp = (x, z, yaw, yHint) => page.evaluate(
     ({ x, z, yaw, yHint }) => window.__game.player.setPosition(x, z, yaw, yHint),
     { x, z, yaw, yHint });
   const interact = async () => { await h.tapKey('KeyE'); await h.sleep(400); };
+  const loc = (name) => page.evaluate((n) => {
+    const v = window.__game.world.locations[n];
+    return { x: v.x, y: v.y, z: v.z };
+  }, name);
+  // 等待某个 flag 变真（低帧率下演出被拉长，用轮询）
+  const waitFlag = async (name, timeoutMs) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < timeoutMs) {
+      const v = await page.evaluate((n) => window.__game.story.flags[n], name);
+      if (v) return true;
+      await h.sleep(600);
+    }
+    return false;
+  };
+  const assert = (ok, msg) => { if (!ok) throw new Error('ASSERT: ' + msg); };
 
   await page.click('#title-start');
   await h.sleep(2000);
@@ -16,22 +32,20 @@ export async function run(page, h) {
   await h.tapKey('Space'); // 跳过开场运镜
   await h.sleep(500);
 
-  // ---- 节拍1：礁滩 · 文书① ----
+  // ---- 节拍1：滩涂搁浅 · 文书①喜帖 ----
   await tp(77, 109, 0.5);
   await h.sleep(300);
-  await interact(); // 拾取
+  await interact();
   await h.shot('p01-note1');
-  await h.tapKey('KeyE'); // 关闭
+  await h.tapKey('KeyE');
   await h.sleep(300);
+  let f = await flags();
+  assert(f.notes >= 1, 'note1 not picked');
 
-  // ---- 节拍2：石堤区 · 触发潜行教学 · 文书② ----
+  // ---- 节拍1b：石堤潜行教学 · 文书②渔民日记 ----
   await tp(10, 55, 0);
   await h.sleep(600);
-  // 渔寮一内文书②（h1 在 2,52 门朝南 → 桌上位置 local(-1,0.85,-0.7)）
-  const n2 = await page.evaluate(() => {
-    const v = window.__game.world.locations.note2;
-    return { x: v.x, z: v.z };
-  });
+  const n2 = await loc('note2');
   await tp(n2.x + 0.5, n2.z + 0.8, 0.4);
   await h.sleep(300);
   await interact();
@@ -39,16 +53,15 @@ export async function run(page, h) {
   await h.tapKey('KeyE');
   await h.sleep(200);
 
-  // ---- 节拍3：堤门锁着 → 提示视奸 ----
-  await tp(16, 41, Math.PI);
+  // ---- 节拍1c：堤门锁着 → 视奸巡堤人 → 缸底钥匙 → 开门(议程·迎宾) ----
+  const gate = await loc('gate');
+  await tp(gate.x, gate.z + 2.4, Math.PI);
   await h.sleep(300);
   await interact(); // 推门（锁着）
   await h.shot('p03-gate-locked');
-  let f = await flags();
-  console.log('[verify] after locked gate:', f.sightjackTip ? 'tip OK' : 'TIP MISSING');
-
-  // ---- 节拍4：视奸巡堤人 → 得知钥匙位置 ----
-  // 把巡堤人挪到渔寮二段(wpIndex=6)，玩家在附近视奸
+  f = await flags();
+  console.log('[verify] sightjackTip:', f.sightjackTip);
+  // 把巡堤人挪到钥匙检查段，玩家视奸
   await page.evaluate(() => {
     const e = window.__game.byId.dikePatrol;
     e.wpIndex = 6;
@@ -58,23 +71,21 @@ export async function run(page, h) {
   });
   await tp(8, 62, -1.5);
   await h.sleep(200);
-  await h.tapKey('KeyQ'); // 进入视奸
+  await h.tapKey('KeyQ');
   await h.sleep(400);
-  // 切到巡堤人信道
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 10; i++) {
     const label = await page.evaluate(() => window.__game.sightjack.current?.label);
     if (label === '巡堤的人') break;
     await h.tapKey('KeyQ');
     await h.sleep(250);
   }
-  await h.sleep(2500); // 等他走到钥匙检查段
+  await h.sleep(2500);
   await h.shot('p04-sightjack-key');
   f = await flags();
   console.log('[verify] knowKeySpot:', f.knowKeySpot);
-  await h.tapKey('KeyW'); // 退出视奸
+  assert(f.knowKeySpot, 'sightjack key spot not learned');
+  await h.tapKey('KeyW');
   await h.sleep(300);
-
-  // ---- 节拍5：搬水缸拿钥匙 → 开门 ----
   const vat = await page.evaluate(() => {
     const v = window.__game.world.dynamic.hut2.local(-1.35, 0.6, 1.0);
     return { x: v.x, z: v.z };
@@ -83,181 +94,218 @@ export async function run(page, h) {
   await h.sleep(300);
   await interact();
   f = await flags();
-  console.log('[verify] hasKey:', f.hasKey);
-  await tp(16, 41, Math.PI);
+  assert(f.hasKey, 'key not taken');
+  await tp(gate.x, gate.z + 2.4, Math.PI);
   await h.sleep(300);
   await interact();
   f = await flags();
-  console.log('[verify] gateOpen:', f.gateOpen);
+  assert(f.gateOpen, 'gate not opened');
   await h.sleep(1500);
   await h.shot('p05-gate-open');
 
-  // ---- 节拍6：村中心 → 广播站 文书④ ----
+  // ---- 节拍2：镇中心 · 公告栏文书③ · 广播站文书④ ----
   await tp(2, 6, 0);
-  await h.sleep(600); // 村中心触发
-  const radio = await page.evaluate(() => {
-    const v = window.__game.world.locations.radio;
-    return { x: v.x, z: v.z };
-  });
+  await h.sleep(600);
+  const nb = await loc('noticeBoard');
+  await tp(nb.x, nb.z + 1.6, Math.PI);
+  await h.sleep(300);
+  await interact();
+  await h.shot('p06-notice');
+  await h.tapKey('KeyE');
+  await h.sleep(200);
+  f = await flags();
+  assert(f.knowHotel, 'knowHotel not set');
+  const radio = await loc('radio');
   await tp(radio.x - 0.8, radio.z + 1.0, 2.6);
   await h.sleep(300);
   await interact();
-  await h.shot('p06-radio-note4');
+  await h.shot('p07-radio');
   await h.tapKey('KeyE');
   await h.sleep(300);
 
-  // ---- 节拍7：潮母宫 · 视奸祭师 → 看鬼火顺序 ----
-  // 守殿人巡逻相位在低帧环境下不可控——把他调度到殿北远端路点，避免测试被"抓住演出"打断
+  // ---- 节拍3：进酒店 → 大堂(议程·入席/CRT上电) → 807 陪新娘上头 ----
+  await tp(-4, -42, 0, 3.5);
+  await h.sleep(800); // hotelFront 触发
+  await h.shot('p08-hotel-front');
+  await tp(-4, -48, 0, 3.5);
+  await h.sleep(1200); // hotelLobby 触发
+  f = await flags();
+  assert(f.inHotel, 'inHotel not set');
+  await h.shot('p09-lobby-full');
+  // 登记簿文书⑤
+  const reg = await loc('registry');
+  await tp(reg.x + 1.2, reg.z, 1.57, 3.5);
+  await h.sleep(300);
+  await interact();
+  await h.tapKey('KeyE');
+  await h.sleep(200);
+  // 上 3F 807（传送模拟走楼梯）
+  const dresser = await loc('dresser807');
+  await tp(dresser.x + 1.4, dresser.z + 1.6, -2.4, 10.3);
+  await h.sleep(400);
+  await interact(); // 上头教学（演出 13.5s 真实时间）
+  await h.shot('p10-bride-scene');
+  const gotMirror = await waitFlag('hasMirror', 25000);
+  assert(gotMirror, 'mirror not given');
+  await h.shot('p11-mirror');
+
+  // ---- 节拍4：服务走廊 CRT 对照教学 → 宴会厅敬酒 = 返潮点火 ----
+  const crtc = await loc('crtCorridor');
+  await tp(crtc.x - 0.3, crtc.z + 1.6, Math.PI, 3.5);
+  await h.sleep(400);
+  await interact();
+  f = await flags();
+  assert(f.crtTip, 'crt tutorial missed');
+  await h.shot('p12-crt-foretell');
+  // 进宴会厅触发敬酒（议程收声 2.4s 后 applyStage → 渗漏）
+  await tp(-14, -56, 0.6, 3.5);
+  await h.sleep(600);
+  const leaked = await waitFlag('leaked', 15000);
+  assert(leaked, 'leak not fired after toast');
+  await h.sleep(1500);
+  await h.shot('p13-leak-banquet');
+
+  // ---- 节拍5：二楼保卫科 · 文书⑥ · 钥匙柜(CRT点名) → 一楼总闸破像 ----
+  // 清一下侍应仇恨，避免传送落点撞巡逻线
   await page.evaluate(() => {
     const g = window.__game;
-    const e = g.byId.templeGuard;
-    e.state = 'PATROL';
-    e.wpIndex = 3;
-    e.pos.set(-72, 0, -68);
-    e.pos.y = g.world.heightAt(-72, -68);
-    e.suspectMeter = 0;
+    for (const id of ['waiterBanquet', 'waiterLobby', 'waiterEast']) {
+      const w = g.byId[id];
+      if (w) { w.state = 'PATROL'; w.suspectMeter = 0; }
+    }
+    g.stealth.danger = 0;
   });
-  await tp(-56, -74, 1.57);
-  await h.sleep(700); // 触发台词
-  await tp(-61, -74, 1.57); // 进殿（墙体遮挡视线）
+  const desk = await loc('securityDesk');
+  await tp(desk.x - 1.2, desk.z + 1.2, 2.4, 6.9);
+  await h.sleep(400);
+  await interact(); // 值班日志（文书⑥）
+  await h.tapKey('KeyE');
+  await h.sleep(200);
+  const kc = await loc('keyCabinet');
+  await tp(kc.x, kc.z + 1.3, Math.PI, 6.9);
   await h.sleep(300);
-  await h.tapKey('KeyQ');
-  for (let i = 0; i < 10; i++) {
-    const label = await page.evaluate(() => window.__game.sightjack.current?.label);
-    if (label === '祭师 闫守潮') break;
-    await h.tapKey('KeyQ');
-    await h.sleep(250);
-  }
-  await h.shot('p07-ritual-sightjack');
-  // 鬼火按 2.4s/炷轮播、叩拜间歇 3.2s——轮询直到看到亮起
-  let ghost = [];
-  for (let i = 0; i < 24; i++) {
-    ghost = await page.evaluate(() =>
-      window.__game.world.dynamic.censers.map((c) => c.ghostOn));
-    if (ghost.some(Boolean)) break;
-    await h.sleep(400);
-  }
-  console.log('[verify] ghost during sightjack:', JSON.stringify(ghost));
-  await h.tapKey('KeyW');
-  await h.sleep(300);
-
-  // ---- 节拍8：按序点香（北2 → 南0 → 中1） ----
-  const censers = await page.evaluate(() =>
-    window.__game.world.dynamic.censers.map((c) => ({ x: c.pos.x, z: c.pos.z })));
-  for (const idx of [2, 0, 1]) {
-    const c = censers[idx];
-    await tp(c.x + 1.2, c.z, 1.57);
-    await h.sleep(300);
-    await interact();
-  }
+  await interact(); // 钥匙柜 → 点名
   f = await flags();
-  console.log('[verify] puzzleSolved:', f.puzzleSolved);
-  await h.shot('p08-censers-lit');
-
-  // ---- 节拍9：取喉铃 → 血潮 ----
-  const altar = await page.evaluate(() => {
-    const v = window.__game.world.locations.altar;
-    return { x: v.x, z: v.z };
-  });
-  await tp(altar.x + 1.4, altar.z, 1.57);
+  assert(f.hasAquaKey, 'aqua key not taken');
+  assert(f.namedByCrt, 'not named by CRT');
+  await h.sleep(1500);
+  await h.shot('p14-named-by-crt');
+  // 一楼配电间总闸
+  const brk = await loc('mainBreaker');
+  await tp(brk.x - 1.2, brk.z, 1.57, 3.5);
   await h.sleep(300);
   await interact();
   f = await flags();
-  console.log('[verify] bellTaken:', f.bellTaken);
-  await h.sleep(4500); // 等血潮启动
-  f = await flags();
-  console.log('[verify] bloodTide:', f.bloodTide);
-  await tp(-40, -60, 0.6);
-  await h.sleep(1200);
-  await h.shot('p09-bloodtide-out');
+  assert(f.imageBroken, 'image not broken');
+  await h.shot('p15-image-broken');
+  const crtBroken = await page.evaluate(() => window.__game.crt.broken > 0);
+  console.log('[verify] crt static:', crtBroken);
 
-  // ---- 节拍10：沉船湾（走龙骨） ----
-  await tp(30, -63, -2.6);
-  await h.sleep(700);
-  await h.shot('p10-wreck-keel');
-  // 靠近歌唱者测共鸣
-  await page.evaluate(() => {
-    const s = window.__game.byId.singer;
-    const p = window.__game.player.pos;
-    s.pos.set(p.x + 6, 0, p.z);
-    s.pos.y = window.__game.world.heightAt(s.pos.x, s.pos.z);
-  });
-  await h.sleep(3500);
-  const res = await page.evaluate(() => window.__game.stealth.resonance.toFixed(2));
-  console.log('[verify] resonance near singer:', res);
-  await h.shot('p11-resonance');
-  // 拉开距离
-  await page.evaluate(() => {
-    const s = window.__game.byId.singer;
-    s.pos.set(0, 0, -20);
-    s.pos.y = window.__game.world.heightAt(0, -20);
-  });
+  // ---- 节拍6：大堂上宾振动潜行 → 玻璃连廊 → 海洋馆母带(文书⑦) ----
+  const guestOn = await page.evaluate(() => window.__game.guest.enabled);
+  assert(guestOn, 'honored guest not enabled');
+  // 沿红毯蹲行穿大堂（真实走一段，验证不被点名）
+  await tp(-4, -54, Math.PI, 3.5);
+  await h.tapKey('ShiftLeft');
+  await page.evaluate(() => { window.__game.player.crouching = true; });
+  await h.holdKey('KeyS', 2200); // 朝北退向门厅（yaw=π 时 S 往 -z…用 W 沿面朝走）
+  await page.evaluate(() => { window.__game.player.crouching = false; });
+  const vib = await page.evaluate(() => window.__game.stealth.vibration.toFixed(2));
+  console.log('[verify] vibration after carpet crouch:', vib);
+  await h.shot('p16-lobby-guest');
+  // 玻璃连廊 → 海洋馆
+  await tp(16, -50, 1.57, 3.5);
+  await h.sleep(700); // annex 触发
+  const tape = await loc('tapeCabinet');
+  await tp(tape.x - 1.2, tape.z + 0.6, 2.0, 3.5);
+  await h.sleep(300);
+  await interact(); // 铁柜 → 文书⑦ + 母带
+  await h.shot('p17-tape-note');
+  await h.tapKey('KeyE');
+  await h.sleep(300);
+  f = await flags();
+  assert(f.hasTape, 'tape not taken');
+  assert(f.agenda >= 4, 'agenda not at 上头');
+
+  // ---- 节拍7：回 807 播母带(文书⑧/影子规则) → 全福婆追逐 ----
+  const tv = await loc('tv807');
+  await tp(tv.x + 1.4, tv.z + 1.0, -2.2, 10.3);
+  await h.sleep(400);
+  await interact(); // 播带
   await h.sleep(1000);
+  await h.shot('p18-tape-play');
+  // 等 note8 打开（演出 stage1 → 8.5s）
+  let noteOpened = false;
+  for (let i = 0; i < 30; i++) {
+    noteOpened = await page.evaluate(() => window.__game.game.state === 'NOTE');
+    if (noteOpened) break;
+    await h.sleep(800);
+  }
+  assert(noteOpened, 'note8 never opened during tape');
+  await h.shot('p19-note8');
+  await h.tapKey('KeyE'); // 合上 → 演出尾声
+  const chase = await waitFlag('matronChase', 25000);
+  assert(chase, 'matron chase not started');
+  await h.sleep(800);
+  await h.shot('p20-matron-chase');
+  const matron = await page.evaluate(() => ({
+    enabled: window.__game.byId.matron.enabled,
+    state: window.__game.byId.matron.state,
+  }));
+  console.log('[verify] matron:', JSON.stringify(matron));
 
-  // ---- 节拍11：灯塔（电闸→梯子→顶部） ----
-  const br = await page.evaluate(() => {
-    const v = window.__game.world.locations.breaker;
-    return { x: v.x, z: v.z, y: v.y };
+  // ---- 节拍8：下宴会厅扯囍匾(大破像) → 灯塔终局 ----
+  // 全福婆在 3F 追——传送下楼甩开（对应实际玩法的楼梯逃脱）
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.stealth.danger = 0;
+    for (const e of g.enemies) { if (e.state === 'ALERT') { e.state = 'SEARCH'; e.searchTarget = null; } }
   });
-  await tp(br.x - 0.6, br.z - 0.6, 0.8, br.y); // yHint 指向一楼，避免落在塔顶补丁上
-  await h.sleep(300);
-  await interact();
+  const mic = await loc('stageMic');
+  await tp(mic.x, mic.z + 2.6, Math.PI, 3.5);
+  await h.sleep(400);
+  await interact(); // 扯囍匾
   f = await flags();
-  console.log('[verify] breakerOn:', f.breakerOn);
-  await h.shot('p12-breaker');
-  const lad = await page.evaluate(() => {
-    const v = window.__game.world.locations.ladderBottom;
-    return { x: v.x, z: v.z, y: v.y };
-  });
-  await tp(lad.x, lad.z, 0, lad.y);
-  await h.sleep(300);
-  await interact(); // 上梯（传送含1s黑屏）
-  await h.sleep(1800);
-  f = await flags();
-  console.log('[verify] atTop:', f.atTop);
-  await h.shot('p13-lighthouse-top');
+  assert(f.finaleBroken, 'finale break failed');
+  assert(f.agenda >= 5, 'agenda not at 送入洞房');
+  await h.sleep(1500);
+  await h.shot('p21-finale-break');
 
-  // ---- 节拍12：敲铃 → 终局 ----
-  const bt = await page.evaluate(() => {
-    const v = window.__game.world.locations.bellTop;
-    return { x: v.x, z: v.z };
-  });
-  // 站到铃架正旁（远离梯口，避免最近交互变成"爬下灯塔"）
-  await tp(bt.x + 0.3, bt.z - 0.8, -0.4);
-  await h.sleep(300);
-  await interact();
+  // 出酒店去灯塔
+  await tp(30, -80, -2.4);
+  await h.sleep(500);
+  await tp(75, -118, -2.4);
+  await h.sleep(1000);
   f = await flags();
-  console.log('[verify] ended:', f.ended);
-  // 终局演出全长约 25s 游戏时间；无头低帧率下 dt 钳制会拉长真实耗时 → 按演出阶段轮询截图
+  assert(f.ended, 'ending not triggered at lighthouse');
+  console.log('[verify] ending begun, checkpoint:', f.checkpoint);
+
+  // 终局演出（海的视角 → 淡出 → 结算）——按阶段轮询
   const waitStage = async (stage, timeoutMs) => {
     const t0 = Date.now();
     while (Date.now() - t0 < timeoutMs) {
-      const st = await page.evaluate(() => window.__game.story.endSeq?.stage ?? -1);
+      const st = await page.evaluate(() => window.__game.story.endSeq?.stage ?? 99);
       if (st >= stage) return true;
       await h.sleep(800);
     }
     return false;
   };
-  await waitStage(1, 20000);
-  await h.sleep(4000);
-  await h.shot('p14-tidemother-1');
-  await waitStage(2, 20000);
-  await h.shot('p15-tidemother-2');
-  await waitStage(3, 20000);
-  await h.sleep(2000);
-  await h.shot('p16-forced-sightjack');
-  await waitStage(5, 90000);
-  await h.sleep(1500);
-  await h.shot('p17-ending');
-  // 遮罩淡入由演出阶段触发，低帧率下再多等一会儿
+  await waitStage(1, 25000);
+  await h.sleep(3000);
+  await h.shot('p22-fog-clears');
+  await waitStage(2, 25000);
+  await h.sleep(2500);
+  await h.shot('p23-sea-eye');
+  await waitStage(4, 90000);
   let endShown = false;
-  for (let i = 0; i < 20 && !endShown; i++) {
+  for (let i = 0; i < 25 && !endShown; i++) {
     endShown = await page.evaluate(() =>
       document.getElementById('ending-overlay').classList.contains('show'));
     if (!endShown) await h.sleep(1000);
   }
+  await h.shot('p24-ending');
   console.log('[verify] ending overlay shown:', endShown);
   if (!endShown) throw new Error('ending overlay not shown');
-  const notesTotal = await page.evaluate(() => window.__game.story.notesFound.size);
-  console.log('[verify] notes found in run:', notesTotal);
+  f = await flags();
+  console.log('[verify] final:', JSON.stringify({ notes: f.notes, agenda: f.agenda, checkpoint: f.checkpoint }));
 }
