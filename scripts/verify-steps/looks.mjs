@@ -67,12 +67,22 @@ export async function run(page, h) {
   // —— 宴席工位实体近景 ——
   // 司仪（舞台上）：从上宾空席斜前方看，避开高背椅遮挡
   await look('l21-emcee-close', -14.9, -63.0, -16.5, -64.6, 3.5);
-  // 侍应（动态位置，贴脸看浮木颈臂+托盘）
+  // 侍应（挪到宴会厅入口空地正拍，避开圆桌人群遮挡；拍完归位）
   const wp = await page.evaluate(() => {
-    const p = window.__game.byId.waiterBanquet.pos;
-    return { x: p.x, z: p.z };
+    const w = window.__game.byId.waiterBanquet;
+    const orig = { x: w.pos.x, z: w.pos.z, yaw: w.yaw };
+    w.pos.set(-13.6, w.pos.y, -47.4);
+    w.yaw = Math.atan2(-12.2 - -13.6, -46.2 - -47.4); // 面向镜头
+    w.state = 'PAUSE'; w.stateTimer = -9;
+    return orig;
   });
-  await look('l22-waiter-close', wp.x + 1.6, wp.z + 1.6, wp.x, wp.z, 3.5);
+  await h.sleep(400);
+  await look('l22-waiter-close', -12.2, -46.2, -13.6, -47.4, 3.5);
+  await page.evaluate((orig) => {
+    const w = window.__game.byId.waiterBanquet;
+    w.pos.set(orig.x, w.pos.y, orig.z);
+    w.yaw = orig.yaw; w.stateTimer = 0;
+  }, wp);
   // 全福婆（临时启用到 3F 走廊近景）
   await page.evaluate(() => {
     const g = window.__game;
@@ -80,6 +90,7 @@ export async function run(page, h) {
     m.setEnabled(true);
     m.pos.set(-8, 0, -55.5);
     m.pos.y = g.world.heightAt(-8, -55.5, 10.3);
+    m.yaw = Math.PI / 2; // 面向走廊东侧的镜头——脸对着看她的人
     m.state = 'PAUSE'; m.stateTimer = -9;
   });
   await h.sleep(400);
