@@ -9,6 +9,7 @@ import { Ocean } from './world/water.js';
 import { Sky } from './world/sky.js';
 import { Player } from './entities/player.js';
 import { Enemy, Dog, BirdFlock, Watcher, Floater, Gaze, HonoredGuest } from './entities/enemy.js';
+import { Humanoid } from './entities/humanoid.js';
 import { SightjackSystem } from './systems/sightjack.js';
 import { StealthSystem } from './systems/stealth.js';
 import { CRTSystem } from './systems/crt.js';
@@ -445,6 +446,9 @@ function loop() {
       level: threatLevel,
     } : null,
   });
+
+  // 人形近距 LOD 视点：跟当前渲染相机走（视奸时换成载体的眼睛）
+  engine.renderPass.camera.getWorldPosition(Humanoid.viewer);
 
   engine.render(elapsed);
   input.endFrame();

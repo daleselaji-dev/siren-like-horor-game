@@ -19,6 +19,25 @@ export function buildMaterials(lowspec = false) {
     ...opts.extra,
   });
 
+  // 皮肤专用：双层法线物理材质
+  //   底层 normalMap = 皮肤宏观（皱纹/斑驳/粗毛孔，烘进 skinTexture 高度场）
+  //   清漆层 clearcoatNormalMap = 细胞噪声毛孔微法线（平铺 3.5x）——油光膜顺毛孔破碎
+  //   clearcoat = 菲涅尔油光层：掠射角一条活人的「皮脂高光」，正视几乎不亮
+  const skinPhys = (tex, o = {}) => {
+    const m = new THREE.MeshPhysicalMaterial({
+      map: tex?.map, normalMap: tex?.normalMap, roughnessMap: tex?.roughnessMap,
+      roughness: 1.0, metalness: 0.0,
+      color: o.color ?? 0xffffff,
+      normalScale: new THREE.Vector2(o.normalScale ?? 0.85, o.normalScale ?? 0.85),
+      envMapIntensity: o.envInt ?? 0.7,
+      clearcoat: o.cc ?? 0.3,
+      clearcoatRoughness: o.ccRough ?? 0.34,
+    });
+    m.clearcoatNormalMap = T.skinPoreN;
+    m.clearcoatNormalScale = new THREE.Vector2(o.poreScale ?? 0.9, o.poreScale ?? 0.9);
+    return m;
+  };
+
   M.wood = std(T.wood, { normalScale: 1.25, envInt: 0.7 });
   M.woodDark = std(T.wood, { color: 0x9a9a9a, normalScale: 1.25, envInt: 0.6 });
   M.stone = std(T.stone, { normalScale: 1.5, envInt: 1.1 });
@@ -29,37 +48,39 @@ export function buildMaterials(lowspec = false) {
   M.salt = std(T.salt, { envInt: 1.3 });
   M.rock = std(T.rock, { normalScale: 1.9, envInt: 1.1 });
 
-  // 潮尸皮肤：灌水的湿油光
-  M.corpseSkin = std(T.corpseSkin, { normalScale: 0.9, envInt: 1.5 });
+  // 潮尸皮肤：灌水的湿油光（清漆层拉满——泡过的皮面浮一层水膜）
+  M.corpseSkin = skinPhys(T.corpseSkin, { normalScale: 0.9, envInt: 1.5, cc: 0.55, ccRough: 0.18, poreScale: 0.7 });
   M.clothNavy = std(T.clothNavy, { envInt: 0.4 });
   M.clothGrey = std(T.clothGrey, { envInt: 0.4 });
   M.clothRed = std(T.clothRed, { envInt: 0.55 });
 
   // ===== 蚀湾 · 人物 =====
-  M.skin = std(T.skin, { normalScale: 0.7, envInt: 0.6 });
-  M.skinPale = std(T.skin, { color: 0xd8dee0, normalScale: 0.7, envInt: 0.9 }); // 深压下失血的脸
+  M.skin = skinPhys(T.skin, { envInt: 0.6, cc: 0.3, ccRough: 0.32 });
+  M.skinPale = skinPhys(T.skin, { color: 0xd8dee0, envInt: 0.9, cc: 0.48, ccRough: 0.24 }); // 深压下失血的脸——更湿
   // 肤色池：2 张底皮 × 色调乘子——人群不再共享同一张皮
   M.skinTones = [
     M.skin,
-    std(T.skinB, { normalScale: 0.7, envInt: 0.6 }),
-    std(T.skin, { color: 0xe8d4c2, normalScale: 0.7, envInt: 0.6 }),   // 偏黄气色
-    std(T.skinB, { color: 0xd9b9a2, normalScale: 0.75, envInt: 0.65 }),// 海边晒褐
-    std(T.skin, { color: 0xf2dfd6, normalScale: 0.65, envInt: 0.6 }),  // 白净
+    skinPhys(T.skinB, { envInt: 0.6, cc: 0.3, ccRough: 0.32 }),
+    skinPhys(T.skin, { color: 0xe8d4c2, envInt: 0.6, cc: 0.26, ccRough: 0.36 }),   // 偏黄气色
+    skinPhys(T.skinB, { color: 0xd9b9a2, normalScale: 0.9, envInt: 0.65, cc: 0.34, ccRough: 0.3 }),// 海边晒褐（汗光）
+    skinPhys(T.skin, { color: 0xf2dfd6, normalScale: 0.8, envInt: 0.6, cc: 0.28, ccRough: 0.34 }), // 白净
   ];
-  // 老年皮池（皱纹沟+老年斑烘进贴图）
+  // 老年皮池（皱纹沟+老年斑烘进贴图；油少——清漆弱、毛孔法线更重）
   M.skinOlds = [
-    std(T.skinOld, { normalScale: 1.0, envInt: 0.55 }),
-    std(T.skinOld, { color: 0xdcc2ac, normalScale: 1.05, envInt: 0.6 }), // 晒褐的老年
-    std(T.skinOld, { color: 0xe4dcc6, normalScale: 0.95, envInt: 0.55 }),// 蜡黄的老年
+    skinPhys(T.skinOld, { normalScale: 1.15, envInt: 0.55, cc: 0.16, ccRough: 0.5, poreScale: 1.25 }),
+    skinPhys(T.skinOld, { color: 0xdcc2ac, normalScale: 1.2, envInt: 0.6, cc: 0.18, ccRough: 0.48, poreScale: 1.25 }), // 晒褐的老年
+    skinPhys(T.skinOld, { color: 0xe4dcc6, normalScale: 1.1, envInt: 0.55, cc: 0.14, ccRough: 0.52, poreScale: 1.25 }),// 蜡黄的老年
   ];
-  // 失血皮池（酒店员工：司仪/侍应/岗亭员）
+  // 失血皮池（酒店员工：司仪/侍应/岗亭员）——湿、青、油光浮起
   M.skinPales = [
     M.skinPale,
-    std(T.skinB, { color: 0xd2dce2, normalScale: 0.7, envInt: 0.95 }),
-    std(T.skinOld, { color: 0xd8dcd4, normalScale: 0.9, envInt: 0.9 }),
+    skinPhys(T.skinB, { color: 0xd2dce2, envInt: 0.95, cc: 0.5, ccRough: 0.22 }),
+    skinPhys(T.skinOld, { color: 0xd8dcd4, normalScale: 1.0, envInt: 0.9, cc: 0.44, ccRough: 0.26 }),
   ];
-  // 骨粉白垩皮（理骨员：干、白、粗糙——像常年裹着一层粉）
-  M.skinChalk = std(T.skinOld, { color: 0xe2e4da, normalScale: 1.1, envInt: 0.4 });
+  // 骨粉白垩皮（理骨员：干、白、粗糙——像常年裹着一层粉；几乎无油）
+  M.skinChalk = skinPhys(T.skinOld, { color: 0xe2e4da, normalScale: 1.25, envInt: 0.4, cc: 0.05, ccRough: 0.7, poreScale: 1.4 });
+  // 盐霜附居痕迹（人脸上的结晶主异常）：干白晶壳、边缘微闪
+  M.saltFrost = std(T.salt, { color: 0xf2efe2, normalScale: 1.1, envInt: 1.5, roughness: 1.0 });
   M.rubber = std(T.rubber, { normalScale: 1.2, envInt: 1.3, extra: { side: THREE.DoubleSide } }); // 胶皮围裙/手套/胶靴（围裙为开放壳，双面）
   M.clothUniform = std(T.clothUniform, { envInt: 0.4 });       // 岗亭员藏青制服
   M.clothDress = std(T.clothDress, { envInt: 0.4 });

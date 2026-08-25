@@ -49,8 +49,9 @@ try {
 
   console.log('[verify] loading page...');
   const query = process.env.FULLSPEC ? '' : '?lowspec=1';
-  await page.goto(`http://127.0.0.1:${PORT}/${query}`, { waitUntil: 'networkidle0', timeout: 60000 });
-  await page.waitForFunction(() => window.__game !== undefined, { timeout: 30000 });
+  // domcontentloaded：FULLSPEC 下贴图程序化生成会长时间占住主线程，networkidle0 会误超时
+  await page.goto(`http://127.0.0.1:${PORT}/${query}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction(() => window.__game !== undefined, { timeout: 90000, polling: 500 });
 
   const stepFile = process.argv[2] || 'smoke';
   const mod = await import(path.resolve(`scripts/verify-steps/${stepFile}.mjs`));

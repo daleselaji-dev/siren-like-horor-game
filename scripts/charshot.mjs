@@ -30,7 +30,7 @@ try {
     await new Promise((r) => setTimeout(r, 900));
     await page.screenshot({ path: `${OUT}/${names[i]}-body.png` });
     await page.evaluate((i) => window.__face(i), i);
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 900)); // 等近距 LOD 高模换入 + 扫视/眨眼落到自然帧
     await page.screenshot({ path: `${OUT}/${names[i]}-face.png` });
     console.log('shot', names[i]);
   }

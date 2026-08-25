@@ -78,6 +78,7 @@ let t = 0;
 function tick() {
   requestAnimationFrame(tick);
   const dt = 1 / 60; t += dt;
+  Humanoid.viewer.copy(cam.position); // 近距 LOD 视点
   for (const f of figures) if (f.h) f.h.animate(f.mode, dt, 1);
   renderer.render(scene, cam);
 }

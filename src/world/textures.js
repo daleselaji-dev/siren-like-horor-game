@@ -60,6 +60,32 @@ function makeRidged(seed, octaves = 3) {
   return (x, y) => 1 - Math.abs(fbm(x, y) - 0.5) * 2; // 1 = 脊线上
 }
 
+// 平铺细胞噪声（Worley）：返回 {f1,f2}（到最近/次近特征点的距离，单位=细胞格）
+// f1→0 处是细胞中心（毛孔/石屑心），f2-f1→0 处是细胞边界（皮沟/裂缝网）
+function makeCellular(seed, grid) {
+  const rand = mulberry32(seed);
+  const px = new Float32Array(grid * grid);
+  const py = new Float32Array(grid * grid);
+  for (let i = 0; i < grid * grid; i++) { px[i] = rand(); py[i] = rand(); }
+  const res = { f1: 0, f2: 0 };
+  return (x, y) => {
+    x = (((x % 1) + 1) % 1) * grid;
+    y = (((y % 1) + 1) % 1) * grid;
+    const xi = x | 0, yi = y | 0;
+    let b1 = 1e9, b2 = 1e9;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const cx = (xi + dx + grid) % grid, cy = (yi + dy + grid) % grid;
+        const fx = xi + dx + px[cy * grid + cx], fy = yi + dy + py[cy * grid + cx];
+        const d = (x - fx) * (x - fx) + (y - fy) * (y - fy);
+        if (d < b1) { b2 = b1; b1 = d; } else if (d < b2) { b2 = d; }
+      }
+    }
+    res.f1 = Math.sqrt(b1); res.f2 = Math.sqrt(b2);
+    return res;
+  };
+}
+
 function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 function sstep(a, b, t) { t = clamp01((t - a) / (b - a)); return t * t * (3 - 2 * t); }
 
@@ -113,9 +139,9 @@ function buildMaps(size, fn, normalStrength = 1.8) {
   return { map: cMap, normal: cN, rough: cRough };
 }
 
-function toTex(canvas, { srgb = true, repeat = [1, 1], aniso = 8 } = {}) {
+function toTex(canvas, { srgb = true, repeat = [1, 1], aniso = 8, clamp = false } = {}) {
   const t = new THREE.CanvasTexture(canvas);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.wrapS = t.wrapT = clamp ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
   t.repeat.set(repeat[0], repeat[1]);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = aniso;
@@ -587,11 +613,48 @@ export function clothTexture(seed = 122, baseRGB = [38, 46, 62], size = 256) {
 
 // ================= 蚀湾 · 南方大酒店 / 人物 材质组 =================
 
-/** 活人皮肤：2001 年还晒得到太阳的脸（低饱和暖调 + 微血色 + 毛孔）
- *  age: 0 青壮 → 1 老年（皱纹沟 + 老年斑 + 松弛暗沉），wrinkles 走法线图，近景可读 */
+// 共享毛孔/皮沟场：细胞噪声只在 512² 上算一次，三张皮肤贴图双线性采样复用
+// （细胞噪声 9 格距离循环是皮肤生成的大头——共享后 FULLSPEC 启动省数秒）
+let _poreField = null;
+function getPoreField() {
+  if (_poreField) return _poreField;
+  const S = 512;
+  const cellA = makeCellular(919, 72);    // 粗毛孔（颊/鼻翼级，稀疏可数）
+  const cellB = makeCellular(929, 150);   // 细毛孔底纹
+  const pitArr = new Float32Array(S * S);
+  const sulArr = new Float32Array(S * S);
+  for (let y = 0; y < S; y++) {
+    const v = y / S;
+    for (let x = 0; x < S; x++) {
+      const u = x / S;
+      const cA = cellA(u, v);
+      const cB = cellB(u, v);
+      pitArr[y * S + x] = sstep(0.24, 0.04, cA.f1) * 0.8 + sstep(0.3, 0.07, cB.f1) * 0.35;
+      sulArr[y * S + x] = sstep(0.12, 0.02, cA.f2 - cA.f1);
+    }
+  }
+  const res = { pit: 0, sul: 0 };
+  _poreField = (u, v) => { // 双线性平铺采样
+    const x = (((u % 1) + 1) % 1) * S, y = (((v % 1) + 1) % 1) * S;
+    const xi = x | 0, yi = y | 0, xf = x - xi, yf = y - yi;
+    const x1 = (xi + 1) % S, y1 = (yi + 1) % S;
+    const i00 = yi * S + xi, i10 = yi * S + x1, i01 = y1 * S + xi, i11 = y1 * S + x1;
+    res.pit = (pitArr[i00] * (1 - xf) + pitArr[i10] * xf) * (1 - yf)
+      + (pitArr[i01] * (1 - xf) + pitArr[i11] * xf) * yf;
+    res.sul = (sulArr[i00] * (1 - xf) + sulArr[i10] * xf) * (1 - yf)
+      + (sulArr[i01] * (1 - xf) + sulArr[i11] * xf) * yf;
+    return res;
+  };
+  return _poreField;
+}
+
+/** 活人皮肤 v3：2001 年还晒得到太阳的脸（低饱和暖调 + 微血色 + 细胞噪声毛孔皮沟 + 皮脂油区）
+ *  age: 0 青壮 → 1 老年（皱纹沟 + 老年斑 + 松弛暗沉），wrinkles/毛孔走法线图，近景可读
+ *  粗糙度图承担「油光分区」：皮脂区低粗糙（清漆层在这里最亮），皮沟毛孔高粗糙 */
 export function skinTexture(seed = 211, size = 512, age = 0) {
   const fbm = makeFbm(seed, 4);
   const ridge = makeRidged(seed + 31, 4);
+  const pore = getPoreField();                 // 共享毛孔/皮沟场（只算一次，三张皮共用）
   return buildMaps(size, (u, v, out) => {
     const f = fbm(u * 4, v * 4);
     let r = 186 + f * 26, g = 152 + f * 22, b = 128 + f * 18;
@@ -599,7 +662,9 @@ export function skinTexture(seed = 211, size = 512, age = 0) {
     r += flush * 16 * (1 - age * 0.6); g -= flush * 2; b -= flush * 5;
     const shade = clamp01((fbm(u * 2.6 + 13, v * 2.6 + 13) - 0.58) * 3);
     r -= shade * 24; g -= shade * 22; b -= shade * 16;
-    let h = 0.5 + f * 0.3, ro = 0.6 - flush * 0.05 + f * 0.1;
+    // 皮脂油区：低频云斑——活人的脸不是均匀哑光，油在骨点上积
+    const oil = clamp01((fbm(u * 2.3 + 31, v * 2.3 + 17) - 0.48) * 2.4);
+    let h = 0.5 + f * 0.3, ro = 0.66 - flush * 0.05 + f * 0.1 - oil * 0.3;
     if (age > 0) {
       // 皱纹沟：横向为主的脊线噪声（细而浅——皱纹是沟不是树皮）
       const wr1 = clamp01((ridge(u * 2.2, v * 7 + fbm(u * 2, v * 2) * 0.8) - 0.8) * 4) * age;
@@ -614,13 +679,105 @@ export function skinTexture(seed = 211, size = 512, age = 0) {
       b = b * (1 - spot * 0.32) + spot * 24;
       // 整体暗沉失血
       r -= age * 10; g -= age * 6; b -= age * 3;
-      ro += wr * 0.1;
+      ro += wr * 0.12 - oil * 0.06;
     }
-    const pore = (fbm(u * 26, v * 26) - 0.5) * 9;
-    out[0] = r + pore; out[1] = g + pore; out[2] = b + pore * 0.8;
+    // 毛孔（细胞噪声 F1：孔心一个坑）+ 皮沟网（F2-F1：细胞边界一圈浅沟）
+    // 克制：毛孔主要走高度→法线与粗糙度，颜色只轻点一下——重了会读成胡茬/脏斑
+    const pf = pore(u, v);
+    r -= pf.pit * 9 + pf.sul * 4; g -= pf.pit * 8 + pf.sul * 4; b -= pf.pit * 7 + pf.sul * 3;
+    h -= pf.pit * 0.07 + pf.sul * 0.028;
+    ro += pf.pit * 0.09 + pf.sul * 0.04;
+    out[0] = r; out[1] = g; out[2] = b;
     out[3] = clamp01(h);
     out[4] = clamp01(ro);
-  }, 1.0 + age * 0.5);
+  }, 1.05 + age * 0.35);
+}
+
+/** 皮肤毛孔微法线（清漆层第二法线）：细胞噪声皮丘-皮沟-孔心。
+ *  作为 clearcoatNormalMap 平铺 3-4 次盖在整头上——油光膜顺着毛孔破碎，
+ *  这层「镜面里的颗粒」正是蜡人与活人之间隔着的那层皮。 */
+export function skinPoreNormalTexture(seed = 219, size = 256) {
+  const cellA = makeCellular(seed, 30);
+  const cellB = makeCellular(seed + 7, 72);
+  const fbm = makeFbm(seed + 13, 3);
+  const maps = buildMaps(size, (u, v, out) => {
+    const cA = cellA(u, v), cB = cellB(u, v);
+    // 皮丘（细胞内部微微鼓起）+ 皮沟（边界凹槽）+ 孔心（深坑）
+    let h = 0.5 + Math.min(cA.f1, 0.7) * 0.2
+      - sstep(0.17, 0.02, cA.f2 - cA.f1) * 0.3
+      - sstep(0.26, 0.04, cA.f1) * 0.42
+      - sstep(0.3, 0.06, cB.f1) * 0.22
+      + fbm(u * 9, v * 9) * 0.14;
+    out[0] = 128; out[1] = 128; out[2] = 128;
+    out[3] = clamp01(h);
+    out[4] = 0.5;
+  }, 2.4);
+  return maps.normal;
+}
+
+/** 眉毛贴片：透明底上逐根画毛（内浓竖、外疏平；根部乱、梢部顺）。
+ *  画成浅灰白——由材质 color 乘出发色（黑发/灰发眉共用一张）。 */
+export function browStrokesTexture(w = 256, h = 64) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  const rand = mulberry32(7717);
+  // 底影：贴皮的一层软阴影（毛下的皮色暗带——没有它毛是飘着的）
+  x.strokeStyle = 'rgba(150,140,130,0.16)';
+  x.lineWidth = h * 0.3;
+  x.beginPath();
+  x.moveTo(w * 0.07, h * 0.7);
+  x.quadraticCurveTo(w * 0.55, h * 0.28, w * 0.95, h * 0.55);
+  x.stroke();
+  // 逐根眉毛
+  for (let i = 0; i < 230; i++) {
+    const t = rand();                              // 0 眉头 → 1 眉尾
+    const bx = (0.05 + t * 0.9) * w;
+    const arch = Math.sin(Math.min(1, t * 1.3) * Math.PI) * 0.22;  // 眉峰在 ~2/3
+    const by = (0.68 - arch + (rand() - 0.5) * 0.2) * h;
+    const len = (0.1 - t * 0.035) * w * (0.7 + rand() * 0.6);
+    const ang = -1.25 + t * 1.1 + (rand() - 0.5) * 0.25;           // 眉头近竖 → 眉尾近平
+    const fade = (t < 0.1 ? 0.5 : 1) * (t > 0.85 ? 1 - (t - 0.85) * 5 : 1);
+    x.strokeStyle = `rgba(216,206,196,${Math.max(0.16, (0.55 + rand() * 0.42) * fade)})`;
+    x.lineWidth = 1.2 + rand() * 1.4;
+    x.beginPath();
+    x.moveTo(bx, by);
+    x.quadraticCurveTo(
+      bx + Math.cos(ang) * len * 0.5, by + Math.sin(ang) * len * 0.55,
+      bx + Math.cos(ang * 0.8) * len, by + Math.sin(ang * 0.8) * len);
+    x.stroke();
+  }
+  return c;
+}
+
+/** 睫毛贴片：根部密合的暗线 + 一排向外上翘的细毛（上睑缘） */
+export function lashStrokesTexture(w = 128, h = 48) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  const rand = mulberry32(3313);
+  // 睑缘线：贴眼球的深色密合带（近景里眼睛「嵌进眼眶」的关键）
+  x.strokeStyle = 'rgba(225,215,205,0.85)';
+  x.lineWidth = 2.6;
+  x.beginPath();
+  x.moveTo(w * 0.03, h * 0.86);
+  x.quadraticCurveTo(w * 0.5, h * 0.72, w * 0.97, h * 0.88);
+  x.stroke();
+  // 逐根睫毛：从睑缘向上外掠
+  for (let i = 0; i < 30; i++) {
+    const t = i / 29 + (rand() - 0.5) * 0.02;
+    const bx = (0.05 + t * 0.9) * w;
+    const by = h * (0.85 - Math.sin(t * Math.PI) * 0.1);
+    const len = h * (0.34 + rand() * 0.3) * (0.6 + Math.sin(t * Math.PI) * 0.5);
+    const outw = (t - 0.35) * 0.9 + (rand() - 0.5) * 0.3;          // 外侧的毛向外撇
+    x.strokeStyle = `rgba(210,200,192,${0.35 + rand() * 0.45})`;
+    x.lineWidth = 0.8 + rand() * 0.8;
+    x.beginPath();
+    x.moveTo(bx, by);
+    x.quadraticCurveTo(bx + outw * len * 0.4, by - len * 0.7, bx + outw * len, by - len);
+    x.stroke();
+  }
+  return c;
 }
 
 /** 胶皮（理骨员围裙/长手套/胶靴）：哑光微皱 + 磨亮棱线 + 骨粉扑痕 */
@@ -1102,9 +1259,11 @@ export function buildTextureSet(lowspec = false) {
     clothGrey: clothTexture(123, [58, 60, 58], small),
     clothRed: clothTexture(124, [110, 22, 18], small),
     // —— 蚀湾 · 人物与酒店 ——
-    skin: skinTexture(211, mid),
-    skinB: skinTexture(217, mid),            // 第二张底皮（斑驳分布不同）
-    skinOld: skinTexture(213, mid, 1),       // 老年皮（皱纹沟+老年斑）
+    // 皮肤给 768：整头球面 UV 摊 0..1，脸只占约 1/4——512 时近景是糊的；
+    // 1024 启动太慢（皮肤是逐像素生成里最贵的一张）
+    skin: skinTexture(211, lowspec ? 256 : 768),
+    skinB: skinTexture(217, lowspec ? 256 : 768),      // 第二张底皮（斑驳分布不同）
+    skinOld: skinTexture(213, lowspec ? 256 : 768, 1), // 老年皮（皱纹沟+老年斑）
     rubber: rubberTexture(415, small),
     terrazzo: terrazzoTexture(301, hero),
     carpet: carpetTexture(311, [98, 18, 16], mid),
@@ -1133,6 +1292,10 @@ export function buildTextureSet(lowspec = false) {
       roughnessMap: toTex(v.rough, { srgb: false, aniso }),
     };
   }
+  // 皮肤毛孔微法线（清漆层第二法线）：平铺 3.5 次盖全头
+  set.skinPoreN = toTex(skinPoreNormalTexture(219, lowspec ? 128 : 320), { srgb: false, aniso, repeat: [3.5, 3.5] });
+  set.brow = toTex(browStrokesTexture(), { aniso, clamp: true });
+  set.lash = toTex(lashStrokesTexture(), { aniso, clamp: true });
   set.waterNormal = waterNormalTexture(99, lowspec ? 256 : 512);
   set.net = netTexture();
   set.lantern = lanternTexture('潮');
