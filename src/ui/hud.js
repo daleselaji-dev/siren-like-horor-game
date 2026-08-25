@@ -1,7 +1,8 @@
-// HUD / UI：字幕队列、目标提示、互动提示、文书阅读、暂停、死亡、结局、危险与共鸣指示
+// HUD / UI：字幕队列、目标提示、互动提示、文书阅读、暂停、死亡、结局、危险/振动/议程指示
 export class HUD {
   constructor() {
     this.el = {
+      agenda: document.getElementById('agenda-indicator'),
       subtitles: document.getElementById('subtitles'),
       objToast: document.getElementById('objective-toast'),
       objText: document.querySelector('#objective-toast .obj-text'),
@@ -40,6 +41,17 @@ export class HUD {
 
   /** 电影黑边（演出用） */
   setLetterbox(on) { this.el.letterbox.classList.toggle('on', !!on); }
+
+  /** 喜事议程推进指示（司仪每报一次时辰，右上角亮一次） */
+  agenda(stage, name) {
+    const el = this.el.agenda;
+    if (!el) return;
+    el.textContent = `喜事议程 · ${name}`;
+    el.classList.add('show');
+    el.classList.remove('flash');
+    void el.offsetWidth; // 重触发动画
+    el.classList.add('flash');
+  }
 
   /** 检查点提示（左下角一闪） */
   checkpointToast() {

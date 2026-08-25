@@ -1,16 +1,18 @@
-// 《咸潮》入口：装配引擎/世界/角色/AI/视奸/叙事/音频/HUD，驱动主循环
+// 《返潮》入口：装配引擎/蚀湾小镇/南方大酒店/角色/AI/三轴系统(CRT预现·议程·振动)/叙事/音频/HUD
 import * as THREE from 'three';
 import { Engine } from './core/engine.js';
 import { Input } from './core/input.js';
 import { AudioEngine } from './core/audio.js';
 import { buildMaterials } from './world/materials.js';
-import { buildVillage } from './world/village.js';
+import { buildTown } from './world/town.js';
 import { Ocean } from './world/water.js';
 import { Sky } from './world/sky.js';
 import { Player } from './entities/player.js';
-import { Enemy, Dog, BirdFlock, Watcher } from './entities/enemy.js';
+import { Enemy, Dog, BirdFlock, Watcher, Floater, Gaze, HonoredGuest } from './entities/enemy.js';
 import { SightjackSystem } from './systems/sightjack.js';
 import { StealthSystem } from './systems/stealth.js';
+import { CRTSystem } from './systems/crt.js';
+import { Agenda } from './systems/agenda.js';
 import { Story, NOTES } from './systems/story.js';
 import { HUD } from './ui/hud.js';
 import { TitleSea } from './ui/title.js';
@@ -25,7 +27,7 @@ const audio = new AudioEngine();
 const hud = new HUD();
 
 const M = buildMaterials(LOWSPEC);
-const world = buildVillage(engine.scene, M);
+const world = buildTown(engine.scene, M);
 const ocean = new Ocean(engine.scene, M.textures, world);
 const sky = new Sky(engine.scene);
 world.waterLevel = () => ocean.level;
@@ -34,78 +36,155 @@ const player = new Player(engine.camera, input, world, audio);
 player.setPosition(world.locations.spawn.x, world.locations.spawn.z, world.locations.spawn.yaw);
 player.frozen = true; // 标题画面锁定
 
-// ---------------- 敌人编制 ----------------
+// ---------------- 实体编制 ----------------
+// 镇上：还在履职的普通人；酒店：宴席工位（司仪/侍应/保卫科/全福婆）
 const P = world.patrols;
+const HFY = P.hotelFloorY; // { f1, f2, f3 }
 const enemyDefs = [
+  // —— 蚀湾镇（外景） ——
   {
-    id: 'netMender', label: '补网的人', kind: 'worker',
+    id: 'netMender', label: '补网的人', kind: 'worker', role: 'fisher',
     workPos: P.netMenderWork, workMode: 'work_net', workYaw: 2.6,
-    cloth: 'navy', hat: true, fov: 80, sightRange: 15, hearRange: 12,
+    fov: 80, sightRange: 15, hearRange: 12,
     waypoints: [[12, 47], [4, 56], [18, 60], [26, 50]],
   },
   {
-    id: 'saltWorker', label: '晒盐的人', kind: 'worker',
-    workPos: P.saltWorkerWork, workMode: 'work_rake', workYaw: -0.6,
-    cloth: 'grey', hat: true, tool: 'rake', fov: 85, sightRange: 16, hearRange: 13,
+    id: 'saltWorker', label: '晒盐的人', kind: 'worker', role: 'fisher',
+    workPos: P.saltWorkerWork, workMode: 'work_rake', workYaw: -0.6, tool: 'rake',
+    fov: 85, sightRange: 16, hearRange: 13,
     waypoints: [[-44, 4], [-30, 12], [-24, -4], [-40, -8]],
   },
   {
-    id: 'dikePatrol', label: '巡堤的人', kind: 'patrol',
+    id: 'dikePatrol', label: '巡堤的人', kind: 'patrol', role: 'townsman',
     waypoints: P.dike, lantern: true, lanternLight: true,
-    cloth: 'navy', fov: 88, sightRange: 18, hearRange: 15, walkSpeed: 1.0,
+    fov: 88, sightRange: 18, hearRange: 15, walkSpeed: 1.0,
   },
   {
-    id: 'villagePatrol1', label: '提灯的祭仆', kind: 'patrol',
+    id: 'runner1', label: '送席的伙计', kind: 'patrol', role: 'townsman',
     waypoints: P.village1, lantern: true, lanternLight: true,
-    cloth: 'grey', fov: 92, sightRange: 18, hearRange: 15,
+    fov: 92, sightRange: 18, hearRange: 15,
   },
   {
-    id: 'villagePatrol2', label: '挑水的人', kind: 'patrol',
+    id: 'runner2', label: '挑担的伙计', kind: 'patrol', role: 'townsman',
     waypoints: P.village2, hat: true,
-    cloth: 'navy', fov: 84, sightRange: 16, hearRange: 14,
+    fov: 84, sightRange: 16, hearRange: 14,
   },
   {
-    id: 'templeGuard', label: '守殿的人', kind: 'patrol',
-    waypoints: P.templeGuard, lantern: true, lanternLight: true,
-    cloth: 'grey', fov: 90, sightRange: 17, hearRange: 15,
+    id: 'streetRunner', label: '跑腿的伙计', kind: 'patrol', role: 'townsman',
+    waypoints: P.townStreet,
+    fov: 86, sightRange: 16, hearRange: 14, walkSpeed: 1.05,
   },
   {
-    // 祭师对玩家全盲全聋——他的眼睛只看得见他没做完的祭（安全的视奸对象）
-    id: 'priest', label: '祭师 闫守潮', kind: 'worker',
+    // 守祀人对玩家全盲全聋——他的眼睛只看得见旧海祀没做完的祭（安全的视奸对象）
+    id: 'keeper', label: '守祀的人', kind: 'worker', role: 'fisher',
     workPos: P.priestWork, workMode: 'work_pray', workYaw: Math.PI / 2,
-    cloth: 'grey', fov: 1, sightRange: 0, hearRange: 0,
+    fov: 1, sightRange: 0, hearRange: 0,
   },
   {
-    id: 'singer', label: '唱歌的人', kind: 'singer',
-    waypoints: P.singer, cloth: 'red', enabled: false,
+    id: 'templeGuard', label: '看祠的人', kind: 'patrol', role: 'townsman',
+    waypoints: P.templeGuard, lantern: true, lanternLight: true,
+    fov: 90, sightRange: 17, hearRange: 15,
+  },
+  // —— 南方大酒店（宴席工位） ——
+  {
+    // 司仪不追人：他的职是念议程。全盲全聋——但他的眼睛看得见整个宴会厅（视奸侦察位）
+    id: 'emcee', label: '司仪', kind: 'worker', role: 'emcee',
+    workPos: P.emceeStage, workMode: 'mc', workYaw: 0, floorY: HFY.f1,
+    fov: 1, sightRange: 0, hearRange: 0,
   },
   {
-    id: 'warden', label: '守塔的人', kind: 'patrol',
-    waypoints: P.wardenPost, lantern: true, lanternLight: true,
-    cloth: 'navy', fov: 90, sightRange: 17, hearRange: 15, enabled: false,
+    id: 'waiterBanquet', label: '侍应', kind: 'patrol', role: 'waiter', fxKind: 'waiter', mute: true,
+    waypoints: P.waiterBanquet, floorY: HFY.f1,
+    fov: 88, sightRange: 13, hearRange: 11, walkSpeed: 0.85, chaseSpeed: 2.55,
+  },
+  {
+    id: 'waiterLobby', label: '侍应', kind: 'patrol', role: 'waiter', fxKind: 'waiter', mute: true,
+    waypoints: P.waiterLobby, floorY: HFY.f1,
+    fov: 88, sightRange: 13, hearRange: 11, walkSpeed: 0.85, chaseSpeed: 2.55,
+  },
+  {
+    id: 'waiterEast', label: '侍应', kind: 'patrol', role: 'waiter', fxKind: 'waiter', mute: true,
+    waypoints: P.waiterEast, floorY: HFY.f1,
+    fov: 86, sightRange: 12, hearRange: 11, walkSpeed: 0.8, chaseSpeed: 2.5,
+  },
+  {
+    id: 'security', label: '保卫科值班员', kind: 'patrol', role: 'townsman',
+    waypoints: P.security2F, floorY: HFY.f2, enabled: false,
+    fov: 92, sightRange: 14, hearRange: 12, walkSpeed: 0.95, chaseSpeed: 2.7,
+  },
+  {
+    id: 'matron', label: '全福婆', kind: 'patrol', role: 'matron',
+    waypoints: P.matron3F, floorY: HFY.f3, enabled: false,
+    fov: 104, sightRange: 15, hearRange: 13, walkSpeed: 0.78, chaseSpeed: 2.35,
   },
 ];
 
 const enemies = enemyDefs.map((d) => new Enemy(engine.scene, world, M, d));
-const dog = new Dog(engine.scene, world, M, { id: 'dog', label: '村犬', waypoints: P.dogWander });
+const dog = new Dog(engine.scene, world, M, { id: 'dog', label: '镇犬', waypoints: P.dogWander });
 const birds = new BirdFlock(engine.scene, world, { id: 'birds', label: '海鸟群', center: [0, 0], radius: 46, height: 34 });
-// 望海者：站在滩涂尽头的水里，面向海。血潮之后他们会转过身来。
+// 望潮者：站在滩涂尽头的水里，面向海。敬酒（返潮点火）之后他们会转过身来。
 const watchers = [
-  new Watcher(engine.scene, world, M, { id: 'watcher1', x: 104, z: 131, yaw: 0.75, seed: 1101, cloth: 'grey' }),
-  new Watcher(engine.scene, world, M, { id: 'watcher2', x: 42, z: 125, yaw: 0.2, seed: 2202, cloth: 'navy' }),
-  new Watcher(engine.scene, world, M, { id: 'watcher3', x: 103, z: -95, yaw: 1.5, seed: 3303, cloth: 'grey' }),
+  new Watcher(engine.scene, world, M, { id: 'watcher1', x: 104, z: 131, yaw: 0.75, seed: 1101 }),
+  new Watcher(engine.scene, world, M, { id: 'watcher2', x: 42, z: 125, yaw: 0.2, seed: 2202 }),
+  new Watcher(engine.scene, world, M, { id: 'watcher3', x: 103, z: -95, yaw: 1.5, seed: 3303 }),
 ];
-const viewers = [...enemies, dog, birds, ...watchers]; // 视奸信道
+
+// —— 浮客：敬酒后才浮起来的宾客（非敌对·视奸载体） ——
+const HI = world.dynamic.hotelInfo;
+const hb = HI.origin.y, hx = HI.origin.x, hz = HI.origin.z;
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const floaters = [
+  new Floater(engine.scene, world, M, {
+    id: 'floater1', label: '宾客', role: 'guest_m', seed: 501, enabled: false, floorY: hb,
+    spots: [V3(hx - 3, hb, hz + 7.5), V3(hx + 2, hb, hz + 4), V3(hx - 5, hb, hz + 3.5)],
+  }),
+  new Floater(engine.scene, world, M, {
+    id: 'floater2', label: '宾客', role: 'guest_f', seed: 502, enabled: false, floorY: hb,
+    spots: [V3(hx + 4, hb, hz + 8.5), V3(hx + 6, hb, hz + 3), V3(hx + 1, hb, hz + 9)],
+  }),
+  new Floater(engine.scene, world, M, {
+    id: 'floater3', label: '宾客', role: 'guest_m2', seed: 503, enabled: false, floorY: hb,
+    spots: [V3(hx - 12, hb, hz + 6), V3(hx - 10, hb, hz - 2), V3(hx - 14.5, hb, hz + 2)],
+  }),
+  new Floater(engine.scene, world, M, {
+    id: 'floater4', label: '宾客', role: 'guest_f', seed: 504, enabled: false, floorY: hb,
+    spots: [V3(hx - 10, hb, hz + 8), V3(hx - 15, hb, hz + 7), V3(hx - 12.5, hb, hz + 3.5)],
+  }),
+  new Floater(engine.scene, world, M, {
+    id: 'floater5', label: '宾客', role: 'guest_m', seed: 505, enabled: false, floorY: hb,
+    spots: [V3(hx - 10, hb, hz - 5.5), V3(hx - 14, hb, hz - 4), V3(hx - 11, hb, hz - 7.5)],
+  }),
+];
+
+// —— 回眸客：非敌对指针，出现在关键路口，回头看向你该去的方向 ——
+const gaze = new Gaze(engine.scene, world, M, { id: 'gaze', label: '回眸的人', seed: 77 });
+
+// —— 上宾：破像后进驻大堂挑空的板重组前肢——它听楼板的振动 ——
+const guest = new HonoredGuest(engine.scene, world, M, {
+  id: 'guest', label: '上宾',
+  area: { minX: hx - 8, maxX: hx + 8, minZ: hz, maxZ: hz + 11 },
+  shoulder: [hx + 7.2, hb + 6.3, hz + 9.6],
+  anchors: [
+    [hx - 5, hb + 0.7, hz + 8],
+    [hx + 3, hb + 0.7, hz + 3],
+    [hx - 2, hb + 0.7, hz + 6],
+    [hx + 5, hb + 0.7, hz + 9],
+  ],
+});
+
+const viewers = [...enemies, dog, birds, ...watchers, ...floaters, gaze]; // 视奸信道
 const byId = {};
 for (const e of enemies) byId[e.id] = e;
 
 // ---------------- 系统 ----------------
 const sightjack = new SightjackSystem(engine, player, audio);
 const stealth = new StealthSystem(world, player);
+const crt = new CRTSystem(engine, world);
 
 const game = {
   scene: engine.scene, engine, world, player, hud, audio,
-  enemies, byId, viewers, watchers, sightjack, stealth, ocean, sky, M,
+  enemies, byId, viewers, watchers, floaters, gaze, guest,
+  sightjack, stealth, crt, ocean, sky, M,
   state: 'TITLE', // TITLE | PLAY | NOTE | PAUSE | ENDED
   openNote(note) {
     hud.showNote(note);
@@ -119,6 +198,8 @@ const game = {
   },
   onEnded() { game.state = 'ENDED'; },
 };
+const agenda = new Agenda(game);
+game.agenda = agenda;
 const story = new Story(game);
 game.story = story;
 
@@ -130,7 +211,7 @@ requestAnimationFrame(() => titleScreen.classList.add('ready')); // 触发字幕
 document.getElementById('title-start').addEventListener('click', () => {
   if (game.state !== 'TITLE') return;
   audio.init();
-  audio.update(0, { playerPos: player.pos, danger: 0, chase: 0, songBase: 0.14 });
+  audio.update(0, { playerPos: player.pos, danger: 0, chase: 0, songBase: 0.12 });
   titleScreen.classList.add('fading');
   setTimeout(() => { titleScreen.classList.add('hidden'); titleSea.stop(); }, 2700);
   hud.fade(false);
@@ -181,7 +262,7 @@ function handleInput(dt) {
     }
     return;
   }
-  if (story.caughtSeq) return; // 被抓演出中
+  if (story.caughtSeq || story.tapeSeq) return; // 演出中
 
   // 视奸
   const sjKey = input.justPressed('KeyQ') || input.justPressed('Tab');
@@ -233,33 +314,39 @@ function loop() {
     // 玩家
     player.update(dt);
 
-    // 敌人 AI
+    // 敌人/实体 AI
     const ctx = {
       player, dt, audio,
       envSightFactor: stealth.envSightFactor,
-      noiseEvents: [...stealth.noiseEvents, ...(player.noiseLevel > 0 ? [] : [])],
+      noiseEvents: stealth.noiseEvents,
+      vibration: stealth.vibration,      // 上宾循振
+      leaked: story.flags.leaked,        // 望潮者转身
       onCaught: (enemy) => {
-        story.beginCaught(enemy); // 近身抓住演出 → 溺毙
+        story.beginCaught(enemy); // 近身抓住演出 → 引座
       },
       onAlerted: (enemy) => {
-        // 呼喊惊动附近同伴
+        // 呼喊惊动附近同伴（同层）
         for (const e of enemies) {
           if (e === enemy || !e.enabled) continue;
           const d = Math.hypot(e.pos.x - enemy.pos.x, e.pos.z - enemy.pos.z);
-          if (d < 26) e.hearAlarm(player.pos);
+          if (d < 26 && Math.abs(e.pos.y - enemy.pos.y) < 2.4) e.hearAlarm(player.pos);
         }
       },
     };
     for (const e of enemies) e.update(ctx);
     dog.update(ctx);
     birds.update(ctx);
-    ctx.bloodTide = story.flags.bloodTide;
     for (const w of watchers) w.update(ctx);
+    for (const f of floaters) f.update(ctx);
+    gaze.update(ctx);
+    guest.update(ctx);
 
     // 系统
-    stealth.update(dt, enemies, byId.singer);
+    stealth.update(dt, enemies);
+    agenda.update(dt);
     story.update(dt);
     sightjack.update(dt, elapsed);
+    crt.update(dt, player.pos);
 
     // 世界
     ocean.update(dt);
@@ -273,25 +360,20 @@ function loop() {
       audio.thunderDistant(2.5 + Math.random() * 2);
     }
 
-    // 音频
+    // 音频：喜歌从酒店方向飘来；广播站转播实况
+    const stageP = world.locations.stageMic;
     audio.update(dt, {
       playerPos: player.pos,
       playerYaw: player.yaw,
       crouching: player.crouching,
       danger: stealth.danger,
       chase: stealth.chaseCount,
-      songBase: story.flags.ended ? 0.4 : story.flags.bloodTide ? 0.1 : elapsed < 60 ? 0.1 : 0.03,
-      singer: { x: byId.singer.pos.x, z: byId.singer.pos.z, on: byId.singer.enabled },
-      radio: { x: world.locations.radio.x, z: world.locations.radio.z, on: story.flags.radioOn },
-      resonance: stealth.resonance,
+      songBase: story.flags.ended ? 0.26 : story.flags.leaked ? 0.09 : elapsed < 60 ? 0.08 : 0.03,
+      singer: { x: stageP.x, z: stageP.z, on: agenda.silence <= 0 },
+      radio: { x: world.locations.radio.x, z: world.locations.radio.z, on: story.flags.radioOn && agenda.silence <= 0 },
+      resonance: stealth.vibrationActive ? stealth.vibration * 0.5 : 0,
     });
 
-    // 血潮后画面常驻轻微偏红
-    if (story.flags.bloodTide && !player.dead && !story.deathSeq) {
-      const target = 0.12 + stealth.resonance * 0.25;
-      const u = engine.finalPass.uniforms.uRedShift;
-      u.value += (target - u.value) * Math.min(1, dt * 2);
-    }
     // 视奸心跳复位
     if (!sightjack.active) {
       engine.finalPass.uniforms.uPulse.value *= Math.max(0, 1 - dt * 3);
@@ -306,12 +388,17 @@ function loop() {
       const lvl = e.state === 'ALERT' ? 1 : e.state === 'SUSPECT' ? 0.4 + (e.suspectMeter ?? 0) * 0.35 : 0;
       if (lvl > threatLevel) { threatLevel = lvl; threat = e; }
     }
+    // 上宾的手逼近也算威胁
+    if (guest.enabled && guest.nameT > 0.02) {
+      threatLevel = Math.max(threatLevel, Math.min(1, guest.nameT * 2.2));
+      threat = guest;
+    }
   }
 
   // HUD
   hud.update(dt, {
     danger: player.dead ? 0 : stealth.danger,
-    resonance: stealth.resonance,
+    resonance: stealth.vibrationActive && !player.dead ? stealth.vibration : 0,
     crouching: player.crouching && game.state === 'PLAY',
     drown: story.drownView ?? 0,
     noise: player.dead ? 0 : player.noiseLevel / 14,
@@ -329,5 +416,6 @@ loop();
 // 供无头验证注入
 window.__game = {
   engine, player, world, ocean, sky, input, enemies, byId, dog, birds, watchers,
+  floaters, gaze, guest, crt, agenda,
   sightjack, stealth, story, hud, audio, game,
 };
