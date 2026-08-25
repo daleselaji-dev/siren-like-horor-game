@@ -1,16 +1,45 @@
 {
-  "name": "workspace",
+  "name": "salt-tide",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "description": "咸潮 SALT TIDE — 中式民俗海洋恐怖 · 类《死魂曲》第一人称潜行 Demo",
+  "main": "desktop/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "desktop": "vite build && electron .",
+    "dist": "vite build && electron-builder --win portable --linux AppImage",
+    "dist:win": "vite build && electron-builder --win portable",
+    "dist:win-zip": "vite build && electron-builder --win zip",
+    "dist:linux": "vite build && electron-builder --linux AppImage"
+  },
+  "build": {
+    "appId": "com.salttide.demo",
+    "productName": "SaltTide",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "SaltTide-${version}-win-portable.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Game",
+      "artifactName": "SaltTide-${version}-linux.AppImage"
+    }
   },
   "repository": {
     "type": "git",
@@ -27,6 +56,8 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
     "puppeteer-core": "^24.43.1",
     "vite": "^8.2.2"
   },

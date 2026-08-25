@@ -931,7 +931,18 @@ export function buildVillage(scene, M) {
     colliders, bounds, heightAt, locations, patrols, dynamic, zones, lights,
     waterLevelRef: { value: 0 },
     waterLevel() { return this.waterLevelRef.value; },
-    /** 每帧特效更新（烟柱等） */
-    updateFx(time) { for (const s of smokes) s.update(time); },
+    /** 每帧特效更新（烟柱 + 灯火呼吸） */
+    updateFx(time) {
+      for (const s of smokes) s.update(time);
+      // 灯笼/烛火不是恒亮的——火苗在风里咽气又缓过来
+      for (let i = 0; i < lights.length; i++) {
+        const pl = lights[i];
+        if (pl._base === undefined) pl._base = pl.intensity;
+        const f = Math.sin(time * 6.9 + i * 2.13) * 0.30
+                + Math.sin(time * 13.7 + i * 4.71) * 0.22
+                + Math.sin(time * 1.7 + i) * 0.18;
+        pl.intensity = pl._base * (0.88 + f * 0.16);
+      }
+    },
   };
 }

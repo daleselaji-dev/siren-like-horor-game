@@ -6,18 +6,20 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-// 最终合成着色器：暗角 + 胶片颗粒 + 色差 + 轻度色阶
+// 最终合成着色器：暗角 + 胶片颗粒 + 色差 + 轻度色阶 + 镜头畸变 + 闪电 + 青灰分离调色
 const FinalShader = {
   uniforms: {
     tDiffuse: { value: null },
     uTime: { value: 0 },
-    uGrain: { value: 0.055 },       // 颗粒强度
+    uGrain: { value: 0.05 },        // 颗粒强度
     uVignette: { value: 1.12 },     // 暗角强度
     uAberration: { value: 0.0009 }, // 色差
     uDesat: { value: 0.12 },        // 去饱和
     uLift: { value: 0.015 },        // 黑位提升(湿雾感)
     uRedShift: { value: 0.0 },      // 血潮/受伤时整体偏红
     uPulse: { value: 0.0 },         // 心跳脉冲(视奸/共鸣)
+    uDistort: { value: 0.0 },       // 桶形畸变(借来的眼睛不合自己的眼眶)
+    uFlash: { value: 0.0 },         // 远处无声闪电
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -25,7 +27,7 @@ const FinalShader = {
   `,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
-    uniform float uTime, uGrain, uVignette, uAberration, uDesat, uLift, uRedShift, uPulse;
+    uniform float uTime, uGrain, uVignette, uAberration, uDesat, uLift, uRedShift, uPulse, uDistort, uFlash;
     varying vec2 vUv;
 
     float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
@@ -34,6 +36,11 @@ const FinalShader = {
       vec2 uv = vUv;
       vec2 c = uv - 0.5;
       float r2 = dot(c, c);
+
+      // 桶形畸变（视奸/濒死）：边缘向外弯出去，像隔着一层水晶体
+      uv = 0.5 + c * (1.0 + uDistort * r2 * 2.2);
+      c = uv - 0.5;
+      r2 = dot(c, c);
 
       // 心跳脉冲：轻微径向缩放
       float pulse = uPulse * 0.012 * sin(uTime * 7.0);
@@ -52,16 +59,25 @@ const FinalShader = {
       col = mix(col, vec3(lum), uDesat);
       col = col * (1.0 - uLift) + uLift * vec3(0.55, 0.62, 0.66);
 
+      // 分离调色：阴影压向铅青，高光带一点旧纸暖——"被潮水腌过的胶片"
+      float sh = clamp(0.6 - lum, 0.0, 1.0);
+      float hi = clamp(lum - 0.55, 0.0, 1.0);
+      col += sh * vec3(-0.016, 0.006, 0.014);
+      col += hi * vec3(0.020, 0.012, -0.010);
+
       // 血潮 / 受伤偏红
       col = mix(col, col * vec3(1.25, 0.62, 0.55) + vec3(0.03,0.0,0.0), uRedShift);
+
+      // 远处无声闪电：整屏抬亮一瞬，偏冷
+      col += uFlash * vec3(0.42, 0.48, 0.56) * (0.5 + 0.5 * (1.0 - r2 * 2.0));
 
       // 暗角
       float vig = 1.0 - uVignette * r2 * (1.3 + uPulse);
       col *= clamp(vig, 0.0, 1.0);
 
-      // 胶片颗粒
+      // 胶片颗粒（暗部更粗）
       float g = hash(vUv * (uTime * 60.0 + 1.0)) - 0.5;
-      col += g * uGrain * (0.6 + r2 * 1.2);
+      col += g * uGrain * (0.6 + r2 * 1.2 + sh * 0.8);
 
       gl_FragColor = vec4(col, 1.0);
     }
@@ -95,9 +111,9 @@ export class Engine {
     if (!lowspec) {
       this.bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.42,  // strength：只让灯火与眼点溢光
-        0.55,  // radius
-        0.82   // threshold
+        0.55,  // strength：只让灯火与眼点溢光
+        0.62,  // radius
+        0.78   // threshold
       );
       this.composer.addPass(this.bloomPass);
     }
