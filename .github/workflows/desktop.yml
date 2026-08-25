@@ -1,11 +1,11 @@
-# 桌面打包：推 main / 手动触发 / 打 v* 标签时构建 Windows 便携 exe 与 Linux AppImage
+# 桌面打包：推 main 或 cursor/** 分支 / 手动触发 / 打 v* 标签时构建 Windows 便携 exe 与 Linux AppImage
 # 下载方式：仓库 Actions 页 → 本工作流运行记录 → Artifacts；打 tag 时自动附到 Release
 name: desktop-build
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 'cursor/**']
     tags: ['v*']
 
 permissions:
