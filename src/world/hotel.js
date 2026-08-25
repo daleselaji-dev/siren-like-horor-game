@@ -982,14 +982,15 @@ export function buildHotel(ctx) {
       colliders.push({ minX: hx + 41.1, maxX: hx + 41.3, minZ: hz + 0.25, maxZ: hz + 7.75, minY: hb, maxY: hb + 1.0, noSightBlock: true });
       colliders.push({ minX: hx + 54.7, maxX: hx + 54.9, minZ: hz + 0.25, maxZ: hz + 7.75, minY: hb, maxY: hb + 1.0, noSightBlock: true });
     }
-    // —— 脊柱（12 节椎骨，弓起 3.2m）+ 棘突 ——
+    // —— 脊柱（12 节椎骨，弓起 3.2m；逐节沿弧线倾斜衔接）+ 棘突 ——
     const spineY = (t) => 1.4 + Math.sin(t * Math.PI) * 1.75;
     for (let i = 0; i < 12; i++) {
       const t = i / 11;
       const lx = 42.4 + t * 11.2;
       const y = spineY(t);
       const r = 0.42 - Math.abs(t - 0.45) * 0.3;
-      cyl(M.bone, lx, y, 4, r * 2, 0.62, r * 2, 0, 0, Math.PI / 2);
+      const slope = (1.75 * Math.PI * Math.cos(t * Math.PI)) / 11.2;
+      cyl(M.bone, lx, y, 4, r * 2, 0.94, r * 2, 0, 0, Math.PI / 2 + Math.atan(slope));
       box(M.bone, lx, y + r + 0.28, 4, 0.16, 0.6, 0.1, 0, 0, (t - 0.5) * 0.5);
     }
     // —— 肋骨（房间尺度的拱，半埋进沉积床；管径固定不随弧放大——否则像水管） ——
