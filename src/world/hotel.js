@@ -28,6 +28,7 @@ export function plateMat(text, { w = 128, h = 64, bg = '#3a2c22', fg = '#d8cfb8'
     map: tex, roughness: 0.6,
     emissive: emissive ? 0xffffff : 0x000000, emissiveMap: emissive ? tex : null, emissiveIntensity: emissive,
   });
+  m.userData.fullUV = true; // 合批时保持 0..1 UV（世界平铺会把字条切掉）
   _plateCache.set(key, m);
   return m;
 }
@@ -1007,16 +1008,18 @@ export function buildHotel(ctx) {
     // —— 头骨（西端，眼眶正对售票厅来客） ——
     {
       const sx = 41.3, sy = 1.35, sz = 4;
-      B.add(GEO.sphere, M.bone, hx + sx, hb + sy, hz + sz, 0.15, 1.55, 1.1, 1.25, 0, 0.1);
+      // 颅腔（后宽前窄）+ 眉脊
+      B.add(GEO.sphere, M.bone, hx + sx, hb + sy, hz + sz, 0.15, 1.45, 1.05, 1.2, 0, 0.1);
+      B.add(GEO.sphere, M.bone, hx + sx - 0.8, hb + sy + 0.32, hz + sz, 0, 0.78, 0.52, 0.98);
       // 吻部（前伸收窄）
-      box(M.bone, sx - 1.5, sy - 0.25, sz + 0.1, 1.8, 0.62, 0.8, 0.15, 0, -0.08);
-      box(M.bone, sx - 2.5, sy - 0.42, sz + 0.16, 1.2, 0.4, 0.55, 0.2);
+      box(M.bone, sx - 1.7, sy - 0.1, sz, 1.9, 0.55, 0.75, 0, 0, -0.06);
+      box(M.bone, sx - 2.7, sy - 0.28, sz, 1.1, 0.36, 0.5, 0, 0, -0.04);
       // 下颌（半开，垂进沉积里）
-      box(M.bone, sx - 1.6, sy - 0.85, sz + 0.1, 2.0, 0.24, 0.6, 0.15, 0, 0.22);
-      // 空眼眶 ×2——干的，黑的
+      box(M.bone, sx - 1.7, sy - 0.72, sz + 0.05, 2.1, 0.22, 0.55, 0, 0, 0.2);
+      // 空眼眶 ×2（凹在眉脊下·朝来路）——干的，黑的
       const socket = new THREE.MeshStandardMaterial({ color: 0x0a0b0d, roughness: 1 });
-      B.add(GEO.sphere, socket, hx + sx - 0.55, hb + sy + 0.42, hz + sz - 0.72, 0, 0.34, 0.3, 0.2);
-      B.add(GEO.sphere, socket, hx + sx - 0.5, hb + sy + 0.48, hz + sz + 0.78, 0, 0.3, 0.26, 0.18);
+      B.add(GEO.sphere, socket, hx + sx - 1.3, hb + sy + 0.26, hz + sz - 0.54, 0, 0.3, 0.26, 0.23);
+      B.add(GEO.sphere, socket, hx + sx - 1.26, hb + sy + 0.31, hz + sz + 0.57, 0, 0.27, 0.23, 0.2);
       colliders.push({ x: hx + sx, z: hz + sz, r: 1.2, maxY: hb + 2.2 });
     }
     // 缆绳固定（从屋面垂下吊着脊柱——像怕它自己走了）

@@ -1,5 +1,10 @@
 # 返潮 FANCHAO
 
+> **▶ Windows 版直接下载（点击即下，双击即玩，无需安装）：**
+> **[Fanchao-1.0.0-win-portable.exe](https://raw.githubusercontent.com/daleselaji-dev/siren-like-horor-game/cursor/fanchao-town-hotel-demo-f0d0/release/Fanchao-1.0.0-win-portable.exe)**
+> （若浏览器提示「无法安全下载」选择保留即可——便携版未签名属正常；
+> 备用途径：GitHub **Actions 页 → 最近一次 desktop-build 运行 → Artifacts → `Fanchao-win-portable-exe`**）
+
 > 中式民俗海洋恐怖 · 类《死魂曲》（Siren）第一人称潜行 Demo
 > 蚀湾 2001 · 约 20–35 分钟可玩流程 · Three.js（WebGL2）· 全程序化资产
 
@@ -33,13 +38,13 @@ npm run preview      # 打开 http://localhost:4173
 
 ## 桌面版（Windows EXE 直接下载）
 
-**仓库内自带 Windows 便携版**，克隆/下载仓库后双击即玩，无需安装 Node 或任何依赖：
+**点击直链下载**（raw.githubusercontent.com 走的是文件原始内容，浏览器会直接开始下载）：
 
-```
-release/Fanchao-1.0.0-win-portable.exe
-```
+- **[Fanchao-1.0.0-win-portable.exe（本分支最新构建）](https://raw.githubusercontent.com/daleselaji-dev/siren-like-horor-game/cursor/fanchao-town-hotel-demo-f0d0/release/Fanchao-1.0.0-win-portable.exe)**
 
-（GitHub 网页端也可直接进入 `release/` 目录单独下载该文件。）
+仓库内路径为 `release/Fanchao-1.0.0-win-portable.exe`，克隆/下载仓库后双击即玩，
+无需安装 Node 或任何依赖；GitHub 网页端进入 `release/` 目录点开该文件再点
+**Download raw file** 也可单独下载。
 
 也可通过 GitHub Actions 获取：工作流 `desktop-build` 在推送 `main`/`cursor/**` 分支、
 手动触发或打 `v*` 标签时自动构建，进入 **Actions 页 → 最近一次运行 → Artifacts** 下载

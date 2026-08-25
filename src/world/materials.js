@@ -115,6 +115,8 @@ export function buildMaterials(lowspec = false) {
     map: T.signAqua, emissive: 0x9fd8e8, emissiveMap: T.signAqua, emissiveIntensity: 0.7, roughness: 0.6,
   });
   M.mural = new THREE.MeshStandardMaterial({ map: T.mural, roughness: 0.85 });
+  // 整幅贴图类材质：合批时保持 0..1 UV，禁止世界空间平铺（否则字/画被切成色带）
+  for (const sm of [M.xiPanel, M.signSouth, M.signSouthV, M.signAqua, M.mural]) sm.userData.fullUV = true;
   // 镇口公路沥青（2001 年的县道：补丁摞补丁）
   M.asphalt = std(T.slab, { normalScale: 0.7, envInt: 0.6, roughness: 1.0 });
   M.asphalt.color = new THREE.Color(0x4a4c4e);

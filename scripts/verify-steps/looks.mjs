@@ -61,7 +61,7 @@ export async function run(page, h) {
 
   // —— 海洋馆主展厅：巨物残骸（深海巨物恐怖奇观） ——
   await look('l20b-skeleton-wide', 37, -46, 44, -52, 3.5);    // 肋拱全景
-  await look('l20c-skeleton-skull', 39.5, -50, 37.3, -52, 3.5); // 头骨眼眶近景
+  await look('l20c-skeleton-skull', 35.9, -50.1, 37.6, -52.2, 3.5); // 头骨眼眶近景(正面)
   await look('l20d-processing', 49.5, -55.5, 52.5, -57, 3.5); // 处理间铁柜
 
   // —— 宴席工位实体近景 ——

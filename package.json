@@ -18,6 +18,7 @@
   "build": {
     "appId": "com.fanchao.demo",
     "productName": "Fanchao",
+    "compression": "maximum",
     "directories": {
       "output": "release"
     },

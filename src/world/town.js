@@ -709,16 +709,20 @@ export function buildTown(scene, M) {
 
     // —— 告示墙（进镇第一眼：文书②规则告示）——
     {
-      const nx = 41.6, nz = 3.6, base = g(nx, nz);
-      B.add(GEO.box, M.plaster, nx, base + 1.25, nz, 0.12, 3.2, 2.1, 0.3);
-      B.add(GEO.box, M.roof, nx, base + 2.42, nz, 0.12, 3.5, 0.18, 0.7);
+      const nx = 41.6, nz = 3.6, base = g(nx, nz), th = 0.12;
+      B.add(GEO.box, M.plaster, nx, base + 1.25, nz, th, 3.2, 2.1, 0.3);
+      B.add(GEO.box, M.roof, nx, base + 2.42, nz, th, 3.5, 0.18, 0.7);
       aabb(nx, nz, 3.2, 0.4, base + 2.4);
-      B.add(GEO.box, plateMat('蚀湾镇人民政府 告示', { w: 384, h: 56, bg: '#8c1616', fg: '#f0d28c', font: 0.44 }), nx - 0.1, base + 2.1, nz - 0.17, 0.12, 1.9, 0.26, 0.04);
+      // 头牌与纸张要贴着「旋转后的墙面」摆——否则一端嵌进墙里
+      const face = (ox, d) => [nx + ox * Math.cos(th) - d * Math.sin(th), nz - ox * Math.sin(th) - d * Math.cos(th)];
+      const [hpx, hpz] = face(-0.1, 0.18);
+      B.add(GEO.box, plateMat('蚀湾镇人民政府 告示', { w: 384, h: 56, bg: '#8c1616', fg: '#f0d28c', font: 0.44 }), hpx, base + 2.1, hpz, th, 1.9, 0.26, 0.04);
       // 三张告示纸（其中一张可读=文书②）
       for (const [ox, oy, rz2] of [[-0.95, 1.35, 0.05], [0.05, 1.3, -0.03], [0.95, 1.4, 0.08]]) {
+        const [ppx, ppz] = face(ox, 0.17);
         const p = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.8), M.notice);
-        p.position.set(nx + ox, base + oy, nz - 0.18);
-        p.rotation.y = Math.PI + 0.12;
+        p.position.set(ppx, base + oy, ppz);
+        p.rotation.y = Math.PI + th;
         p.rotation.z = rz2;
         scene.add(p);
       }
