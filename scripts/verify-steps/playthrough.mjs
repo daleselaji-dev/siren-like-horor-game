@@ -107,8 +107,20 @@ export async function run(page, h) {
   await h.sleep(300);
 
   // ---- 节拍7：潮母宫 · 视奸祭师 → 看鬼火顺序 ----
+  // 守殿人巡逻相位在低帧环境下不可控——把他调度到殿北远端路点，避免测试被"抓住演出"打断
+  await page.evaluate(() => {
+    const g = window.__game;
+    const e = g.byId.templeGuard;
+    e.state = 'PATROL';
+    e.wpIndex = 3;
+    e.pos.set(-72, 0, -68);
+    e.pos.y = g.world.heightAt(-72, -68);
+    e.suspectMeter = 0;
+  });
   await tp(-56, -74, 1.57);
   await h.sleep(700); // 触发台词
+  await tp(-61, -74, 1.57); // 进殿（墙体遮挡视线）
+  await h.sleep(300);
   await h.tapKey('KeyQ');
   for (let i = 0; i < 10; i++) {
     const label = await page.evaluate(() => window.__game.sightjack.current?.label);
@@ -116,10 +128,15 @@ export async function run(page, h) {
     await h.tapKey('KeyQ');
     await h.sleep(250);
   }
-  await h.sleep(2600); // 看一轮鬼火
   await h.shot('p07-ritual-sightjack');
-  const ghost = await page.evaluate(() =>
-    window.__game.world.dynamic.censers.map((c) => c.ghostOn));
+  // 鬼火按 2.4s/炷轮播、叩拜间歇 3.2s——轮询直到看到亮起
+  let ghost = [];
+  for (let i = 0; i < 24; i++) {
+    ghost = await page.evaluate(() =>
+      window.__game.world.dynamic.censers.map((c) => c.ghostOn));
+    if (ghost.some(Boolean)) break;
+    await h.sleep(400);
+  }
   console.log('[verify] ghost during sightjack:', JSON.stringify(ghost));
   await h.tapKey('KeyW');
   await h.sleep(300);

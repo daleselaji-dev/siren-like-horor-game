@@ -170,6 +170,7 @@ function handleInput(dt) {
   if (story.introSeq) {
     if (['KeyE', 'Space', 'Enter', 'KeyQ'].some((k) => input.justPressed(k))) {
       story.endIntro();
+      hud.clearSubtitles(); // 跳过时不让开场旁白拖进正式游玩
       hud.subtitle('（已跳过开场）', 1.5);
     }
     return;
