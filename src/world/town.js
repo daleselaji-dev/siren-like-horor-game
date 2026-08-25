@@ -665,21 +665,27 @@ export function buildTown(scene, M) {
       dynamic.townGateCollider = { minX: ax - 0.3, maxX: ax + 0.3, minZ: -3.0, maxZ: 3.0, maxY: base + 2.0 };
       colliders.push(dynamic.townGateCollider);
       locations.townGate = new THREE.Vector3(ax, base + 1.1, 0);
-      // 岗亭（检票的岗位还有人守着）
+      // 岗亭（检票的岗位还有人守着）——西墙开真窗洞：看得见里头那个人
       const kx = 46.8, kz = 4.8, kb = g(kx, kz);
-      B.add(GEO.box, M.plaster, kx, kb + 1.35, kz, 0, 2.0, 2.7, 2.0);
+      B.add(GEO.box, M.plaster, kx, kb + 1.35, kz - 0.94, 0, 2.0, 2.7, 0.12);   // 南墙
+      B.add(GEO.box, M.plaster, kx, kb + 1.35, kz + 0.94, 0, 2.0, 2.7, 0.12);   // 北墙
+      B.add(GEO.box, M.plaster, kx + 0.94, kb + 1.35, kz, 0, 0.12, 2.7, 2.0);   // 东墙(背)
+      B.add(GEO.box, M.plaster, kx - 0.94, kb + 0.55, kz, 0, 0.12, 1.1, 2.0);   // 西墙·窗下
+      B.add(GEO.box, M.plaster, kx - 0.94, kb + 2.5, kz, 0, 0.12, 0.4, 2.0);    // 西墙·窗上
+      B.add(GEO.box, M.plaster, kx - 0.94, kb + 1.65, kz - 0.78, 0, 0.12, 1.0, 0.44); // 窗侧
+      B.add(GEO.box, M.plaster, kx - 0.94, kb + 1.65, kz + 0.78, 0, 0.12, 1.0, 0.44);
+      B.add(GEO.box, M.slab, kx, kb + 0.06, kz, 0, 2.0, 0.14, 2.0);             // 地台
       B.add(GEO.box, M.roof, kx, kb + 2.85, kz, 0, 2.5, 0.16, 2.5);
-      // 西窗（朝栅门）：暗色内衬 + 玻璃 + 小台
-      B.add(GEO.box, M.ironDark, kx - 1.01, kb + 1.65, kz, 0, 0.06, 0.9, 1.1);
-      B.add(GEO.box, M.crtGlass, kx - 1.04, kb + 1.75, kz, 0, 0.04, 0.7, 1.0);
-      B.add(GEO.box, M.wood, kx - 1.16, kb + 1.18, kz, 0, 0.3, 0.06, 1.2);
+      // 玻璃只掩了半扇——够一条手臂探进去
+      B.add(GEO.box, M.crtGlass, kx - 0.97, kb + 1.65, kz + 0.28, 0, 0.04, 1.0, 0.6);
+      B.add(GEO.box, M.wood, kx - 1.16, kb + 1.18, kz, 0, 0.3, 0.06, 1.2);      // 外窗台
       aabb(kx, kz, 2.0, 2.0, kb + 2.9);
       // 亭内一盏比外头都暖的灯——暖得不太对
       const kl = new THREE.PointLight(0xffc880, 7, 8, 2);
       kl.position.set(kx, kb + 2.2, kz);
       scene.add(kl);
       lights.push(kl);
-      B.add(GEO.box, plateMat('岗亭 · 外来车辆止步', { w: 320, h: 64, bg: '#c8bfa8', fg: '#4a3428', font: 0.34 }), kx - 1.02, kb + 2.35, kz, 0, 0.04, 0.3, 1.3);
+      B.add(GEO.box, plateMat('岗亭 · 外来车辆止步', { w: 320, h: 64, bg: '#c8bfa8', fg: '#4a3428', font: 0.34 }), kx - 1.04, kb + 2.48, kz, 0, 0.04, 0.3, 1.3);
       locations.boothWindow = new THREE.Vector3(kx - 1.3, kb + 1.3, kz);
       patrols.boothWork = [kx, kz];
       // 木栅围栏（把牌坊两侧封住——进镇只此一门）

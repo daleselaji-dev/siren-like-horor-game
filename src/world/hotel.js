@@ -992,13 +992,13 @@ export function buildHotel(ctx) {
       cyl(M.bone, lx, y, 4, r * 2, 0.62, r * 2, 0, 0, Math.PI / 2);
       box(M.bone, lx, y + r + 0.28, 4, 0.16, 0.6, 0.1, 0, 0, (t - 0.5) * 0.5);
     }
-    // —— 肋骨（房间尺度的拱，半埋进沉积床） ——
-    const ribGeoBig = new THREE.TorusGeometry(1, 0.13, 8, 20, Math.PI);
+    // —— 肋骨（房间尺度的拱，半埋进沉积床；管径固定不随弧放大——否则像水管） ——
     for (let i = 0; i < 6; i++) {
       const t = 0.12 + i * 0.15;
       const lx = 42.4 + t * 11.2;
       const s = 1.6 + Math.sin(t * Math.PI) * 1.7;
-      B.add(ribGeoBig, M.bone, hx + lx, hb + 0.5, hz + 4, Math.PI / 2, s, s, s, 0, 0);
+      const ribGeo = new THREE.TorusGeometry(s, 0.085 + s * 0.016, 8, 26, Math.PI * 1.03);
+      B.add(ribGeo, M.bone, hx + lx, hb + 0.5, hz + 4, Math.PI / 2 + (i % 2 ? 0.05 : -0.04), 1, 1, 1, 0, (i - 2.5) * 0.025);
       // 肋骨端点埋进床里的碎骨
       B.add(GEO.sphere, M.bone, hx + lx, hb + 0.55, hz + 4 - s, 0, 0.2, 0.14, 0.2);
       B.add(GEO.sphere, M.bone, hx + lx, hb + 0.55, hz + 4 + s, 0, 0.2, 0.14, 0.2);

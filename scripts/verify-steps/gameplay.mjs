@@ -86,8 +86,12 @@ export async function run(page, h) {
     g.stealth.danger = 0;
   });
 
-  // 5. 拾取文书①（喜帖）
-  await page.evaluate(() => window.__game.player.setPosition(76.5, 108.5, 0));
+  // 5. 拾取文书①（喜帖——车站长椅上的行李箱）
+  await page.evaluate(() => {
+    const g = window.__game;
+    const l = g.world.locations.luggage;
+    g.player.setPosition(l.x, l.z - 1.2, Math.PI);
+  });
   await h.sleep(400);
   await h.tapKey('KeyE');
   await h.sleep(600);

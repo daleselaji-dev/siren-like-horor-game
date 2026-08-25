@@ -40,7 +40,7 @@ export async function run(page, h) {
     ['14-hotel-2f-security', 7, -59.5, -0.49, 6.9],
     ['15-hotel-3f-suite', -12, -60.5, 0.35, 10.3],
     ['16-annex-aqua', 30, -50, 2.6, 3.5],
-    ['17-aqua-mainhall', 44, -46.5, 0.35, 3.5],
+    ['17-aqua-mainhall', 37.5, -46, -0.85, 3.5],
     ['18-aqua-processing', 49.5, -55.5, -0.9, 3.5],
   ];
   for (const [name, x, z, yaw, yHint] of spots) {

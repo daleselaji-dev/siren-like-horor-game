@@ -28,6 +28,14 @@ export async function run(page, h) {
     await h.shot(name);
   };
 
+  // —— 镇口 · 阈限车站与前街（新开场动线） ——
+  await look('l00-busstation', 63, 1.5, 52, 3.5);           // 空车站雨棚+牌坊
+  await look('l00b-archway', 47.5, 0, 40, 0);               // 蚀湾牌坊+栅门+岗亭
+  await look('l00c-frontstreet', 38, -1, 24, -5);           // 前街街灯纵深
+  await look('l00d-videohall', 26, -1.5, 30.5, 3);          // 通宵录像厅灯箱
+  await look('l00e-ruleboard', 41.6, 1.4, 41.6, 3.6);       // 政府告示墙(规则怪谈)
+  await look('l00f-dorm', -30, 17, -37, 23);                // 家属筒子楼·一扇亮窗
+
   // —— 小镇外景（滩涂/石堤/盐田/灯塔全部保留） ——
   await look('l01-netmender', 12, 51, 12, 46.8);
   await look('l02-saltworker', -40, 8, -44, 4);
@@ -50,6 +58,11 @@ export async function run(page, h) {
   await look('l18-3f-corridor', -11, -55.5, 2, -55.5, 10.3);  // 3F 客房走廊
   await look('l19-suite-807', -12, -60, -13.5, -64.6, 10.3);  // 807 三面镜+新娘
   await look('l20-annex-tank', 24, -50, 32, -52, 3.5);        // 海洋馆主展缸
+
+  // —— 海洋馆主展厅：巨物残骸（深海巨物恐怖奇观） ——
+  await look('l20b-skeleton-wide', 37, -46, 44, -52, 3.5);    // 肋拱全景
+  await look('l20c-skeleton-skull', 39.5, -50, 37.3, -52, 3.5); // 头骨眼眶近景
+  await look('l20d-processing', 49.5, -55.5, 52.5, -57, 3.5); // 处理间铁柜
 
   // —— 宴席工位实体近景 ——
   // 司仪（舞台上）：从上宾空席斜前方看，避开高背椅遮挡
@@ -80,6 +93,18 @@ export async function run(page, h) {
   await h.sleep(500);
   await look('l24-gaze-close', -4, -46.5, -4, -49, 3.5);
   await page.evaluate(() => window.__game.gaze.setEnabled(false));
+  // 岗亭员（镇口·投币口封嘴）
+  const bp = await page.evaluate(() => {
+    const p = window.__game.byId.booth.pos;
+    return { x: p.x, z: p.z };
+  });
+  await look('l24b-booth-close', bp.x - 1.4, bp.z - 0.6, bp.x, bp.z);
+  // 理骨员（主展厅·胶皮围裙+歪头）
+  const op = await page.evaluate(() => {
+    const p = window.__game.byId.osteo.pos;
+    return { x: p.x, z: p.z };
+  });
+  await look('l24c-osteo-close', op.x + 1.5, op.z + 1.5, op.x, op.z, 3.5);
 
   // —— 渗漏态：浮客+上宾+深绿黑海色 ——
   await page.evaluate(() => {
