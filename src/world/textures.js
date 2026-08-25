@@ -585,6 +585,435 @@ export function clothTexture(seed = 122, baseRGB = [38, 46, 62], size = 256) {
   }, 1.0);
 }
 
+// ================= 蚀湾 · 南方大酒店 / 人物 材质组 =================
+
+/** 活人皮肤：2001 年还晒得到太阳的脸（低饱和暖调 + 微血色 + 毛孔） */
+export function skinTexture(seed = 211, size = 512) {
+  const fbm = makeFbm(seed, 4);
+  return buildMaps(size, (u, v, out) => {
+    const f = fbm(u * 4, v * 4);
+    let r = 186 + f * 26, g = 152 + f * 22, b = 128 + f * 18;
+    const flush = clamp01((fbm(u * 1.8 + 7, v * 1.8 + 7) - 0.52) * 2.6);
+    r += flush * 16; g -= flush * 2; b -= flush * 5;
+    const shade = clamp01((fbm(u * 2.6 + 13, v * 2.6 + 13) - 0.58) * 3);
+    r -= shade * 24; g -= shade * 22; b -= shade * 16;
+    const pore = (fbm(u * 26, v * 26) - 0.5) * 9;
+    out[0] = r + pore; out[1] = g + pore; out[2] = b + pore * 0.8;
+    out[3] = clamp01(0.5 + f * 0.3);
+    out[4] = clamp01(0.6 - flush * 0.05 + f * 0.1);
+  }, 1.0);
+}
+
+/** 水磨石地面：青灰浆 + 黑白红青石屑 + 铜条分格 + 抛光走道 */
+export function terrazzoTexture(seed = 301, size = 1024) {
+  const fbm = makeFbm(seed, 4);
+  const chipN = makeValueNoise(seed + 5, 96);
+  const chipN2 = makeValueNoise(seed + 55, 160);
+  const toneN = makeValueNoise(seed + 11, 48);
+  const tiles = 4;
+  return buildMaps(size, (u, v, out) => {
+    const f = fbm(u * 3, v * 3);
+    let r = 128 + f * 18, g = 132 + f * 17, b = 126 + f * 16, h = 0.55, ro = 0.34;
+    const c1 = chipN(u, v), c2 = chipN2(u, v);
+    const chip = c1 > 0.67 ? 1 : c2 > 0.73 ? 2 : 0;
+    if (chip) {
+      const tone = toneN(u * 2 + chip, v * 2);
+      if (tone < 0.3) { r = 60 + tone * 40; g = 62 + tone * 40; b = 64 + tone * 38; }
+      else if (tone < 0.62) { r = 198; g = 194; b = 184; }
+      else if (tone < 0.82) { r = 150; g = 92; b = 72; }
+      else { r = 116; g = 126; b = 114; }
+      if (chip === 2) { r = r * 0.82 + 34; g = g * 0.82 + 34; b = b * 0.82 + 32; }
+      h += 0.06; ro -= 0.06;
+    }
+    // 分格铜条
+    const gu = (u * tiles) % 1, gv = (v * tiles) % 1;
+    const eg = Math.min(gu, 1 - gu, gv, 1 - gv) * tiles;
+    if (eg < 0.01) { r = 164; g = 134; b = 80; h = 0.6; ro = 0.4; }
+    // 磨旧渍
+    const stain = clamp01((fbm(u * 1.4 + 9, v * 1.4 + 9) - 0.56) * 3);
+    r *= 1 - stain * 0.18; g *= 1 - stain * 0.2; b *= 1 - stain * 0.2;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(h + f * 0.1);
+    out[4] = clamp01(ro + stain * 0.25);
+  }, 0.8);
+}
+
+/** 红地毯：绒面织纹 + 团花暗纹 + 踩旧的暗渍 */
+export function carpetTexture(seed = 311, base = [98, 18, 16], size = 512) {
+  const fbm = makeFbm(seed, 4);
+  return buildMaps(size, (u, v, out) => {
+    const weave = (Math.sin(u * 640) + Math.sin(v * 640)) * 3;
+    const f = fbm(u * 5, v * 5);
+    let r = base[0] + f * 26 + weave, g = base[1] + f * 9 + weave * 0.5, b = base[2] + f * 8 + weave * 0.5;
+    const px = (u * 3) % 1 - 0.5, py = (v * 3) % 1 - 0.5;
+    const ring = Math.abs(Math.sin(Math.hypot(px, py) * 26)) < 0.24 ? 1 : 0;
+    r += ring * 15; g += ring * 5; b += ring * 4;
+    const stain = clamp01((fbm(u * 1.6 + 6, v * 1.6 + 6) - 0.52) * 2.4);
+    r *= 1 - stain * 0.3; g *= 1 - stain * 0.3; b *= 1 - stain * 0.26;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.5 + f * 0.28 + ring * 0.05);
+    out[4] = 0.98;
+  }, 0.8);
+}
+
+/** 仿大理石：奶白底 + 赭灰双尺度石纹 + 抛光 */
+export function marbleTexture(seed = 321, size = 512) {
+  const fbm = makeFbm(seed, 5);
+  const veinR = makeRidged(seed + 3, 4);
+  return buildMaps(size, (u, v, out) => {
+    const f = fbm(u * 2, v * 2);
+    let r = 206 + f * 22, g = 198 + f * 20, b = 184 + f * 18;
+    const vn = clamp01((veinR(u * 1.6 + f * 0.3, v * 1.6) - 0.88) * 10);
+    r -= vn * 76; g -= vn * 64; b -= vn * 42;
+    const vn2 = clamp01((veinR(u * 4 + 9, v * 4 + 9) - 0.93) * 14) * 0.6;
+    r -= vn2 * 40; g -= vn2 * 36; b -= vn2 * 26;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.6 + f * 0.2 - vn * 0.1);
+    out[4] = clamp01(0.2 + vn * 0.16);
+  }, 0.9);
+}
+
+/** 2001 县镇酒店墙纸：米金竖条 + 小团花 + 返潮黄褐渍 + 贴缝 */
+export function wallpaperTexture(seed = 331, size = 512) {
+  const fbm = makeFbm(seed, 4);
+  return buildMaps(size, (u, v, out) => {
+    const sBand = Math.sin(u * Math.PI * 2 * 14) > 0.2 ? 1 : 0;
+    let r = sBand ? 194 : 174, g = sBand ? 176 : 156, b = sBand ? 136 : 120;
+    const f = fbm(u * 3, v * 3);
+    r += f * 14 - 7; g += f * 13 - 7; b += f * 11 - 6;
+    const px = (u * 14) % 1 - 0.5, py = (v * 7) % 1 - 0.5;
+    if (sBand && Math.hypot(px * 1.4, py) < 0.09) { r -= 26; g -= 24; b -= 14; }
+    // 返潮渍：云状黄褐斑（干的，但像刚从水里捞出来过）
+    const damp = clamp01((fbm(u * 1.5 + 8, v * 1.5 + 3) - 0.56) * 4);
+    r = r * (1 - damp * 0.32) + damp * 46;
+    g = g * (1 - damp * 0.36) + damp * 34;
+    b = b * (1 - damp * 0.44) + damp * 20;
+    if (((u * 2) % 1) < 0.006) { r -= 30; g -= 30; b -= 26; }
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.55 + f * 0.2 - damp * 0.15);
+    out[4] = clamp01(0.86 - damp * 0.16);
+  }, 1.0);
+}
+
+/** 白瓷砖（服务走廊/后厨）：小方砖 + 发黑灰缝 + 陈年油垢 */
+export function tileTexture(seed = 341, size = 512) {
+  const fbm = makeFbm(seed, 4);
+  const n = 8;
+  return buildMaps(size, (u, v, out) => {
+    const iu = (u * n) | 0, iv = (v * n) | 0;
+    const fu = (u * n) % 1, fv = (v * n) % 1;
+    const eg = Math.min(fu, 1 - fu, fv, 1 - fv) * n;
+    const grout = 1 - sstep(0.02, 0.07, eg);
+    const shade = 0.92 + (mulberry32(seed + iu * 31 + iv * 7)() - 0.5) * 0.1;
+    const f = fbm(u * 4, v * 4);
+    let r = 204 * shade + f * 14, g = 206 * shade + f * 14, b = 196 * shade + f * 13;
+    const grime = clamp01((fbm(u * 2 + 5, v * 2 + 5) - 0.55) * 3);
+    r *= 1 - grime * 0.3; g *= 1 - grime * 0.32; b *= 1 - grime * 0.32;
+    r = r * (1 - grout) + grout * 88; g = g * (1 - grout) + grout * 88; b = b * (1 - grout) + grout * 82;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.72 - grout * 0.5 + f * 0.08);
+    out[4] = clamp01(0.22 + grout * 0.55 + grime * 0.3);
+  }, 2.0);
+}
+
+/** 红漆木饰面（总台/客房门）：直纹 + 亮漆 + 磨白划痕 */
+export function veneerTexture(seed = 351, size = 512) {
+  const fbm = makeFbm(seed, 4);
+  return buildMaps(size, (u, v, out) => {
+    const grain = 0.5 + 0.5 * Math.sin((v * 4 + fbm(u * 2, v * 2) * 3.4 + u * 0.4) * Math.PI * 2);
+    const f = fbm(u * 5, v * 5);
+    let r = 98 + grain * 30 + f * 12, g = 44 + grain * 15 + f * 7, b = 26 + grain * 9 + f * 5;
+    const scratch = clamp01((fbm(u * 0.7 + 4, v * 9) - 0.62) * 5);
+    r += scratch * 32; g += scratch * 20; b += scratch * 14;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.6 + grain * 0.1);
+    out[4] = clamp01(0.22 + scratch * 0.3 - grain * 0.04);
+  }, 0.7);
+}
+
+/** 舞台红丝绒幕布：竖褶明暗 + 积灰 + 底部金穗 */
+export function curtainTexture(seed = 361, size = 512) {
+  const fbm = makeFbm(seed, 3);
+  return buildMaps(size, (u, v, out) => {
+    const lit = Math.sin(u * Math.PI * 2 * 9 + fbm(u, v * 0.4) * 1.6) * 0.5 + 0.5;
+    let r = 72 + lit * 96, g = 10 + lit * 22, b = 12 + lit * 20;
+    const dust = clamp01((fbm(u * 4 + 3, v * 4 + 3) - 0.6) * 3) * (1 - v * 0.6);
+    r *= 1 - dust * 0.2; g *= 1 - dust * 0.16; b *= 1 - dust * 0.14;
+    if (v > 0.94) {
+      const tass = Math.abs(Math.sin(u * Math.PI * 2 * 90)) > 0.3 ? 1 : 0.4;
+      r = 158 * tass; g = 118 * tass; b = 50 * tass;
+    }
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.4 + lit * 0.4);
+    out[4] = clamp01(0.8 - lit * 0.18);
+  }, 1.4);
+}
+
+/** 枣红缎（全福婆袄/嫁衣）：流动缎光 + 团寿暗纹 */
+export function satinTexture(seed = 391, size = 256) {
+  const fbm = makeFbm(seed, 3);
+  return buildMaps(size, (u, v, out) => {
+    const sheen = Math.sin((u * 3 + v * 5 + fbm(u * 2, v * 2)) * Math.PI * 2) * 0.5 + 0.5;
+    let r = 102 + sheen * 66, g = 16 + sheen * 18, b = 20 + sheen * 16;
+    const px = (u * 8) % 1 - 0.5, py = (v * 8) % 1 - 0.5;
+    const d = Math.hypot(px, py);
+    if (Math.abs(Math.sin(d * 40)) < 0.3 && d < 0.32) { r += 20; g += 6; b += 5; }
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.5 + sheen * 0.2);
+    out[4] = clamp01(0.4 - sheen * 0.12);
+  }, 0.8);
+}
+
+/** 浪蚀浮木（侍应颈臂）：被掏空软纤维的深槽顺纹 + 盐白 */
+export function driftwoodTexture(seed = 371, size = 512) {
+  const fbm = makeFbm(seed, 4);
+  const ridge = makeRidged(seed + 7, 4);
+  return buildMaps(size, (u, v, out) => {
+    const groove = clamp01((ridge(u * 1.2, v * 6) - 0.7) * 4);
+    const f = fbm(u * 3, v * 3);
+    let r = 152 + f * 26, g = 142 + f * 24, b = 126 + f * 20;
+    r *= 1 - groove * 0.52; g *= 1 - groove * 0.52; b *= 1 - groove * 0.48;
+    const salt = clamp01((fbm(u * 5 + 4, v * 5 + 4) - 0.68) * 6);
+    r += salt * 58; g += salt * 56; b += salt * 48;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.62 - groove * 0.4 + f * 0.2);
+    out[4] = clamp01(0.88 - salt * 0.1);
+  }, 3.0);
+}
+
+/** 沉积岩截面（托盘菜/古海床建材）：地层色带 + 嵌贝 */
+export function sedimentTexture(seed = 381, size = 512) {
+  const fbm = makeFbm(seed, 4);
+  const tones = [[168, 150, 124], [126, 116, 102], [150, 128, 96], [102, 98, 92], [140, 134, 120]];
+  return buildMaps(size, (u, v, out) => {
+    const warp = fbm(u * 2, v * 0.6) * 0.14;
+    const bandV = v * 14 + warp * 8;
+    const band = bandV % 1;
+    const tone = tones[(bandV | 0) % 5];
+    const f = fbm(u * 6, v * 6);
+    let r = tone[0] + f * 18, g = tone[1] + f * 16, b = tone[2] + f * 14;
+    const line = Math.min(band, 1 - band) < 0.06 ? 1 : 0;
+    r *= 1 - line * 0.3; g *= 1 - line * 0.3; b *= 1 - line * 0.28;
+    const shell = fbm(u * 20, v * 20) > 0.8 ? 1 : 0;
+    r += shell * 58; g += shell * 56; b += shell * 48;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.5 + f * 0.3 - line * 0.2);
+    out[4] = clamp01(0.85 - shell * 0.2);
+  }, 2.2);
+}
+
+/** 素色布料（西装/衬衫/马甲/工装）：织纹 + 皱褶明暗，无盐渍 */
+export function plainClothTexture(seed, baseRGB, size = 256) {
+  const fbm = makeFbm(seed, 4);
+  return buildMaps(size, (u, v, out) => {
+    const weave = (Math.sin(u * 340) + Math.sin(v * 340)) * 2.0;
+    const f = fbm(u * 3, v * 3);
+    const wrinkle = Math.sin((v * 5 + fbm(u * 2, v) * 3) * Math.PI * 2) * 0.5 + 0.5;
+    let r = baseRGB[0] + f * 16 + weave - wrinkle * 8;
+    let g = baseRGB[1] + f * 15 + weave - wrinkle * 8;
+    let b = baseRGB[2] + f * 16 + weave - wrinkle * 7;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.5 + f * 0.2 + wrinkle * 0.12);
+    out[4] = clamp01(0.9 - wrinkle * 0.06);
+  }, 0.9);
+}
+
+/** 红灯笼（囍/金字） */
+export function lanternRedTexture(char = '囍', size = 256) {
+  const [c, ctx] = makeCanvas(size);
+  const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.08, size / 2, size / 2, size * 0.72);
+  grad.addColorStop(0, '#ff7a52');
+  grad.addColorStop(0.5, '#d63020');
+  grad.addColorStop(0.85, '#8a1410');
+  grad.addColorStop(1, '#530a08');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  const rand = mulberry32(886);
+  for (let i = 0; i < 220; i++) {
+    ctx.fillStyle = `rgba(90,16,10,${(rand() * 0.07).toFixed(3)})`;
+    ctx.fillRect(rand() * size, rand() * size, 1 + rand() * 4, 1);
+  }
+  for (let i = 0; i <= 8; i++) {
+    const x = (i / 8) * size;
+    ctx.strokeStyle = 'rgba(60,8,4,0.5)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, size); ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,214,120,0.92)';
+  ctx.font = `${size * 0.4}px "Songti SC","Noto Serif SC",serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(char, size / 2, size / 2 + size * 0.02);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** 囍字红板（宴会厅主背景） */
+export function xiPanelTexture(size = 512) {
+  const [c, ctx] = makeCanvas(size);
+  ctx.fillStyle = '#8e1410';
+  ctx.fillRect(0, 0, size, size);
+  const rand = mulberry32(4111);
+  for (let i = 0; i < 400; i++) {
+    ctx.fillStyle = `rgba(40,6,4,${(rand() * 0.14).toFixed(3)})`;
+    ctx.fillRect(rand() * size, rand() * size, 2 + rand() * 6, 1 + rand() * 3);
+  }
+  ctx.strokeStyle = 'rgba(215,170,90,0.9)';
+  ctx.lineWidth = size * 0.014;
+  ctx.strokeRect(size * 0.05, size * 0.05, size * 0.9, size * 0.9);
+  ctx.strokeStyle = 'rgba(215,170,90,0.45)';
+  ctx.lineWidth = size * 0.006;
+  ctx.strokeRect(size * 0.085, size * 0.085, size * 0.83, size * 0.83);
+  ctx.fillStyle = '#e8b64c';
+  ctx.font = `700 ${size * 0.62}px "Songti SC","Noto Serif SC",serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('囍', size / 2, size / 2 + size * 0.03);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** 灯箱招牌：「南方大酒店」（横/竖） */
+export function signboardTexture(text = '南方大酒店', vertical = false, w = 1024, h = 256) {
+  const c = document.createElement('canvas');
+  if (vertical) { c.width = h; c.height = w; } else { c.width = w; c.height = h; }
+  const ctx = c.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, c.height);
+  grad.addColorStop(0, '#6e1210');
+  grad.addColorStop(0.5, '#8e1a14');
+  grad.addColorStop(1, '#5a0e0c');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, c.width, c.height);
+  const rand = mulberry32(913);
+  for (let i = 0; i < 200; i++) {
+    ctx.fillStyle = `rgba(30,6,4,${(rand() * 0.2).toFixed(3)})`;
+    ctx.fillRect(rand() * c.width, rand() * c.height, 2 + rand() * 8, 1 + rand() * 4);
+  }
+  ctx.strokeStyle = 'rgba(220,180,100,0.85)';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(10, 10, c.width - 20, c.height - 20);
+  ctx.fillStyle = '#f4d488';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (vertical) {
+    ctx.font = `700 ${c.width * 0.62}px "Songti SC","Noto Serif SC",serif`;
+    const chars = [...text];
+    chars.forEach((ch, i) => {
+      ctx.fillText(ch, c.width / 2, (i + 0.55) * (c.height / chars.length));
+    });
+  } else {
+    ctx.font = `700 ${c.height * 0.6}px "Songti SC","Noto Serif SC",serif`;
+    ctx.fillText(text, c.width / 2, c.height / 2 + c.height * 0.03);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** 海洋馆壁画：退色的鱼群与浪线 + 裂纹 */
+export function muralTexture(size = 512) {
+  const [c, ctx] = makeCanvas(size);
+  const grad = ctx.createLinearGradient(0, 0, 0, size);
+  grad.addColorStop(0, '#4a6a6e');
+  grad.addColorStop(0.6, '#39565c');
+  grad.addColorStop(1, '#2b4046');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  const rand = mulberry32(3721);
+  // 浪线
+  ctx.strokeStyle = 'rgba(200,214,208,0.35)';
+  ctx.lineWidth = 4;
+  for (let j = 0; j < 4; j++) {
+    ctx.beginPath();
+    for (let x = 0; x <= size; x += 8) {
+      const y = size * (0.2 + j * 0.2) + Math.sin(x * 0.05 + j) * 10;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  // 鱼群剪影
+  ctx.fillStyle = 'rgba(216,206,170,0.5)';
+  for (let i = 0; i < 26; i++) {
+    const x = rand() * size, y = rand() * size, s = 8 + rand() * 16, d = rand() < 0.5 ? 1 : -1;
+    ctx.beginPath();
+    ctx.ellipse(x, y, s, s * 0.36, 0, 0, 6.28);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + s * d, y);
+    ctx.lineTo(x + s * 1.5 * d, y - s * 0.3);
+    ctx.lineTo(x + s * 1.5 * d, y + s * 0.3);
+    ctx.fill();
+  }
+  // 裂纹与退色
+  ctx.strokeStyle = 'rgba(20,26,26,0.4)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 14; i++) {
+    ctx.beginPath();
+    let x = rand() * size, y = rand() * size;
+    ctx.moveTo(x, y);
+    for (let k = 0; k < 6; k++) {
+      x += (rand() - 0.5) * 60; y += rand() * 40;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  for (let i = 0; i < 60; i++) {
+    ctx.fillStyle = `rgba(210,206,190,${(rand() * 0.1).toFixed(3)})`;
+    ctx.fillRect(rand() * size, rand() * size, 4 + rand() * 30, 2 + rand() * 10);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** 矿物孔板（全福婆第三只眼）：暗青板上放射状细孔 */
+export function poreplateTexture(size = 128) {
+  const [c, ctx] = makeCanvas(size);
+  ctx.fillStyle = '#2c3834';
+  ctx.fillRect(0, 0, size, size);
+  const cx = size / 2, cy = size / 2;
+  for (let ring = 1; ring <= 5; ring++) {
+    const n = ring * 6;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + ring * 0.4;
+      const rr = ring * size * 0.085;
+      ctx.fillStyle = 'rgba(8,12,10,0.95)';
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, size * 0.028 - ring * 0.4, 0, 6.28);
+      ctx.fill();
+    }
+  }
+  ctx.fillStyle = 'rgba(6,8,8,1)';
+  ctx.beginPath(); ctx.arc(cx, cy, size * 0.05, 0, 6.28); ctx.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** 喜事通告红纸（镇口张贴） */
+export function noticeTexture(size = 256) {
+  const [c, ctx] = makeCanvas(size);
+  ctx.fillStyle = '#a8241a';
+  ctx.fillRect(0, 0, size, size);
+  const rand = mulberry32(553);
+  for (let i = 0; i < 120; i++) {
+    ctx.fillStyle = `rgba(60,10,6,${(rand() * 0.16).toFixed(3)})`;
+    ctx.fillRect(rand() * size, rand() * size, 2 + rand() * 5, 1 + rand() * 3);
+  }
+  ctx.fillStyle = '#f4dfa0';
+  ctx.font = `700 ${size * 0.3}px "Songti SC",serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('囍', size / 2, size * 0.36);
+  ctx.font = `${size * 0.105}px "Songti SC",serif`;
+  ctx.fillText('周宅嫁女 · 阖镇入席', size / 2, size * 0.6);
+  ctx.fillText('十月初六 南方大酒店', size / 2, size * 0.76);
+  ctx.strokeStyle = 'rgba(240,210,140,0.7)';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(size * 0.06, size * 0.05, size * 0.88, size * 0.9);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 // ---------------- 打包导出 ----------------
 /**
  * @param lowspec 低配：全部 256，跳过粗糙度图之外的高分辨率
@@ -594,6 +1023,7 @@ export function buildTextureSet(lowspec = false) {
   const hero = lowspec ? 256 : 1024;
   const mid = lowspec ? 256 : 512;
   const set = {};
+  const small = lowspec ? 128 : 256;
   const defs = {
     wood: woodTexture(7, hero),
     stone: stoneTexture(21, hero),
@@ -601,12 +1031,29 @@ export function buildTextureSet(lowspec = false) {
     roof: roofTileTexture(44, mid),
     sand: sandTexture(55, mid),
     slab: slabTexture(66, mid),
-    salt: saltTexture(77, lowspec ? 128 : 256),
+    salt: saltTexture(77, small),
     rock: rockTexture(88, mid),
     corpseSkin: corpseSkinTexture(111, mid),
-    clothNavy: clothTexture(122, [38, 46, 62], lowspec ? 128 : 256),
-    clothGrey: clothTexture(123, [58, 60, 58], lowspec ? 128 : 256),
-    clothRed: clothTexture(124, [110, 22, 18], lowspec ? 128 : 256),
+    clothNavy: clothTexture(122, [38, 46, 62], small),
+    clothGrey: clothTexture(123, [58, 60, 58], small),
+    clothRed: clothTexture(124, [110, 22, 18], small),
+    // —— 蚀湾 · 人物与酒店 ——
+    skin: skinTexture(211, mid),
+    terrazzo: terrazzoTexture(301, hero),
+    carpet: carpetTexture(311, [98, 18, 16], mid),
+    marble: marbleTexture(321, mid),
+    wallpaper: wallpaperTexture(331, mid),
+    tile: tileTexture(341, mid),
+    veneer: veneerTexture(351, mid),
+    curtain: curtainTexture(361, mid),
+    satin: satinTexture(391, small),
+    driftwood: driftwoodTexture(371, mid),
+    sediment: sedimentTexture(381, mid),
+    clothSuit: plainClothTexture(401, [42, 42, 48], small),
+    clothShirt: plainClothTexture(402, [206, 202, 188], small),
+    clothVest: plainClothTexture(403, [26, 26, 30], small),
+    clothWork: plainClothTexture(404, [56, 66, 90], small),
+    clothBrown: plainClothTexture(405, [96, 78, 58], small),
   };
   const aniso = lowspec ? 2 : 8;
   for (const [k, v] of Object.entries(defs)) {
@@ -620,6 +1067,14 @@ export function buildTextureSet(lowspec = false) {
   set.net = netTexture();
   set.lantern = lanternTexture('潮');
   set.lanternJi = lanternTexture('祭');
+  set.lanternXi = lanternRedTexture('囍');
   set.talisman = talismanTexture();
+  set.xiPanel = xiPanelTexture(lowspec ? 256 : 512);
+  set.signSouth = signboardTexture('南方大酒店', false);
+  set.signSouthV = signboardTexture('南方大酒店', true, 768, 160);
+  set.signAqua = signboardTexture('蚀湾海洋馆', false, 768, 224);
+  set.mural = muralTexture(lowspec ? 256 : 512);
+  set.poreplate = poreplateTexture();
+  set.notice = noticeTexture();
   return set;
 }
