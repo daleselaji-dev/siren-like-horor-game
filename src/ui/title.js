@@ -1,5 +1,6 @@
-// 标题画面背景：2D Canvas 程序化夜海 —— 暗浪、潮线、盐雾颗粒、电台玻璃闪断
-// 低分辨率绘制 + CSS 放大，得到胶片颗粒的粗颗粒质感
+// 标题画面背景：2D Canvas 程序化「迎宾楼」前庭夜景
+// 海雾、灯箱招牌的钠光、两扇不该亮的窗、湿沥青上的倒影。
+// 禁则：无 VHS 撕裂、无噪点 glitch——只有镇流器老化的明灭。
 export class TitleSea {
   constructor(canvas) {
     this.canvas = canvas;
@@ -11,9 +12,16 @@ export class TitleSea {
     canvas.style.imageRendering = 'auto';
     this.t = 0;
     this.running = false;
-    this.glitchT = 0;
     this._raf = 0;
     this._last = 0;
+    // 雾带
+    this.fogBands = [];
+    for (let i = 0; i < 5; i++) {
+      this.fogBands.push({
+        y: 0.45 + i * 0.11, speed: 3 + i * 2.2, ph: i * 2.1,
+        h: 12 + i * 8, op: 0.05 + i * 0.02,
+      });
+    }
   }
 
   start() {
@@ -36,106 +44,124 @@ export class TitleSea {
     cancelAnimationFrame(this._raf);
   }
 
-  draw(dt) {
+  draw() {
     const { ctx, W, H, t } = this;
-    const horizon = H * 0.46;
+    const groundY = H * 0.78;
 
-    // ---- 天：铅灰渐黑，压得很低 ----
-    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    // ---- 天：铅灰阴夜 ----
+    const sky = ctx.createLinearGradient(0, 0, 0, groundY);
     sky.addColorStop(0, '#05080b');
-    sky.addColorStop(0.75, '#0d151a');
-    sky.addColorStop(1, '#18232a');
+    sky.addColorStop(0.6, '#0c1318');
+    sky.addColorStop(1, '#1a2226');
     ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, horizon);
+    ctx.fillRect(0, 0, W, groundY);
 
-    // 隔着湿布的月斑
-    const mg = ctx.createRadialGradient(W * 0.62, horizon * 0.55, 2, W * 0.62, horizon * 0.55, 46);
-    mg.addColorStop(0, 'rgba(150,168,172,0.20)');
+    // 隔雾的月
+    const mg = ctx.createRadialGradient(W * 0.18, H * 0.18, 2, W * 0.18, H * 0.18, 40);
+    mg.addColorStop(0, 'rgba(150,168,172,0.16)');
     mg.addColorStop(1, 'rgba(150,168,172,0)');
     ctx.fillStyle = mg;
-    ctx.fillRect(0, 0, W, horizon);
+    ctx.fillRect(0, 0, W, groundY);
 
-    // ---- 海：一层层向前推进的暗浪带 ----
-    const seaG = ctx.createLinearGradient(0, horizon, 0, H);
-    seaG.addColorStop(0, '#121e22');
-    seaG.addColorStop(1, '#050a0c');
-    ctx.fillStyle = seaG;
-    ctx.fillRect(0, horizon, W, H - horizon);
+    // ---- 迎宾楼剪影 ----
+    const bx = W * 0.24, bw = W * 0.52, byTop = H * 0.24, byBot = groundY;
+    ctx.fillStyle = '#0a0e11';
+    ctx.fillRect(bx, byTop, bw, byBot - byTop);
+    // 檐口线
+    ctx.fillStyle = '#12181c';
+    ctx.fillRect(bx - 6, byTop - 5, bw + 12, 6);
 
-    const rows = 26;
-    for (let i = 0; i < rows; i++) {
-      const f = i / rows;                       // 0 远 → 1 近
-      const y0 = horizon + f * f * (H - horizon);
-      const amp = 0.6 + f * 3.4;
-      const speed = 0.25 + f * 0.9;
-      const phase = t * speed + i * 1.7;
-      const lum = 0.05 + f * 0.1 + Math.sin(phase * 1.3) * 0.02;
-      ctx.strokeStyle = `rgba(${(90 + f * 40) | 0},${(120 + f * 46) | 0},${(124 + f * 44) | 0},${lum.toFixed(3)})`;
-      ctx.lineWidth = 0.7 + f * 1.6;
-      ctx.beginPath();
-      for (let x = 0; x <= W; x += 6) {
-        const y = y0
-          + Math.sin(x * 0.045 + phase) * amp
-          + Math.sin(x * 0.013 - phase * 0.6) * amp * 0.6;
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+    // 招牌灯箱：迎宾楼（镇流器老化的明灭——整体亮度缓变，偶尔哑一下）
+    const buzz = Math.sin(t * 0.7) + Math.sin(t * 3.1 + 2);
+    const signOn = buzz > 1.93 ? 0.25 : 1;
+    const glow = (0.75 + Math.sin(t * 9) * 0.04) * signOn;
+    const sx = W * 0.5, sy = byTop + 16;
+    const sg = ctx.createRadialGradient(sx, sy, 4, sx, sy, 90);
+    sg.addColorStop(0, `rgba(255,170,110,${0.30 * glow})`);
+    sg.addColorStop(1, 'rgba(255,170,110,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(sx - 90, sy - 60, 180, 120);
+    ctx.fillStyle = `rgba(20,14,10,0.9)`;
+    ctx.fillRect(sx - 58, sy - 12, 116, 26);
+    ctx.font = '18px "Songti SC","Noto Serif SC",serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = `rgba(255,196,140,${0.9 * glow})`;
+    ctx.fillText('迎 宾 楼', sx, sy + 1);
+    // 右下角一个小小的红囍
+    ctx.fillStyle = `rgba(190,50,40,${0.8 * glow})`;
+    ctx.font = '9px serif';
+    ctx.fillText('囍', sx + 66, sy + 2);
+
+    // 窗格：大部分黑着，两扇亮着不该亮的灯
+    ctx.textAlign = 'left';
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 8; c++) {
+        const wx = bx + 14 + c * (bw - 28) / 8;
+        const wy = byTop + 40 + r * 26;
+        const lit = (r === 1 && c === 2) || (r === 0 && c === 6);
+        ctx.fillStyle = lit
+          ? `rgba(255,190,120,${0.5 + Math.sin(t * 1.1 + c) * 0.08})`
+          : 'rgba(16,22,26,0.9)';
+        ctx.fillRect(wx, wy, 12, 16);
       }
-      ctx.stroke();
     }
 
-    // ---- 潮线泡沫：底部一条不肯退的白线 ----
-    const foamY = H * 0.9;
-    ctx.strokeStyle = 'rgba(190,200,196,0.16)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let x = 0; x <= W; x += 4) {
-      const y = foamY + Math.sin(x * 0.06 + t * 0.8) * 3 + Math.sin(x * 0.21 - t * 1.3) * 1.5;
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    for (let k = 0; k < 26; k++) {
-      const x = (k * 97 + ((t * 12) | 0) * 7) % W;
-      const y = foamY + Math.sin(x * 0.06 + t * 0.8) * 3 + (k % 5) - 2;
-      ctx.fillStyle = `rgba(200,208,204,${0.05 + (k % 4) * 0.03})`;
-      ctx.fillRect(x, y, 2 + (k % 3), 1);
+    // 门廊：玻璃门里一线暖光
+    const dx = W * 0.5;
+    ctx.fillStyle = '#0d1114';
+    ctx.fillRect(dx - 30, groundY - 44, 60, 44);
+    ctx.fillStyle = `rgba(255,200,140,${0.28 + Math.sin(t * 0.9) * 0.04})`;
+    ctx.fillRect(dx - 9, groundY - 40, 18, 40);
+    // 门廊柱
+    ctx.fillStyle = '#141a1e';
+    ctx.fillRect(dx - 44, groundY - 52, 9, 52);
+    ctx.fillRect(dx + 35, groundY - 52, 9, 52);
+
+    // ---- 海雾带：从右往左爬 ----
+    for (const f of this.fogBands) {
+      const y = f.y * H;
+      const off = (t * f.speed + f.ph * 40) % (W + 160) - 80;
+      const fg = ctx.createRadialGradient(W - off, y, 4, W - off, y, 110);
+      fg.addColorStop(0, `rgba(170,185,182,${f.op})`);
+      fg.addColorStop(1, 'rgba(170,185,182,0)');
+      ctx.fillStyle = fg;
+      ctx.fillRect(0, y - f.h, W, f.h * 2);
     }
 
-    // ---- 海平线上的一串灯（很远，偶尔明灭：它的鳞） ----
-    for (let k = 0; k < 7; k++) {
-      const lx = W * 0.15 + k * W * 0.1 + Math.sin(k * 3.1) * 8;
-      const on = Math.sin(t * 0.4 + k * 1.9) > 0.55 - k * 0.02;
-      if (!on) continue;
-      ctx.fillStyle = 'rgba(255,148,64,0.5)';
-      ctx.fillRect(lx, horizon - 1.5, 1.5, 1.5);
-      const lg = ctx.createRadialGradient(lx, horizon - 1, 0, lx, horizon - 1, 5);
-      lg.addColorStop(0, 'rgba(255,148,64,0.22)');
-      lg.addColorStop(1, 'rgba(255,148,64,0)');
-      ctx.fillStyle = lg;
-      ctx.fillRect(lx - 5, horizon - 6, 10, 10);
+    // ---- 湿沥青前庭：招牌与门灯的倒影被拉长 ----
+    const gg = ctx.createLinearGradient(0, groundY, 0, H);
+    gg.addColorStop(0, '#121517');
+    gg.addColorStop(1, '#07090b');
+    ctx.fillStyle = gg;
+    ctx.fillRect(0, groundY, W, H - groundY);
+    // 倒影条
+    const refl = (x, w, col, a) => {
+      const rg = ctx.createLinearGradient(0, groundY, 0, H);
+      rg.addColorStop(0, `rgba(${col},${a})`);
+      rg.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = rg;
+      for (let i = 0; i < 5; i++) {
+        const wob = Math.sin(t * 1.4 + i * 1.7) * 2;
+        ctx.fillRect(x - w / 2 + wob, groundY + i * (H - groundY) / 5, w * (1 - i * 0.13), (H - groundY) / 5 - 1);
+      }
+    };
+    refl(sx, 60, '255,170,110', 0.10 * glow);
+    refl(dx, 16, '255,200,140', 0.12);
+
+    // 水洼高光点
+    for (let k = 0; k < 14; k++) {
+      const x = (k * 137) % W;
+      const y = groundY + ((k * 53) % (H - groundY));
+      ctx.fillStyle = `rgba(180,195,195,${0.02 + (k % 3) * 0.015})`;
+      ctx.fillRect(x, y, 8 + (k % 4) * 4, 1);
     }
 
-    // ---- 盐雾颗粒 ----
-    for (let k = 0; k < 90; k++) {
+    // ---- 空气里的水汽颗粒 ----
+    for (let k = 0; k < 60; k++) {
       const v = Math.random();
-      ctx.fillStyle = `rgba(200,210,208,${(v * 0.09).toFixed(3)})`;
+      ctx.fillStyle = `rgba(190,205,202,${(v * 0.07).toFixed(3)})`;
       ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
-    }
-
-    // ---- 电台玻璃闪断：偶发的横向撕裂条 ----
-    this.glitchT -= dt;
-    if (this.glitchT <= 0 && Math.random() < 0.012) this.glitchT = 0.12 + Math.random() * 0.1;
-    if (this.glitchT > 0) {
-      const bands = 2 + ((Math.random() * 3) | 0);
-      for (let b = 0; b < bands; b++) {
-        const y = Math.random() * H;
-        const h = 1 + Math.random() * 5;
-        const off = (Math.random() - 0.5) * 26;
-        const slice = ctx.getImageData(0, y, W, h);
-        ctx.putImageData(slice, off, y);
-        ctx.fillStyle = `rgba(${Math.random() < 0.5 ? '180,60,50' : '90,180,190'},0.06)`;
-        ctx.fillRect(0, y, W, h);
-      }
     }
   }
 }

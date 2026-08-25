@@ -1,6 +1,8 @@
 node_modules/
 dist/
-release/
+# release/ 下的便携 exe 按交付要求入库；其余打包中间产物忽略
+release/*
+!release/*.exe
 verify/*.png
 verify/*.jpg
 !verify/keep/

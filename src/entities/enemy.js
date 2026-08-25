@@ -1,8 +1,10 @@
-// 潮尸 AI：劳作型 / 巡游型 / 歌唱者 + 村犬 + 海鸟群（视奸载体）
+// 《返潮》AI：还在上班的员工 + F01「井身者」+ 监控摄像头（听潮载体）
 // 状态机：WORK/PATROL → SUSPECT → ALERT(追踪) → SEARCH → RETURN
-// 设计要点（死魂曲精神）：不冲刺跳脸；维持生前劳作；被惊动后执着、永不忘记（警戒范围永久上调）
+// 设计（死魂曲精神 × F01 Canon）：不冲刺跳脸；维持岗位职责；被惊动后执着、永不忘记。
+// F01 特有：6m 先读出"他只是个人"；2m 读出井；追逐 = 一个赶路的中年人快步走来——这才吓人。
 import * as THREE from 'three';
 import { Humanoid } from './humanoid.js';
+import { F01Body } from './f01.js';
 import { slideMove, hasLineOfSight } from '../world/collision.js';
 
 const _v1 = new THREE.Vector3();
@@ -14,13 +16,13 @@ function angleWrap(a) {
   return a;
 }
 
-export class Enemy {
+export class Staff {
   /**
    * def: {
-   *   id, label, kind: 'worker'|'patrol'|'singer',
-   *   workPos:[x,z], workMode, waypoints:[[x,z]...],
-   *   cloth, hat, lantern, tool, fov(度), sightRange, hearRange, chaseSpeed, walkSpeed,
-   *   enabled: 初始是否激活
+   *   id, label, kind: 'worker'|'patrol',
+   *   role: humanoid role, tool, hair,
+   *   workPos:[x,z], workMode, workYaw, waypoints:[[x,z]...],
+   *   fov(度), sightRange, hearRange, chaseSpeed, walkSpeed, enabled
    * }
    */
   constructor(scene, world, M, def) {
@@ -31,33 +33,9 @@ export class Enemy {
     this.kind = def.kind;
     this.enabled = def.enabled !== false;
 
-    this.body = new Humanoid(M, {
-      cloth: def.cloth, hat: def.hat, lantern: def.lantern, tool: def.tool,
-      light: def.lanternLight, seed: (def.id ?? '').split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0,
-    });
+    this.body = this.makeBody(M, def);
     scene.add(this.body.group);
     this.body.group.visible = this.enabled;
-
-    // 歌唱者：歌声可视化——从她喉咙里荡出去的涟漪
-    if (def.kind === 'singer') {
-      this.songFx = new THREE.Group();
-      const ringGeo = new THREE.RingGeometry(0.94, 1.0, 40);
-      ringGeo.rotateX(-Math.PI / 2);
-      this.songRings = [];
-      for (let i = 0; i < 3; i++) {
-        const rm = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
-          color: 0xb84052, transparent: true, opacity: 0,
-          blending: THREE.AdditiveBlending, depthWrite: false,
-          side: THREE.DoubleSide, fog: false,
-        }));
-        rm.renderOrder = 6;
-        this.songFx.add(rm);
-        this.songRings.push(rm);
-      }
-      this.songFx.visible = this.enabled;
-      scene.add(this.songFx);
-      this.songT = 0;
-    }
 
     this.pos = new THREE.Vector3();
     if (def.workPos) this.pos.set(def.workPos[0], 0, def.workPos[1]);
@@ -65,48 +43,53 @@ export class Enemy {
     this.pos.y = world.heightAt(this.pos.x, this.pos.z);
     this.yaw = def.yaw ?? 0;
 
-    this.state = def.kind === 'patrol' ? 'PATROL' : def.kind === 'singer' ? 'SING' : 'WORK';
+    this.state = def.kind === 'patrol' ? 'PATROL' : 'WORK';
     this.wpIndex = 0;
     this.stateTimer = 0;
-    this.gazeTimer = 5 + Math.random() * 8; // 劳作者抬头望海计时
-    this.gazing = false;
+    this.pauseTimer = 8 + Math.random() * 10; // 偶尔停下来，像在听什么
+    this.pausing = false;
     this.suspectPos = new THREE.Vector3();
     this.lastSeenPos = new THREE.Vector3();
     this.loseTimer = 0;
-    this.permAlertBonus = 0;    // 永不忘记：每次警报永久+
+    this.permAlertBonus = 0;
     this.moveBlocked = 0;
     this.avoidSide = 1;
     this.stuckJiggle = 0;
-    this.grabbing = false;      // 抓住玩家演出中
-    this.gurgleT = 0;           // 追击喉音计时
-    this.searchLook = 0;        // 搜索张望计时
-    this.searchRing = 0;        // 搜索圈数（越搜越大）
+    this.grabbing = false;
+    this.vocalT = 0;
+    this.searchLook = 0;
+    this.searchRing = 0;
 
-    // 参数
     this.fov = (def.fov ?? 75) * Math.PI / 180;
-    this.sightRange = def.sightRange ?? 17;
-    this.hearRange = def.hearRange ?? 14;
+    this.sightRange = def.sightRange ?? 15;
+    this.hearRange = def.hearRange ?? 12;
     this.walkSpeed = def.walkSpeed ?? 0.95;
-    this.chaseSpeed = def.chaseSpeed ?? 2.9;
+    this.chaseSpeed = def.chaseSpeed ?? 2.7;
 
-    this.visibilityOfPlayer = 0; // 供 HUD 显示危险度
-    this.body.setEyeIntensity(0.7);
+    this.visibilityOfPlayer = 0;
     this.syncBody(0);
+  }
+
+  makeBody(M, def) {
+    return new Humanoid(M, {
+      role: def.role ?? 'staff', tool: def.tool, hair: def.hair,
+      flashlightOn: def.flashlightOn,
+      seed: (def.id ?? '').split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0,
+    });
   }
 
   setEnabled(on) {
     this.enabled = on;
     this.body.group.visible = on;
-    if (this.songFx) this.songFx.visible = on;
   }
 
-  /** 检查点重试：复位位置与状态（保留 permAlertBonus——永不忘记） */
+  /** 检查点重试：复位（保留 permAlertBonus——他们记得你） */
   reset() {
     const def = this.def;
     if (def.workPos && this.kind !== 'patrol') this.pos.set(def.workPos[0], 0, def.workPos[1]);
     else if (def.waypoints) this.pos.set(def.waypoints[0][0], 0, def.waypoints[0][1]);
     this.pos.y = this.world.heightAt(this.pos.x, this.pos.z);
-    this.state = this.kind === 'patrol' ? 'PATROL' : this.kind === 'singer' ? 'SING' : 'WORK';
+    this.state = this.kind === 'patrol' ? 'PATROL' : 'WORK';
     this.wpIndex = 0;
     this.stateTimer = 0;
     this.loseTimer = 0;
@@ -121,7 +104,7 @@ export class Enemy {
     this.syncBody(0);
   }
 
-  /** 视奸信道接口（向面朝方向前移，避免看到自己的头模型） */
+  /** 听潮信道接口（借他的眼睛） */
   viewPos(out) {
     const v = this.body.headWorldPos(out);
     v.x += Math.sin(this.yaw) * 0.22;
@@ -129,12 +112,10 @@ export class Enemy {
     return v;
   }
   viewYawPitch() {
-    // 头部朝向 = 身体朝向 + 颈部俯仰
     const pitch = -(this.body.neck.rotation.x + this.body.torso.rotation.x) * 0.8;
-    return { yaw: this.yaw + Math.PI, pitch }; // 人形面向 +z, 相机看 -z → 转半圈
+    return { yaw: this.yaw + Math.PI, pitch };
   }
 
-  /** 感知玩家：返回可见强度 0..1 */
   senseSight(player, environmentFactor) {
     if (player.dead) return 0;
     const dx = player.pos.x - this.pos.x;
@@ -142,20 +123,16 @@ export class Enemy {
     const dist = Math.hypot(dx, dz);
     let range = (this.sightRange + this.permAlertBonus) * environmentFactor;
     if (player.crouching) range *= 0.55;
-    // 劳作低头时视野打折；凝望时增强
-    if (this.state === 'WORK' && !this.gazing) range *= 0.45;
-    if (this.gazing) range *= 1.25;
+    if (this.state === 'WORK' && !this.pausing) range *= 0.45; // 低头干活
+    if (this.pausing) range *= 1.2;
     if (dist > range) return 0;
-    // 视锥
     const angTo = Math.atan2(dx, dz);
     const diff = Math.abs(angleWrap(angTo - this.yaw));
     const halfFov = this.fov / 2 * (this.state === 'ALERT' ? 1.5 : 1);
     if (diff > halfFov) return 0;
-    // 遮挡
     _v1.set(this.pos.x, this.pos.y + 1.55, this.pos.z);
     _v2.copy(player.pos); _v2.y += player.crouching ? 0.8 : 1.5;
-    if (!hasLineOfSight(_v1, _v2, this.world.colliders, this.world.heightAt)) return 0;
-    // 越近越清楚
+    if (!hasLineOfSight(_v1, _v2, this.world.colliders, null)) return 0;
     return Math.min(1, (1 - dist / range) * 1.6 + 0.15);
   }
 
@@ -165,13 +142,11 @@ export class Enemy {
     return dist < Math.min(player.noiseLevel, this.hearRange + this.permAlertBonus);
   }
 
-  /** 移动到目标点，带避障；返回剩余距离 */
   moveToward(tx, tz, speed, dt) {
     const dx = tx - this.pos.x, dz = tz - this.pos.z;
     const dist = Math.hypot(dx, dz);
     if (dist < 0.05) return 0;
     let dirX = dx / dist, dirZ = dz / dist;
-    // 卡住时侧向绕行
     if (this.stuckJiggle > 0) {
       const px = -dirZ * this.avoidSide, pz = dirX * this.avoidSide;
       dirX = dirX * 0.35 + px * 0.65;
@@ -204,32 +179,27 @@ export class Enemy {
     this.yaw += angleWrap(targetYaw - this.yaw) * Math.min(1, dt * rate);
   }
 
-  /**
-   * @param ctx { player, dt, envSightFactor, audio, onCaught, onAlerted, noiseEvents:[{x,z,r}] }
-   */
+  /** @param ctx { player, dt, envSightFactor, audio, onCaught, onAlerted, noiseEvents } */
   update(ctx) {
     const { player, dt, audio } = ctx;
     if (!this.enabled) return;
     this.stateTimer += dt;
 
-    // ---- 抓住演出：贴上来，掐住，别的什么都不做 ----
+    // ---- 抓住演出 ----
     if (this.grabbing) {
       this.faceToward(player.pos.x, player.pos.z, dt, 14);
       const d = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
-      if (d > 0.62) this.moveToward(player.pos.x, player.pos.z, 2.2, dt);
-      this._eye = 4;
-      this.body.setEyeIntensity(4);
+      if (d > 0.62) this.moveToward(player.pos.x, player.pos.z, 2.0, dt);
       this.body.animate('grab', dt, 1);
       this.syncBody(dt);
       return;
     }
 
-    const sight = this.kind === 'singer' ? 0 : this.senseSight(player, ctx.envSightFactor);
+    const sight = this.senseSight(player, ctx.envSightFactor);
     this.visibilityOfPlayer = sight;
-    const heard = this.kind === 'singer' ? false : this.senseHearing(player);
+    const heard = this.senseHearing(player);
     const distToPlayer = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
 
-    // 外部噪音事件
     let noiseAt = null;
     for (const n of ctx.noiseEvents) {
       const d = Math.hypot(n.x - this.pos.x, n.z - this.pos.z);
@@ -242,21 +212,21 @@ export class Enemy {
     switch (this.state) {
       case 'WORK': {
         anim = this.def.workMode ?? 'idle';
-        // 周期性直起身"望海"
-        this.gazeTimer -= dt;
-        if (this.gazing) {
+        // 偶尔直起身，停一拍——像在听远处的什么
+        this.pauseTimer -= dt;
+        if (this.pausing) {
           anim = 'idle';
-          this.yaw += dt * 0.25; // 缓缓扫视
-          if (this.gazeTimer < 0) { this.gazing = false; this.gazeTimer = 7 + Math.random() * 9; }
-        } else if (this.gazeTimer < 0) {
-          this.gazing = true;
-          this.gazeTimer = 2.5 + Math.random() * 2;
+          this.yaw += dt * 0.18;
+          if (this.pauseTimer < 0) { this.pausing = false; this.pauseTimer = 9 + Math.random() * 11; }
+        } else if (this.pauseTimer < 0) {
+          this.pausing = true;
+          this.pauseTimer = 2.2 + Math.random() * 2;
         }
-        if (this.def.workYaw !== undefined && !this.gazing) {
+        if (this.def.workYaw !== undefined && !this.pausing) {
           this.yaw += angleWrap(this.def.workYaw - this.yaw) * Math.min(1, dt * 3);
         }
-        if (sight > 0.5 || (sight > 0 && heard)) this.enterSuspect(player.pos, audio, distToPlayer, player);
-        else if (heard || noiseAt) this.enterSuspect(noiseAt ?? player.pos, audio, distToPlayer, player);
+        if (sight > 0.5 || (sight > 0 && heard)) this.enterSuspect(player.pos, audio, distToPlayer);
+        else if (heard || noiseAt) this.enterSuspect(noiseAt ?? player.pos, audio, distToPlayer);
         break;
       }
       case 'PATROL': {
@@ -267,25 +237,21 @@ export class Enemy {
           this.wpIndex = (this.wpIndex + 1) % this.def.waypoints.length;
           if (Math.random() < 0.3) { this.state = 'PAUSE'; this.stateTimer = 0; }
         }
-        if (sight > 0.5 || (sight > 0 && heard)) this.enterSuspect(player.pos, audio, distToPlayer, player);
-        else if (heard || noiseAt) this.enterSuspect(noiseAt ?? player.pos, audio, distToPlayer, player);
+        if (sight > 0.5 || (sight > 0 && heard)) this.enterSuspect(player.pos, audio, distToPlayer);
+        else if (heard || noiseAt) this.enterSuspect(noiseAt ?? player.pos, audio, distToPlayer);
         break;
       }
       case 'PAUSE': {
         anim = 'idle';
         if (this.stateTimer > 2 + Math.random()) this.state = 'PATROL';
-        if (sight > 0.4 || heard || noiseAt) this.enterSuspect(noiseAt ?? player.pos, audio, distToPlayer, player);
+        if (sight > 0.4 || heard || noiseAt) this.enterSuspect(noiseAt ?? player.pos, audio, distToPlayer);
         break;
       }
       case 'SUSPECT': {
         anim = 'alert';
         this.faceToward(this.suspectPos.x, this.suspectPos.z, dt, 4);
-        // 持续看到 → 警报；否则回归
-        if (sight > 0.25) {
-          this.suspectMeter += sight * dt * 1.7;
-        } else {
-          this.suspectMeter -= dt * 0.5;
-        }
+        if (sight > 0.25) this.suspectMeter += sight * dt * 1.7;
+        else this.suspectMeter -= dt * 0.5;
         if (heard) this.suspectMeter += dt * 0.5;
         if (this.suspectMeter >= 1) this.enterAlert(player, audio, ctx.onAlerted);
         else if (this.suspectMeter <= 0 || this.stateTimer > 6) {
@@ -294,7 +260,7 @@ export class Enemy {
         break;
       }
       case 'ALERT': {
-        anim = 'chase'; animSpeed = 1.1;
+        anim = 'chase'; animSpeed = 1.05;
         if (sight > 0 || distToPlayer < 4) {
           this.lastSeenPos.copy(player.pos);
           this.loseTimer = 0;
@@ -302,15 +268,13 @@ export class Enemy {
           this.loseTimer += dt;
         }
         this.moveToward(this.lastSeenPos.x, this.lastSeenPos.z, this.chaseSpeed, dt);
-        // 追击喉音：灌满水的喉咙一路"咕咚"着追上来
-        this.gurgleT -= dt;
-        if (this.gurgleT <= 0) {
-          this.gurgleT = 1.8 + Math.random() * 1.6;
-          audio?.chaseGurgle?.(distToPlayer);
+        // 追赶时的声音：员工呵斥；F01 覆写为湿的呼吸
+        this.vocalT -= dt;
+        if (this.vocalT <= 0) {
+          this.vocalT = 1.8 + Math.random() * 1.6;
+          this.chaseVocal(audio, distToPlayer);
         }
-        // 抓住玩家
         if (distToPlayer < 1.15 && !player.dead) ctx.onCaught(this);
-        // 丢失目标
         if (this.loseTimer > 5.5) {
           this.state = 'SEARCH'; this.stateTimer = 0;
           this.searchTotal = 0; this.searchRing = 0; this.searchLook = 0;
@@ -319,13 +283,12 @@ export class Enemy {
         break;
       }
       case 'SEARCH': {
-        // 执着的筛查：围着最后目击点一圈圈找，走到点上就站定张望
         this.searchTotal = (this.searchTotal ?? 0) + dt;
         if (!this.searchTarget) this.pickSearchPoint();
         if (this.searchLook > 0) {
           this.searchLook -= dt;
-          anim = 'idle';
-          this.yaw += Math.sin(this.stateTimer * 1.35) * dt * 1.15; // 缓慢左右扫头
+          anim = 'alert';
+          this.yaw += Math.sin(this.stateTimer * 1.35) * dt * 1.15;
           if (this.searchLook <= 0) this.pickSearchPoint();
         } else {
           anim = 'walk'; animSpeed = 0.75;
@@ -336,7 +299,7 @@ export class Enemy {
           }
         }
         if (sight > 0.2) this.enterAlert(player, audio, ctx.onAlerted);
-        else if (this.searchTotal > 16) {
+        else if (this.searchTotal > 15) {
           this.searchTotal = 0;
           this.state = this.kind === 'patrol' ? 'PATROL' : 'RETURN';
         }
@@ -347,48 +310,24 @@ export class Enemy {
         const wp = this.def.workPos ?? this.def.waypoints[0];
         const left = this.moveToward(wp[0], wp[1], this.walkSpeed, dt);
         if (left < 0.4) this.state = this.kind === 'patrol' ? 'PATROL' : 'WORK';
-        if (sight > 0.4 || heard) this.enterSuspect(player.pos, audio, distToPlayer, player);
-        break;
-      }
-      case 'SING': {
-        anim = 'sing';
-        // 歌唱者沿路点极缓慢游荡，永不追
-        if (this.def.waypoints) {
-          const wp = this.def.waypoints[this.wpIndex];
-          const left = this.moveToward(wp[0], wp[1], 0.55, dt);
-          if (left < 0.5) this.wpIndex = (this.wpIndex + 1) % this.def.waypoints.length;
-          anim = distToPlayer < 20 ? 'sing' : 'walk';
-          if (anim === 'walk') animSpeed = 0.5;
-        }
-        // 歌声涟漪：一圈圈荡到共鸣半径的边上
-        if (this.songFx) {
-          this.songT += dt;
-          this.songFx.position.set(this.pos.x, this.pos.y + 1.35, this.pos.z);
-          for (let i = 0; i < this.songRings.length; i++) {
-            const t = (this.songT * 0.22 + i / this.songRings.length) % 1;
-            const s = 0.6 + t * 16.4;
-            this.songRings[i].scale.set(s, 1, s);
-            this.songRings[i].material.opacity = (1 - t) * (1 - t) * 0.28;
-          }
-        }
+        if (sight > 0.4 || heard) this.enterSuspect(player.pos, audio, distToPlayer);
         break;
       }
     }
 
-    // 眼点亮度
-    const eyeTarget = this.state === 'ALERT' ? 3.2 : this.state === 'SUSPECT' ? 1.8 : 0.7;
-    this._eye = (this._eye ?? 0.7) + (eyeTarget - (this._eye ?? 0.7)) * Math.min(1, dt * 6);
-    this.body.setEyeIntensity(this._eye);
-
     this.body.animate(anim, dt, animSpeed);
+    this.postUpdate(ctx, distToPlayer);
     this.syncBody(dt);
   }
 
-  /** 搜索点：绕最后目击点螺旋外扩 */
+  /** 子类扩展点 */
+  postUpdate() {}
+  chaseVocal(audio, dist) { audio?.alertShout?.(Math.max(6, dist)); }
+
   pickSearchPoint() {
     this.searchRing += 1;
     const a = Math.random() * Math.PI * 2;
-    const r = 2.5 + this.searchRing * (1.4 + Math.random() * 1.4);
+    const r = 2 + this.searchRing * (1.2 + Math.random() * 1.2);
     this.searchTarget = {
       x: this.lastSeenPos.x + Math.sin(a) * r,
       z: this.lastSeenPos.z + Math.cos(a) * r,
@@ -396,12 +335,12 @@ export class Enemy {
     this.stateTimer = 0;
   }
 
-  enterSuspect(atPos, audio, distToPlayer, player) {
+  enterSuspect(atPos, audio, distToPlayer) {
     if (this.state === 'ALERT' || this.state === 'SUSPECT') return;
     this.state = 'SUSPECT';
     this.stateTimer = 0;
     this.suspectMeter = 0.25;
-    this.suspectPos.copy(atPos.x !== undefined && atPos.isVector3 ? atPos : new THREE.Vector3(atPos.x, 0, atPos.z));
+    this.suspectPos.copy(atPos.isVector3 ? atPos : new THREE.Vector3(atPos.x, 0, atPos.z));
     audio?.suspect(distToPlayer);
   }
 
@@ -409,7 +348,7 @@ export class Enemy {
     if (this.state !== 'ALERT') {
       const dist = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
       audio?.alertShout(dist);
-      this.permAlertBonus = Math.min(this.permAlertBonus + 3, 9); // 永不忘记
+      this.permAlertBonus = Math.min(this.permAlertBonus + 3, 9);
       onAlerted?.(this);
     }
     this.state = 'ALERT';
@@ -418,7 +357,6 @@ export class Enemy {
     this.lastSeenPos.copy(player.pos);
   }
 
-  /** 被同伴警报呼叫 */
   hearAlarm(pos) {
     if (!this.enabled) return;
     if (this.state === 'ALERT') return;
@@ -434,191 +372,116 @@ export class Enemy {
   }
 }
 
-// ---------------- 村犬（非敌对视奸载体） ----------------
-export class Dog {
+// ============================================================
+// F01「井身者」王承海：维修工。
+// 平时擦桌子/巡他的厅。6m 内第一次读出"人"，2m 内第一次读出"井"。
+// 追逐 = 一个中年人快步走来，不喊。抓住 = 把你的头捧起来，凑近他的左眼。
+// ============================================================
+export class F01 extends Staff {
+  constructor(scene, world, M, def) {
+    super(scene, world, M, {
+      fov: 92, sightRange: 14, hearRange: 13,
+      walkSpeed: 0.9, chaseSpeed: 2.55,
+      ...def,
+      role: 'f01', kind: def.kind ?? 'worker',
+    });
+    this.read6 = false;   // 6m 读取已触发
+    this.read2 = false;   // 2m 读取已触发
+    this.onSixMeter = def.onSixMeter;
+    this.onTwoMeter = def.onTwoMeter;
+    this.wellsAwake = 0;
+  }
+
+  makeBody(M) {
+    return new F01Body(M);
+  }
+
+  chaseVocal(audio, dist) {
+    // 不喊。只有一声很近的、湿的吞咽。
+    audio?.chaseGurgle?.(dist);
+  }
+
+  postUpdate(ctx, distToPlayer) {
+    // 井的近距表现
+    this.body.setEyeIntensity(this.state === 'ALERT' ? 3 : this.state === 'SUSPECT' ? 1.5 : 0.4);
+    this.body.updateWells?.(distToPlayer, ctx.dt);
+    // 6m / 2m 读取事件（每次靠近只触发一次，远离 10m 复位）
+    if (distToPlayer > 10) { this.read6 = false; this.read2 = false; }
+    if (!ctx.player.dead && this.enabled) {
+      if (!this.read6 && distToPlayer < 6) {
+        this.read6 = true;
+        this.onSixMeter?.(this, distToPlayer);
+      }
+      if (!this.read2 && distToPlayer < 2.2) {
+        this.read2 = true;
+        this.onTwoMeter?.(this, distToPlayer);
+      }
+    }
+  }
+}
+
+// ============================================================
+// 监控摄像头：不动的眼睛（听潮载体 + 录像事件的机位）
+// ============================================================
+export class SecurityCamera {
   constructor(scene, world, M, def) {
     this.world = world;
-    this.def = def;
     this.id = def.id;
-    this.label = def.label;
-    this.kind = 'dog';
-    this.enabled = true;
+    this.label = def.label ?? '监控';
+    this.kind = 'camera';
+    this.enabled = def.enabled !== false;
     this.visibilityOfPlayer = 0;
+    this.state = null;
 
-    const fur = new THREE.MeshStandardMaterial({ color: 0x4a423a, roughness: 0.95 });
+    this.pos = new THREE.Vector3(def.x, def.y ?? 2.5, def.z);
+    this.baseYaw = def.yaw ?? 0;
+    this.pitch = def.pitch ?? -0.35;
+    this.panRange = def.panRange ?? 0.5;
+    this.panSpeed = def.panSpeed ?? 0.14;
+    this.yaw = this.baseYaw;
+    this.t = Math.random() * 20;
+
+    // 外形：墙装小盒 + 镜头筒 + 待机红点
     this.group = new THREE.Group();
-    const mk = (geo, x, y, z, sx = 1, sy = 1, sz = 1) => {
-      const m = new THREE.Mesh(geo, fur);
-      m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true;
-      this.group.add(m);
-      return m;
-    };
-    mk(new THREE.BoxGeometry(0.22, 0.24, 0.62), 0, 0.38, 0);
-    this.headM = mk(new THREE.BoxGeometry(0.16, 0.16, 0.22), 0, 0.52, 0.36);
-    mk(new THREE.BoxGeometry(0.05, 0.09, 0.05), -0.05, 0.64, 0.32);
-    mk(new THREE.BoxGeometry(0.05, 0.09, 0.05), 0.05, 0.64, 0.32);
-    this.legs = [
-      mk(new THREE.BoxGeometry(0.06, 0.3, 0.06), -0.08, 0.15, 0.22),
-      mk(new THREE.BoxGeometry(0.06, 0.3, 0.06), 0.08, 0.15, 0.22),
-      mk(new THREE.BoxGeometry(0.06, 0.3, 0.06), -0.08, 0.15, -0.22),
-      mk(new THREE.BoxGeometry(0.06, 0.3, 0.06), 0.08, 0.15, -0.22),
-    ];
-    this.tail = mk(new THREE.BoxGeometry(0.045, 0.045, 0.3), 0, 0.46, -0.42);
-    // 狗眼也有一点冷光——它也被腌住了
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 6), M.eyeGlow);
-    eye.position.set(-0.04, 0.54, 0.47); this.group.add(eye);
-    const eye2 = eye.clone(); eye2.position.x = 0.04; this.group.add(eye2);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.3), M.plastic);
+    box.castShadow = true;
+    this.group.add(box);
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.1, 12), M.plasticDark);
+    lens.rotation.x = Math.PI / 2;
+    lens.position.set(0, -0.01, 0.18);
+    this.group.add(lens);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 6), M.standby);
+    dot.position.set(0.05, 0.05, 0.16);
+    this.group.add(dot);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 8), M.steelWorn);
+    arm.position.set(0, 0.14, -0.06);
+    this.group.add(arm);
+    this.group.position.copy(this.pos);
+    this.group.rotation.y = this.yaw;
+    this.group.rotation.x = -this.pitch * 0.6;
     scene.add(this.group);
-
-    this.pos = new THREE.Vector3(def.waypoints[0][0], 0, def.waypoints[0][1]);
-    this.yaw = 0;
-    this.wpIndex = 0;
-    this.phase = 0;
-    this.waitTimer = 0;
   }
 
   setEnabled(on) { this.enabled = on; this.group.visible = on; }
+  reset() {}
+  hearAlarm() {}
 
   viewPos(out) {
     const v = out ?? new THREE.Vector3();
-    return this.headM.getWorldPosition(v);
-  }
-  viewYawPitch() { return { yaw: this.yaw + Math.PI, pitch: -0.1 }; }
-
-  update(ctx) {
-    const { dt, player } = ctx;
-    const distP = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
-    if (distP < 4) {
-      // 站定，盯着玩家看——不叫，只是看
-      const targetYaw = Math.atan2(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
-      this.yaw += angleWrap(targetYaw - this.yaw) * Math.min(1, dt * 5);
-      this.phase *= 0.9;
-    } else if (this.waitTimer > 0) {
-      this.waitTimer -= dt;
-    } else {
-      const wp = this.def.waypoints[this.wpIndex];
-      const dx = wp[0] - this.pos.x, dz = wp[1] - this.pos.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist < 0.4) {
-        this.wpIndex = (this.wpIndex + 1) % this.def.waypoints.length;
-        this.waitTimer = 2 + Math.random() * 5;
-      } else {
-        const speed = 0.8;
-        const targetYaw = Math.atan2(dx, dz);
-        this.yaw += angleWrap(targetYaw - this.yaw) * Math.min(1, dt * 5);
-        slideMove(this.pos, (dx / dist) * speed * dt, (dz / dist) * speed * dt, 0.2,
-          this.world.colliders, this.world.bounds, this.pos.y);
-        this.phase += dt * 9;
-      }
-    }
-    this.pos.y = this.world.heightAt(this.pos.x, this.pos.z, this.pos.y);
-    // 腿部小跑动画
-    for (let i = 0; i < 4; i++) {
-      this.legs[i].rotation.x = Math.sin(this.phase + (i % 2) * Math.PI) * 0.5 * Math.min(1, this.phase % 1 + 0.5);
-    }
-    this.tail.rotation.y = Math.sin(this.phase * 0.7) * 0.2;
-    this.group.position.copy(this.pos);
-    this.group.rotation.y = this.yaw;
-  }
-}
-
-// ---------------- 望海者（滩涂尽头站在水里的人） ----------------
-// 不巡逻、不追人、不说话。只是站着，面向海。
-// 血潮之后再看——他们全体转过身来，面向村子。
-export class Watcher {
-  constructor(scene, world, M, def) {
-    this.world = world;
-    this.id = def.id;
-    this.label = def.label ?? '望海的人';
-    this.kind = 'watcher';
-    this.enabled = true;
-    this.visibilityOfPlayer = 0;
-    this.body = new Humanoid(M, { cloth: def.cloth ?? 'grey', seed: def.seed });
-    scene.add(this.body.group);
-    this.pos = new THREE.Vector3(def.x, 0, def.z);
-    this.pos.y = world.heightAt(def.x, def.z);
-    this.yaw = def.yaw ?? 0;
-    this._turned = false;
-    this.targetYaw = this.yaw;
-    this.body.group.position.copy(this.pos);
-    this.body.group.rotation.y = this.yaw;
-  }
-
-  setEnabled(on) { this.enabled = on; this.body.group.visible = on; }
-
-  viewPos(out) {
-    const v = this.body.headWorldPos(out);
-    v.x += Math.sin(this.yaw) * 0.22;
-    v.z += Math.cos(this.yaw) * 0.22;
+    v.copy(this.pos);
+    v.x += Math.sin(this.yaw) * 0.3;
+    v.z += Math.cos(this.yaw) * 0.3;
+    v.y -= 0.05;
     return v;
   }
-  viewYawPitch() { return { yaw: this.yaw + Math.PI, pitch: -0.03 }; }
-
-  update(ctx) {
-    const { dt } = ctx;
-    // 血潮之夜：一夜之间换了姿势
-    if (ctx.bloodTide && !this._turned) {
-      this._turned = true;
-      this.targetYaw = this.yaw + Math.PI;
-    }
-    this.yaw += angleWrap(this.targetYaw - this.yaw) * Math.min(1, dt * 0.5);
-    this.body.animate('watch', dt, 1);
-    this.body.group.rotation.y = this.yaw;
-  }
-}
-
-// ---------------- 海鸟群（高空俯瞰视奸载体） ----------------
-export class BirdFlock {
-  constructor(scene, world, def) {
-    this.world = world;
-    this.id = def.id;
-    this.label = def.label;
-    this.kind = 'birds';
-    this.enabled = true;
-    this.visibilityOfPlayer = 0;
-    this.center = new THREE.Vector3(def.center[0], def.height, def.center[1]);
-    this.radius = def.radius;
-    this.angle = 0;
-
-    // 一群小三角
-    const mat = new THREE.MeshBasicMaterial({ color: 0x2a2f33, side: THREE.DoubleSide });
-    const geo = new THREE.ConeGeometry(0.25, 0.7, 3);
-    this.birds = [];
-    for (let i = 0; i < 9; i++) {
-      const b = new THREE.Mesh(geo, mat);
-      b.rotation.x = Math.PI / 2;
-      scene.add(b);
-      this.birds.push({ mesh: b, off: i * 0.7, r: this.radius + (i % 3) * 3, h: (i % 4) * 1.5 });
-    }
-    this.pos = new THREE.Vector3();
-  }
-
-  setEnabled(on) { this.enabled = on; this.birds.forEach(b => b.mesh.visible = on); }
-
-  viewPos(out) {
-    const v = out ?? new THREE.Vector3();
-    return v.copy(this.pos);
-  }
   viewYawPitch() {
-    // 朝圆心俯视
-    const yaw = Math.atan2(this.center.x - this.pos.x, this.center.z - this.pos.z) + Math.PI;
-    return { yaw, pitch: -0.72 };
+    return { yaw: this.yaw + Math.PI, pitch: this.pitch };
   }
 
   update(ctx) {
-    this.angle += ctx.dt * 0.11;
-    for (const b of this.birds) {
-      const a = this.angle + b.off;
-      b.mesh.position.set(
-        this.center.x + Math.cos(a) * b.r,
-        this.center.y + b.h + Math.sin(a * 2.3) * 1.2,
-        this.center.z + Math.sin(a) * b.r
-      );
-      b.mesh.rotation.z = -a;
-      // 翅膀扑动（缩放模拟）
-      b.mesh.scale.x = 1 + Math.sin(a * 14) * 0.5;
-    }
-    const lead = this.birds[0].mesh.position;
-    this.pos.copy(lead);
+    this.t += ctx.dt;
+    // 缓慢左右巡摆（老监控的马达声）
+    this.yaw = this.baseYaw + Math.sin(this.t * this.panSpeed * Math.PI) * this.panRange;
+    this.group.rotation.y = this.yaw;
   }
 }

@@ -1,4 +1,6 @@
-// 潜行聚合系统：噪音事件总线 + 威胁度(HUD/音乐) + 歌唱者共鸣
+// 潜行聚合系统：噪音事件总线 + 威胁度(HUD/音乐) + 听潮暴露
+// 暴露（原共鸣槽）：听潮时缓涨——听 F01 的信道涨得最快；
+// 涨满 = 他在井底察觉了你——强制反向听潮（他借你的眼），然后他知道你在哪。
 import * as THREE from 'three';
 
 export class StealthSystem {
@@ -6,19 +8,21 @@ export class StealthSystem {
     this.world = world;
     this.player = player;
     this.noiseEvents = [];      // {x,z,r,ttl}
-    this.danger = 0;            // 0..1 被怀疑/追踪程度（驱动 HUD 红边与音乐）
+    this.danger = 0;            // 0..1 被怀疑/追踪程度
     this.chaseCount = 0;
-    this.resonance = 0;         // 0..1 歌唱者共鸣（满 → 强制视奸崩溃）
-    this.resonanceActive = false;
-    this.envSightFactor = 1;    // 血潮浓雾时 0.75
+    this.resonance = 0;         // 0..1 听潮暴露（HUD 槽沿用 resonance 命名）
+    this.envSightFactor = 1;    // 压力锋面时 AI 视力打折
   }
 
   emitNoise(x, z, r) {
     this.noiseEvents.push({ x, z, r, ttl: 0.6 });
   }
 
-  update(dt, enemies, singer) {
-    // 噪音事件老化
+  /**
+   * @param enemies 有 state 的 AI 列表
+   * @param sightjack 听潮系统（读 exposeRate）
+   */
+  update(dt, enemies, sightjack) {
     for (const n of this.noiseEvents) n.ttl -= dt;
     this.noiseEvents = this.noiseEvents.filter((n) => n.ttl > 0);
 
@@ -34,19 +38,11 @@ export class StealthSystem {
     this.chaseCount = chases;
     this.danger += (d - this.danger) * Math.min(1, dt * (d > this.danger ? 6 : 1.2));
 
-    // 歌唱者共鸣：靠近歌声 → 共鸣涨；远离 → 慢慢退
-    if (singer && singer.enabled && this.resonanceActive && !this.player.dead) {
-      const dist = Math.hypot(singer.pos.x - this.player.pos.x, singer.pos.z - this.player.pos.z);
-      const R = 17;
-      if (dist < R) {
-        // 蹲下捂住耳朵？不行——歌是从喉咙里进来的。只有拉开距离。
-        const rate = (1 - dist / R) * 0.16 * (this.player.crouching ? 0.8 : 1);
-        this.resonance = Math.min(1, this.resonance + rate * dt * 60 * 0.016);
-      } else {
-        this.resonance = Math.max(0, this.resonance - dt * 0.09);
-      }
+    // 听潮暴露：听着就涨；断开慢慢退
+    if (sightjack?.active && !this.player.dead) {
+      this.resonance = Math.min(1, this.resonance + (sightjack.exposeRate ?? 0.4) * dt * 0.055);
     } else {
-      this.resonance = Math.max(0, this.resonance - dt * 0.15);
+      this.resonance = Math.max(0, this.resonance - dt * 0.06);
     }
   }
 }

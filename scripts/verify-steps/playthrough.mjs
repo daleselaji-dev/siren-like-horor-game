@@ -1,263 +1,235 @@
-// 全流程通关验证：按 20 分钟节拍表把主线走一遍（用传送加速位移，交互全部真实按键）
+// 全流程通关验证《返潮》M01：按节拍表把主线走一遍
+// Normal(登记) → Measure(深度尺/走廊 12.6m) → Leak(走廊变深) → 镜子复测 → 婚宴厅
+// → 录像超前现实 → 18 秒后 F01 重演 → 拿信 → 追逐 → 被抓(井演出) → 重生 → 逃出 → 回望结局
+// 位移用传送加速；互动全部真实按键；长等待用 evaluate 快进演出时钟。
 export async function run(page, h) {
   const flags = () => page.evaluate(() => {
     const s = window.__game.story;
-    return { ...s.flags, notes: [...s.notesFound], checkpoint: s.checkpoint.name };
+    return { ...s.flags, notes: [...s.notesFound], checkpoint: s.checkpointId };
   });
-  // yHint：多层结构（如灯塔内部/顶部）中指定期望楼层的参考高度
-  const tp = (x, z, yaw, yHint) => page.evaluate(
-    ({ x, z, yaw, yHint }) => window.__game.player.setPosition(x, z, yaw, yHint),
-    { x, z, yaw, yHint });
-  const interact = async () => { await h.tapKey('KeyE'); await h.sleep(400); };
+  const tp = (x, z, yaw = 0) => page.evaluate(
+    ({ x, z, yaw }) => window.__game.player.setPosition(x, z, yaw),
+    { x, z, yaw });
+  const interact = async () => { await h.tapKey('KeyE'); await h.sleep(450); };
+  const closeNote = async () => { await h.tapKey('KeyE'); await h.sleep(350); };
+  const waitFor = async (fn, timeoutMs, poll = 500) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < timeoutMs) {
+      if (await page.evaluate(fn)) return true;
+      await h.sleep(poll);
+    }
+    return false;
+  };
 
   await page.click('#title-start');
-  await h.sleep(2000);
+  await h.sleep(2200);
   await h.shot('p00-start');
   await h.tapKey('Space'); // 跳过开场运镜
   await h.sleep(500);
 
-  // ---- 节拍1：礁滩 · 文书① ----
-  await tp(77, 109, 0.5);
-  await h.sleep(300);
-  await interact(); // 拾取
-  await h.shot('p01-note1');
-  await h.tapKey('KeyE'); // 关闭
-  await h.sleep(300);
-
-  // ---- 节拍2：石堤区 · 触发潜行教学 · 文书② ----
-  await tp(10, 55, 0);
-  await h.sleep(600);
-  // 渔寮一内文书②（h1 在 2,52 门朝南 → 桌上位置 local(-1,0.85,-0.7)）
-  const n2 = await page.evaluate(() => {
-    const v = window.__game.world.locations.note2;
-    return { x: v.x, z: v.z };
-  });
-  await tp(n2.x + 0.5, n2.z + 0.8, 0.4);
+  // ---- 节拍1：前庭 → 推门进楼 ----
+  await tp(0, 4.2, 0);
   await h.sleep(300);
   await interact();
-  await h.shot('p02-note2');
-  await h.tapKey('KeyE');
-  await h.sleep(200);
-
-  // ---- 节拍3：堤门锁着 → 提示视奸 ----
-  await tp(16, 41, Math.PI);
-  await h.sleep(300);
-  await interact(); // 推门（锁着）
-  await h.shot('p03-gate-locked');
   let f = await flags();
-  console.log('[verify] after locked gate:', f.sightjackTip ? 'tip OK' : 'TIP MISSING');
+  console.log('[verify] entered:', f.entered);
+  if (!f.entered) throw new Error('main door not opened');
+  await h.shot('p01-entered');
 
-  // ---- 节拍4：视奸巡堤人 → 得知钥匙位置 ----
-  // 把巡堤人挪到渔寮二段(wpIndex=6)，玩家在附近视奸
-  await page.evaluate(() => {
-    const e = window.__game.byId.dikePatrol;
-    e.wpIndex = 6;
-    e.pos.set(20, 0, 60);
-    e.pos.y = window.__game.world.heightAt(20, 60);
-    e.state = 'PATROL';
-  });
-  await tp(8, 62, -1.5);
-  await h.sleep(200);
-  await h.tapKey('KeyQ'); // 进入视奸
-  await h.sleep(400);
-  // 切到巡堤人信道
-  for (let i = 0; i < 8; i++) {
-    const label = await page.evaluate(() => window.__game.sightjack.current?.label);
-    if (label === '巡堤的人') break;
-    await h.tapKey('KeyQ');
-    await h.sleep(250);
-  }
-  await h.sleep(2500); // 等他走到钥匙检查段
-  await h.shot('p04-sightjack-key');
-  f = await flags();
-  console.log('[verify] knowKeySpot:', f.knowKeySpot);
-  await h.tapKey('KeyW'); // 退出视奸
-  await h.sleep(300);
-
-  // ---- 节拍5：搬水缸拿钥匙 → 开门 ----
-  const vat = await page.evaluate(() => {
-    const v = window.__game.world.dynamic.hut2.local(-1.35, 0.6, 1.0);
-    return { x: v.x, z: v.z };
-  });
-  await tp(vat.x, vat.z + 0.6, Math.PI);
-  await h.sleep(300);
-  await interact();
-  f = await flags();
-  console.log('[verify] hasKey:', f.hasKey);
-  await tp(16, 41, Math.PI);
-  await h.sleep(300);
-  await interact();
-  f = await flags();
-  console.log('[verify] gateOpen:', f.gateOpen);
-  await h.sleep(1500);
-  await h.shot('p05-gate-open');
-
-  // ---- 节拍6：村中心 → 广播站 文书④ ----
-  await tp(2, 6, 0);
-  await h.sleep(600); // 村中心触发
-  const radio = await page.evaluate(() => {
-    const v = window.__game.world.locations.radio;
-    return { x: v.x, z: v.z };
-  });
-  await tp(radio.x - 0.8, radio.z + 1.0, 2.6);
-  await h.sleep(300);
-  await interact();
-  await h.shot('p06-radio-note4');
-  await h.tapKey('KeyE');
-  await h.sleep(300);
-
-  // ---- 节拍7：潮母宫 · 视奸祭师 → 看鬼火顺序 ----
-  // 守殿人巡逻相位在低帧环境下不可控——把他调度到殿北远端路点，避免测试被"抓住演出"打断
-  await page.evaluate(() => {
-    const g = window.__game;
-    const e = g.byId.templeGuard;
-    e.state = 'PATROL';
-    e.wpIndex = 3;
-    e.pos.set(-72, 0, -68);
-    e.pos.y = g.world.heightAt(-72, -68);
-    e.suspectMeter = 0;
-  });
-  await tp(-56, -74, 1.57);
-  await h.sleep(700); // 触发台词
-  await tp(-61, -74, 1.57); // 进殿（墙体遮挡视线）
-  await h.sleep(300);
-  await h.tapKey('KeyQ');
-  for (let i = 0; i < 10; i++) {
-    const label = await page.evaluate(() => window.__game.sightjack.current?.label);
-    if (label === '祭师 闫守潮') break;
-    await h.tapKey('KeyQ');
-    await h.sleep(250);
-  }
-  await h.shot('p07-ritual-sightjack');
-  // 鬼火按 2.4s/炷轮播、叩拜间歇 3.2s——轮询直到看到亮起
-  let ghost = [];
-  for (let i = 0; i < 24; i++) {
-    ghost = await page.evaluate(() =>
-      window.__game.world.dynamic.censers.map((c) => c.ghostOn));
-    if (ghost.some(Boolean)) break;
-    await h.sleep(400);
-  }
-  console.log('[verify] ghost during sightjack:', JSON.stringify(ghost));
-  await h.tapKey('KeyW');
-  await h.sleep(300);
-
-  // ---- 节拍8：按序点香（北2 → 南0 → 中1） ----
-  const censers = await page.evaluate(() =>
-    window.__game.world.dynamic.censers.map((c) => ({ x: c.pos.x, z: c.pos.z })));
-  for (const idx of [2, 0, 1]) {
-    const c = censers[idx];
-    await tp(c.x + 1.2, c.z, 1.57);
-    await h.sleep(300);
-    await interact();
-  }
-  f = await flags();
-  console.log('[verify] puzzleSolved:', f.puzzleSolved);
-  await h.shot('p08-censers-lit');
-
-  // ---- 节拍9：取喉铃 → 血潮 ----
-  const altar = await page.evaluate(() => {
-    const v = window.__game.world.locations.altar;
-    return { x: v.x, z: v.z };
-  });
-  await tp(altar.x + 1.4, altar.z, 1.57);
-  await h.sleep(300);
-  await interact();
-  f = await flags();
-  console.log('[verify] bellTaken:', f.bellTaken);
-  await h.sleep(4500); // 等血潮启动
-  f = await flags();
-  console.log('[verify] bloodTide:', f.bloodTide);
-  await tp(-40, -60, 0.6);
-  await h.sleep(1200);
-  await h.shot('p09-bloodtide-out');
-
-  // ---- 节拍10：沉船湾（走龙骨） ----
-  await tp(30, -63, -2.6);
+  // ---- 节拍2：大堂检查点 + 登记簿（听潮教学） ----
+  await tp(0, -5, 0);
   await h.sleep(700);
-  await h.shot('p10-wreck-keel');
-  // 靠近歌唱者测共鸣
-  await page.evaluate(() => {
-    const s = window.__game.byId.singer;
-    const p = window.__game.player.pos;
-    s.pos.set(p.x + 6, 0, p.z);
-    s.pos.y = window.__game.world.heightAt(s.pos.x, s.pos.z);
-  });
-  await h.sleep(3500);
-  const res = await page.evaluate(() => window.__game.stealth.resonance.toFixed(2));
-  console.log('[verify] resonance near singer:', res);
-  await h.shot('p11-resonance');
-  // 拉开距离
-  await page.evaluate(() => {
-    const s = window.__game.byId.singer;
-    s.pos.set(0, 0, -20);
-    s.pos.y = window.__game.world.heightAt(0, -20);
-  });
-  await h.sleep(1000);
+  await tp(-7.3, -3.6, 2.2);
+  await h.sleep(300);
+  await interact(); // 翻登记簿 → 文书 + tutorialListen
+  await h.shot('p02-registry');
+  await closeNote();
+  f = await flags();
+  console.log('[verify] lobby cp:', f.checkpoint, '| tutorialListen:', f.tutorialListen,
+    '| notes:', f.notes.join(','));
+  if (!f.tutorialListen) throw new Error('registry note missed');
 
-  // ---- 节拍11：灯塔（电闸→梯子→顶部） ----
-  const br = await page.evaluate(() => {
-    const v = window.__game.world.locations.breaker;
-    return { x: v.x, z: v.z, y: v.y };
+  // ---- 节拍3：保卫室（深度尺 / 日志 / 监控） ----
+  await tp(11, -4.6, Math.PI);
+  await h.sleep(300);
+  await interact(); // 开保卫室门
+  await tp(14.2, -8.6, 0.6);
+  await h.sleep(300);
+  const dbg = await page.evaluate(() => {
+    const g = window.__game;
+    return {
+      state: g.game.state, frozen: g.player.frozen,
+      prompt: g.story.findInteractable()?.prompt ?? null,
+      doorOpen: g.world.isDoorOpen('security'),
+      caught: !!g.story.caughtSeq, guard: g.byId.guard.state,
+    };
   });
-  await tp(br.x - 0.6, br.z - 0.6, 0.8, br.y); // yHint 指向一楼，避免落在塔顶补丁上
+  console.log('[verify] dbg security:', JSON.stringify(dbg));
+  await interact(); // 深度尺
+  f = await flags();
+  console.log('[verify] hasGauge:', f.hasGauge);
+  if (!f.hasGauge) throw new Error('depth gauge not taken');
+  await tp(13.6, -5.6, Math.PI);
+  await h.sleep(300);
+  await interact(); // 值班日志
+  await closeNote();
+  await tp(13.5, -7.9, 0);
+  await h.sleep(300);
+  await interact(); // 看监控（RTT 画面激活）
+  await h.sleep(900);
+  await h.shot('p03-monitors');
+  f = await flags();
+  console.log('[verify] monitorSeen:', f.monitorSeen);
+
+  // ---- 节拍4：走廊平面图 → 测得 21.9m（图纸 12.6m） ----
+  await tp(-1.0, -17.0, -1.57);
   await h.sleep(300);
   await interact();
+  await h.shot('p04-measure');
+  await closeNote();
   f = await flags();
-  console.log('[verify] breakerOn:', f.breakerOn);
-  await h.shot('p12-breaker');
-  const lad = await page.evaluate(() => {
-    const v = window.__game.world.locations.ladderBottom;
-    return { x: v.x, z: v.z, y: v.y };
-  });
-  await tp(lad.x, lad.z, 0, lad.y);
-  await h.sleep(300);
-  await interact(); // 上梯（传送含1s黑屏）
-  await h.sleep(1800);
-  f = await flags();
-  console.log('[verify] atTop:', f.atTop);
-  await h.shot('p13-lighthouse-top');
+  console.log('[verify] measured:', f.measured);
+  if (!f.measured) throw new Error('corridor not measured');
 
-  // ---- 节拍12：敲铃 → 终局 ----
-  const bt = await page.evaluate(() => {
-    const v = window.__game.world.locations.bellTop;
-    return { x: v.x, z: v.z };
-  });
-  // 站到铃架正旁（远离梯口，避免最近交互变成"爬下灯塔"）
-  await tp(bt.x + 0.3, bt.z - 0.8, -0.4);
+  // ---- 节拍5：走到尽头 → 折返 → Leak（走廊变深） ----
+  await tp(0, -28.6, 0);
+  await h.sleep(700);
+  await tp(0, -19, Math.PI);
+  await h.sleep(900);
+  f = await flags();
+  console.log('[verify] extended:', f.extended);
+  if (!f.extended) throw new Error('corridor did not extend');
+  const corr = await page.evaluate(() => ({
+    extended: window.__game.world.corridorExtended,
+    lampCount: window.__game.world.corridorLamps.length,
+  }));
+  console.log('[verify] world corridor:', JSON.stringify(corr));
+  await tp(0, -22, 0);
+  await h.sleep(400);
+  await h.shot('p05-corridor-deep');
+
+  // ---- 节拍6：深段尽头照镜子 → 婚宴厅开门 ----
+  await tp(0, -40.6, 0);
+  await h.sleep(400);
+  await interact();
+  f = await flags();
+  console.log('[verify] deepMeasured:', f.deepMeasured, '| banquetOpen:', f.banquetOpen,
+    '| staffGone:', f.staffGone);
+  if (!f.banquetOpen) throw new Error('banquet not opened');
+  await h.shot('p06-mirror');
+
+  // ---- 节拍7：婚宴厅 → 播放录像（超前现实） ----
+  await tp(-7, -24, 1.57);
+  await h.sleep(800); // 触发厅内节拍
+  await h.shot('p07-banquet');
+  await tp(-6.4, -22.6, 0.4);
   await h.sleep(300);
+  await interact(); // 播放录像
+  f = await flags();
+  const evOn = await page.evaluate(() => !!window.__game.story.videoEvent);
+  console.log('[verify] video started:', evOn);
+  if (!evOn) throw new Error('video event not started');
+  // 快进到幽灵入画段（录像里那个"还没走进来的人"）
+  await page.evaluate(() => { window.__game.story.videoEvent.t = 8; });
+  await h.sleep(700);
+  const ghostOn = await page.evaluate(() => window.__game.story.ghost.group.visible);
+  console.log('[verify] ghost in tape:', ghostOn);
+  await h.shot('p08-video-ghost');
+  // 快进到带尾
+  await page.evaluate(() => { const s = window.__game.story; if (s.videoEvent) s.videoEvent.t = 17.95; });
+  await waitFor(() => window.__game.story.flags.videoSeen, 20000, 400);
+  f = await flags();
+  console.log('[verify] videoSeen:', f.videoSeen);
+  if (!f.videoSeen) throw new Error('video did not finish');
+
+  // ---- 节拍8：十八秒后，现实追上录像（F01 重演） ----
+  await page.evaluate(() => { // 快进等待时钟
+    const s = window.__game.story;
+    for (const it of s.schedule) it.t = s.elapsed;
+  });
+  // 玩家退到门口侧后方（他背对着走向婚台，不会看到）
+  await tp(-5.2, -21.6, 2.6);
+  const replay = await waitFor(() => window.__game.story.flags.replayDone, 20000, 400);
+  console.log('[verify] replayDone:', replay);
+  if (!replay) throw new Error('F01 replay did not begin');
+  await h.sleep(2200);
+  await h.shot('p09-f01-replay');
+  // 等他走完脚本回到擦桌岗位（约 20s 游戏时间；低帧率下 dt 钳制拉长数倍）
+  const scriptDone = await waitFor(() => {
+    const g = window.__game;
+    return !g.story.f01Script && g.byId.f01.state === 'WORK';
+  }, 180000, 1200);
+  // 若玩家在重演中被他看见转入追逐，直接跳过等待（后续节拍兼容）
+  console.log('[verify] f01 script done:', scriptDone);
+  const f01St = await page.evaluate(() => ({
+    state: window.__game.byId.f01.state,
+    mode: window.__game.byId.f01.def.workMode,
+  }));
+  console.log('[verify] f01 after replay:', JSON.stringify(f01St));
+
+  // ---- 节拍9：婚台拿信 → 追逐 → 被抓（井演出） ----
+  await tp(-23.0, -26.2, -2.6);
+  await h.sleep(300);
+  await interact(); // 拿信
+  f = await flags();
+  console.log('[verify] letterTaken:', f.letterTaken);
+  if (!f.letterTaken) throw new Error('bride letter not taken');
+  await closeNote();
+  await waitFor(() => window.__game.story.flags.chase, 20000, 400);
+  f = await flags();
+  console.log('[verify] chase:', f.chase);
+  await h.sleep(900);
+  await h.shot('p10-chase');
+  // 站着不跑——让他抓住：井的特写演出
+  const caught = await waitFor(() => !!window.__game.story.caughtSeq, 90000, 600);
+  console.log('[verify] caught by F01:', caught);
+  if (!caught) throw new Error('F01 did not catch standing player');
+  await h.sleep(2600); // 镜头正沉进左眼的井
+  await h.shot('p11-caught-well');
+  await waitFor(() => window.__game.player.dead, 40000, 500);
+  await h.sleep(800);
+  await h.shot('p12-death');
+  const died = await page.evaluate(() => ({
+    deaths: window.__game.story.deaths,
+    char: document.getElementById('death-text').textContent,
+  }));
+  console.log('[verify] death:', JSON.stringify(died));
+  // 等重生（死亡演出 4.2s 游戏时间）
+  await waitFor(() => !window.__game.player.dead, 60000, 600);
+  f = await flags();
+  console.log('[verify] respawn at:', f.checkpoint, '| letter kept:', f.letterTaken);
+  if (f.checkpoint !== 'banquet') throw new Error('respawn checkpoint wrong: ' + f.checkpoint);
+
+  // ---- 节拍10：带信逃出大门 ----
+  await tp(0, -2, Math.PI); // 大堂
+  await h.sleep(300);
+  await tp(0, 5.5, Math.PI); // 跨出门廊
+  await h.sleep(900);
+  f = await flags();
+  console.log('[verify] escaped:', f.escaped);
+  if (!f.escaped) throw new Error('escape not registered');
+  await h.shot('p13-escaped');
+
+  // ---- 节拍11：门口回望 → 结局 ----
+  await tp(0, 29, Math.PI);
+  await h.sleep(600);
   await interact();
   f = await flags();
   console.log('[verify] ended:', f.ended);
-  // 终局演出全长约 25s 游戏时间；无头低帧率下 dt 钳制会拉长真实耗时 → 按演出阶段轮询截图
-  const waitStage = async (stage, timeoutMs) => {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeoutMs) {
-      const st = await page.evaluate(() => window.__game.story.endSeq?.stage ?? -1);
-      if (st >= stage) return true;
-      await h.sleep(800);
-    }
-    return false;
-  };
-  await waitStage(1, 20000);
+  if (!f.ended) throw new Error('ending not triggered');
   await h.sleep(4000);
-  await h.shot('p14-tidemother-1');
-  await waitStage(2, 20000);
-  await h.shot('p15-tidemother-2');
-  await waitStage(3, 20000);
-  await h.sleep(2000);
-  await h.shot('p16-forced-sightjack');
-  await waitStage(5, 90000);
-  await h.sleep(1500);
-  await h.shot('p17-ending');
-  // 遮罩淡入由演出阶段触发，低帧率下再多等一会儿
-  let endShown = false;
-  for (let i = 0; i < 20 && !endShown; i++) {
-    endShown = await page.evaluate(() =>
-      document.getElementById('ending-overlay').classList.contains('show'));
-    if (!endShown) await h.sleep(1000);
-  }
+  await h.shot('p14-lookback');
+  // 结局演出 ≈10.5s 游戏时间 + 2.6s 淡入；低帧率下按遮罩轮询
+  const endShown = await waitFor(
+    () => document.getElementById('ending-overlay').classList.contains('show'),
+    180000, 1000);
   console.log('[verify] ending overlay shown:', endShown);
   if (!endShown) throw new Error('ending overlay not shown');
-  const notesTotal = await page.evaluate(() => window.__game.story.notesFound.size);
-  console.log('[verify] notes found in run:', notesTotal);
+  await h.sleep(1200);
+  await h.shot('p15-ending');
+  const tally = await page.evaluate(() => ({
+    notes: window.__game.story.notesFound.size,
+    deaths: window.__game.story.deaths,
+  }));
+  console.log('[verify] final tally:', JSON.stringify(tally));
 }

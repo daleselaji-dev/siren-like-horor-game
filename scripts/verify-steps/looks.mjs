@@ -1,4 +1,4 @@
-// 角色与场景外观检查：正确角度看每类角色 + 性能
+// 外观检查《返潮》：员工人形 / F01 六米·两米读取 / 井特写 / 酒店各厅 / 压力锋面 / 监控视角 + 性能
 export async function run(page, h) {
   await page.click('#title-start');
   await h.sleep(1500);
@@ -18,7 +18,6 @@ export async function run(page, h) {
   }));
   console.log('[verify] lowspec fps:', fps);
 
-  // 看补网人（他在 12,46.8，从南边看他 → 站 12,52 朝北 yaw=π）
   const look = async (name, px, pz, tx, tz) => {
     await page.evaluate(({ px, pz, tx, tz }) => {
       const g = window.__game;
@@ -28,68 +27,94 @@ export async function run(page, h) {
     await h.sleep(500);
     await h.shot(name);
   };
+  // 动态角色：按其当前位置取景
+  const lookAtNpc = async (name, id, dist = 3.2) => {
+    const p = await page.evaluate((id) => {
+      const e = window.__game.byId[id];
+      return { x: e.pos.x, z: e.pos.z, yaw: e.yaw };
+    }, id);
+    // 站到他面前偏一点的位置
+    const px = p.x + Math.sin(p.yaw) * dist + 0.6;
+    const pz = p.z + Math.cos(p.yaw) * dist;
+    await look(name, px, pz, p.x, p.z);
+  };
 
-  await look('l1-netmender', 12, 51, 12, 46.8);
-  await look('l2-saltworker', -40, 8, -44, 4);
-  // 巡堤人（动态位置）
-  const pp = await page.evaluate(() => {
-    const p = window.__game.byId.dikePatrol.pos;
-    return { x: p.x, z: p.z };
+  // ---- 员工三人：拖地 / 巡逻 / 切配 ----
+  await lookAtNpc('l1-cleaner', 'cleaner', 3.0);
+  await lookAtNpc('l2-guard', 'guard', 3.4);
+  await lookAtNpc('l3-chef', 'chef', 3.0);
+
+  // ---- F01：六米读出"人" → 两米读出"井" → 井特写 ----
+  // 冻结他的 AI（scripted=true 时主循环跳过 update），避免特写时被追
+  await page.evaluate(() => { window.__game.byId.f01.scripted = true; });
+  const f01p = await page.evaluate(() => {
+    const e = window.__game.byId.f01;
+    return { x: e.pos.x, z: e.pos.z, yaw: e.yaw };
   });
-  await look('l3-patrol', pp.x + 3, pp.z + 3, pp.x, pp.z);
-  await look('l4-priest', -60, -74, -64.4, -74);
-  await look('l5-dog', 4, 8, 6, 6);
-  await look('l6-gate', 16, 46, 16, 38);
-  await look('l7-temple-front', -50, -74, -64, -74);
-  await look('l8-lighthouse', 68, -110, 76, -120);
-  await look('l9-wreck', 30, -60, 37, -72);
-  await look('l10-spawn-boat', 80, 108, 92, 122);
-
-  // 望海者（滩尾站在水里的人）
-  await look('l12-watcher', 100, 127, 104, 131);
-
-  // 歌唱者（临时启用到近处拍一张特写）
-  await page.evaluate(() => {
-    const g = window.__game;
-    const s = g.byId.singer;
-    s.setEnabled(true);
-    s.pos.set(-2, 0, -8);
-    s.pos.y = g.world.heightAt(-2, -8);
+  const face = (d, off = 0) => ({
+    x: f01p.x + Math.sin(f01p.yaw + off) * d,
+    z: f01p.z + Math.cos(f01p.yaw + off) * d,
   });
-  await h.sleep(1200);
-  await look('l13-singer', -5, -5, -2, -8);
-  await page.evaluate(() => window.__game.byId.singer.setEnabled(false));
-
-  // 视奸海鸟（俯瞰全村）——站到空地上，避开巡逻线
-  await page.evaluate(() => {
-    const g = window.__game;
-    g.player.setPosition(50, 20, 0);
+  const p6 = face(6);
+  await look('l4-f01-6m', p6.x, p6.z, f01p.x, f01p.z);
+  const p2 = face(2);
+  await look('l5-f01-2m', p2.x, p2.z, f01p.x, f01p.z);
+  const p1 = face(0.9);
+  await look('l6-f01-well-closeup', p1.x, p1.z, f01p.x, f01p.z);
+  // 井几何自检：三口井真实存在（左眼/右眼/口腔），各有井底水光
+  const wells = await page.evaluate(() => {
+    const b = window.__game.byId.f01.body;
+    const ws = [b.wellL, b.wellR, b.wellM].filter(Boolean);
+    return {
+      count: ws.length,
+      glints: ws.every((w) => !!w.glint),
+      headTris: b.headMesh.geometry.attributes.position.count / 3,
+    };
   });
+  console.log('[verify] f01 wells:', JSON.stringify(wells));
+  if (wells.count !== 3) throw new Error('F01 must have 3 wells (eyes + mouth)');
+  await page.evaluate(() => { window.__game.byId.f01.scripted = false; });
+
+  // ---- 场景：前庭招牌 / 大堂吊灯 / 前台 / 走廊 / 婚宴厅 / 后厨 ----
+  await look('l7-facade-sign', 0, 22, 0, 2);
+  await look('l8-lobby-chandelier', 6, 1, 0, -8);
+  await look('l9-frontdesk', -4.5, -4.5, -8.5, -5);
+  await look('l10-corridor', 0, -16.5, 0, -28);
+  await look('l11-banquet', -6, -22, -20, -29);
+  await look('l12-kitchen', 4.5, -22, 12, -27);
+
+  // ---- 听潮：切到大堂监控信道 ----
+  await page.evaluate(() => window.__game.player.setPosition(8, -2, 0));
   await h.sleep(300);
   await h.tapKey('KeyQ');
-  // 切到海鸟信道（多按几次）
   for (let i = 0; i < 10; i++) {
     const label = await page.evaluate(() => window.__game.sightjack.current?.label);
-    if (label === '海鸟群') break;
+    if (label === '监控 · 大堂') break;
     await h.tapKey('KeyQ');
     await h.sleep(200);
   }
-  await h.sleep(1600); // 等切台噪点脉冲消退
-  await h.shot('l11-birdview');
+  await h.sleep(1600); // 等切入水压脉冲消退
+  await h.shot('l13-camview');
   const ch = await page.evaluate(() => window.__game.sightjack.current?.label);
-  console.log('[verify] bird channel:', ch);
-  await page.evaluate(() => window.__game.sightjack.exit());
-
-  // 血潮：红海 + 磷火 + 望海者转身面向村子
-  // （无头低帧率下渐变太慢，直接快进内部过渡值再拍）
+  console.log('[verify] camera channel:', ch);
   await page.evaluate(() => {
     const g = window.__game;
-    g.story.beginBloodTide();
-    g.ocean.blood = 0.95;
-    g.ocean.level = 1.7;
-    g.sky.blood = 0.95;
+    g.sightjack.exit();
+    g.sightjack.restorePost();
   });
-  await h.sleep(2500);
-  await look('l14-bloodtide-sea', 100, 127, 112, 140);
-  await look('l15-watcher-turned', 108, 136, 104, 131);
+
+  // ---- 压力锋面：雾变密变冷（灰绿，不是血红） ----
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.sky.setPressure(1);
+    g.sky.pressure = 0.95; // 快进过渡
+  });
+  await h.sleep(1200);
+  await look('l14-pressure-forecourt', 0, 24, 0, 2);
+  await look('l15-pressure-sea', 0, 30, 0, 60);
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.sky.setPressure(0);
+    g.sky.pressure = 0;
+  });
 }
