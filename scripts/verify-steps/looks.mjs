@@ -52,8 +52,8 @@ export async function run(page, h) {
   await look('l20-annex-tank', 24, -50, 32, -52, 3.5);        // 海洋馆主展缸
 
   // —— 宴席工位实体近景 ——
-  // 司仪（舞台上）
-  await look('l21-emcee-close', -16.5, -62.2, -16.5, -64.6, 3.5);
+  // 司仪（舞台上）：从上宾空席斜前方看，避开高背椅遮挡
+  await look('l21-emcee-close', -14.9, -63.0, -16.5, -64.6, 3.5);
   // 侍应（动态位置，贴脸看浮木颈臂+托盘）
   const wp = await page.evaluate(() => {
     const p = window.__game.byId.waiterBanquet.pos;
