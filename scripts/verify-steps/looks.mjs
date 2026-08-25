@@ -74,8 +74,22 @@ export async function run(page, h) {
     await h.tapKey('KeyQ');
     await h.sleep(200);
   }
-  await h.sleep(800);
+  await h.sleep(1600); // 等切台噪点脉冲消退
   await h.shot('l11-birdview');
   const ch = await page.evaluate(() => window.__game.sightjack.current?.label);
   console.log('[verify] bird channel:', ch);
+  await page.evaluate(() => window.__game.sightjack.exit());
+
+  // 血潮：红海 + 磷火 + 望海者转身面向村子
+  // （无头低帧率下渐变太慢，直接快进内部过渡值再拍）
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.story.beginBloodTide();
+    g.ocean.blood = 0.95;
+    g.ocean.level = 1.7;
+    g.sky.blood = 0.95;
+  });
+  await h.sleep(2500);
+  await look('l14-bloodtide-sea', 100, 127, 112, 140);
+  await look('l15-watcher-turned', 108, 136, 104, 131);
 }

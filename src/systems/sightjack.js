@@ -48,7 +48,8 @@ export class SightjackSystem {
       .filter((e) => e.enabled)
       .map((e) => ({
         e,
-        dist: e.kind === 'birds' ? 40 : Math.hypot(e.pos.x - p.x, e.pos.z - p.z),
+        // 海鸟不看距离——它们永远在天上盘旋，给一个中等的伪距离让鸟瞰保持可读
+        dist: e.kind === 'birds' ? 22 : Math.hypot(e.pos.x - p.x, e.pos.z - p.z),
       }))
       .filter((c) => c.dist < RANGE)
       .sort((a, b) => a.dist - b.dist);
