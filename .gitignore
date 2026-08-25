@@ -1,6 +1,7 @@
 node_modules/
 dist/
-release/
+release/*
+!release/Fanchao-*.exe
 verify/*.png
 verify/*.jpg
 !verify/keep/
