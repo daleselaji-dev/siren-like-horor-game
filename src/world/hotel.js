@@ -911,6 +911,18 @@ export function buildHotel(ctx) {
     footprint: { minX: hx - 17.4, maxX: hx + 17.4, minZ: hz - 11.4, maxZ: hz + 11.4 },
     annexRect: { minX: hx + 17, maxX: hx + 39.4, minZ: hz - 3.4, maxZ: hz + 11.4 },
   };
+  // 地面材质区（脚步声/减振）：红毯吃振动，瓷砖传远，舞台木板
+  dynamic.dampRects = [
+    dynamic.lobbyCarpetRect,
+    { minX: hx - 17, maxX: hx - 8, minZ: hz - 11, maxZ: hz + 11 },       // 宴会厅红毯
+    { minX: hx - 1.8, maxX: hx + 1.8, minZ: hz - 6.3, maxZ: hz + 0.3 },  // 大楼梯红毯
+  ];
+  dynamic.tileRects = [
+    { minX: hx - 8, maxX: hx + 8, minZ: hz - 11, maxZ: hz - 8 },    // 服务走廊
+    { minX: hx + 8, maxX: hx + 17, minZ: hz - 11, maxZ: hz - 2 },   // 厨房
+    { minX: hx + 11, maxX: hx + 17, minZ: hz + 6, maxZ: hz + 9.2 }, // 卫生间
+  ];
+  dynamic.stageRect = { minX: hx - 16.8, maxX: hx - 8.2, minZ: hz - 10.8, maxZ: hz - 7.6 };
 
   return dynamic.hotelInfo;
 }

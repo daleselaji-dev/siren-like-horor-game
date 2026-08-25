@@ -75,15 +75,20 @@ export class Player {
       this.moveAmt = Math.min(1, speed / WALK_SPEED);
       this.bobPhase += dt * (this.crouching ? 7 : 10.5);
 
-      // 脚步声与噪音（按地面材质：水洼溅 / 滩涂沙 / 石板叩）
+      // 脚步声与噪音（按地面材质：水洼溅 / 滩涂沙 / 石板叩 / 红毯闷 / 瓷砖脆）
+      const gh = this.world.heightAt(this.pos.x, this.pos.z, this.pos.y);
+      const surface = waterD > 0.06 ? 'wet'
+        : (this.world.surfaceAt?.(this.pos.x, this.pos.z, this.pos.y)
+          ?? (gh > 2.1 ? 'stone' : 'sand'));
+      this.surface = surface;
       this.stepTimer -= dt * speed;
       if (this.stepTimer <= 0) {
         this.stepTimer = 2.0;
-        const gh = this.world.heightAt(this.pos.x, this.pos.z, this.pos.y);
-        const surface = waterD > 0.06 ? 'wet' : gh > 2.1 ? 'stone' : 'sand';
         this.audio?.footstep(this.crouching ? 0.35 : 1.0, surface);
       }
-      this.noiseLevel = (this.crouching ? 3.5 : 9) * (waterD > 0.06 ? 1.6 : 1);
+      // 噪音半径：红毯吃声，瓷砖/水磨石传远
+      const surfNoise = surface === 'carpet' ? 0.6 : surface === 'tile' ? 1.35 : surface === 'wet' ? 1.6 : 1;
+      this.noiseLevel = (this.crouching ? 3.5 : 9) * surfNoise;
     } else {
       this.moveAmt = 0;
       this.noiseLevel = 0;

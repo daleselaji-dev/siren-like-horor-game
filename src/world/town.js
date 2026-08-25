@@ -995,8 +995,21 @@ export function buildTown(scene, M) {
     annex: { minX: 14, maxX: 36, minZ: -60, maxZ: -44 },
   };
 
+  // 地面材质解析（脚步声/噪音半径）：酒店内按功能区分毯/砖/木/石
+  const inRect = (r, x, z) => r && x >= r.minX && x <= r.maxX && z >= r.minZ && z <= r.maxZ;
+  function surfaceAt(x, z, y) {
+    const HI = dynamic.hotelInfo;
+    if (!HI) return null;
+    if (!inRect(HI.footprint, x, z) && !inRect(HI.annexRect, x, z)) return null;
+    if (y > HI.origin.y + 2.4) return 'carpet';   // 2F/3F 客房层满铺地毯
+    for (const r of dynamic.tileRects ?? []) if (inRect(r, x, z)) return 'tile';
+    if (inRect(dynamic.stageRect, x, z)) return 'wood';
+    for (const r of dynamic.dampRects ?? []) if (inRect(r, x, z)) return 'carpet';
+    return 'stone'; // 水磨石
+  }
+
   return {
-    colliders, bounds, heightAt, locations, patrols, dynamic, zones, lights,
+    colliders, bounds, heightAt, locations, patrols, dynamic, zones, lights, surfaceAt,
     waterLevelRef: { value: 0 },
     waterLevel() { return this.waterLevelRef.value; },
     /** 每帧特效更新（烟柱 + 灯火呼吸） */

@@ -1,180 +1,183 @@
-// 叙事与关卡逻辑：文书、互动、触发器、谜题、血潮、检查点、死亡、终局
-// 20 分钟节拍见 docs/设计文档.md 第四节
+// 《返潮》叙事与关卡逻辑：八节拍主线 · 文书 · 议程联动 · CRT 预现/破像 · 引座 · 检查点 · 终局
+// 2001 年秋，蚀湾。你是新娘周絮的伴娘。渡船在滩涂搁浅，喜宴今晚开席。
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+import { Humanoid, poseAs } from '../entities/humanoid.js';
 
 // ---------------- 文书全文 ----------------
 export const NOTES = [
   {
-    id: 'note1', title: '① 姐姐的信（最后一封）',
-    body: `弟：
+    id: 'note1', title: '① 喜帖（周宅）',
+    body: `谨詹于辛巳年九月十九（公历二〇〇一年十一月三日）
+为小女 周絮 于归之期
+假座 蚀湾南方大酒店一楼宴会厅 敬备喜筵
 
-不要回来。这不是气话。
-村里在办第二次锁潮祭，闫伯说这次的祭文是"倒着写的"。
-倒着写的祭文不是给神念的。
+恭请　阖第光临
 
-昨夜退潮，潮汐线没有退。今早我去看，
-线上挂着的不是海带，是头发。
+　　　　　　　　　　　　周宅　鞠躬
 
-潮母在点名。点到陈家了。
-我听见有人在水底下喊我的小名——是妈的声音。
-可妈走了十一年了。
-
-不要回来。替我把窗关好。
-
-                         ——织晚，四月初八`,
+【喜帖背面，是絮絮的字】
+阿澄：
+你一定要来。伴娘只能是你。
+镇上的规矩多，你什么都不用懂，
+全福婆让你做什么，你就做什么。
+只有一条是我求你的——
+上头的时候，不管镜子里有什么，
+不要出声。`,
   },
   {
     id: 'note2', title: '② 渔民日记（渔寮·残页）',
-    body: `四月初九　阴
+    body: `九月十二　阴
 
-浪把船顶回来了。不是浪。是浪底下有手。
+湾填了三年，酒店起了三年。
+石头是从湾底捞的。老石匠说那不是石头，
+是"床板"——海睡了一万年的床。
 
-出不了海就补网。老三坐在门口补了一天，
-我叫他吃饭他不应。凑近看，
-他补的哪里是网，他把自己的裤脚和网织在一起了。
-他冲我笑，喉咙里"咕咚咕咚"响，像泡在水里说话。
+九月十四　阴
 
-四月初十　阴
+给酒店送鱼，走的后头服务道。
+新来的侍应帮我卸筐。他不说话，光笑。
+他的手腕搭在筐沿上，我看了一眼——
+那不是晒黑。那是浪蚀的木头纹。
 
-今天全村都在补网。
-我数了数，连死了三年的春伯也坐在堤上补。
+我这辈子在海上，什么怪浪都见过。
+可我头一回见着：潮来了，水没有来。
+滩涂是干的，蟹洞是干的，
+但你把耳朵贴在泥上，底下是涨潮的声音。
 
-我不敢再写了。墨是咸的。`,
+喜宴我不去了。份子钱托人带到。`,
   },
   {
-    id: 'note3', title: '③ 盐工账本（批注）',
-    body: `【账本正文】四月初七　出盐九担半　湿　再晒
-四月初八　出盐——
+    id: 'note3', title: '③ 婚宴通知（镇公告栏）',
+    body: `【喜　讯】
 
-【页边批注，字迹潦草】
-盐晒不干。三天了。
-盐板上的盐每天早上都摆成一样的花纹，
-像鳞。
+周宅嫁女，全镇同贺。
+今晚流水席设南方大酒店一楼宴会厅，
+按户入席，桌牌为准。
 
-婆娘说：别扫，那是潮母的鳞，扫了她要来收。
-我扫了。
+议程如下：
+　酉时　迎宾
+　戌时　入席
+　戌时三刻　上菜
+　亥时　敬酒
+　亥时三刻　上头
+　子时　送入洞房
 
-【最后一行，几乎划破纸面】
-她今晚真的来收了　她拿我的嗓子装盐`,
+【页脚一行小字，墨色比正文旧得多】
+议程即许潮。时辰一到，司仪口中念的
+就不再是人写给人的话。逐条应完，海才收礼。`,
   },
   {
-    id: 'note4', title: '④ 广播站录音稿（誊抄）',
-    body: `【盐门村广播站　四月初八　台风警报誊抄稿】
+    id: 'note4', title: '④ 广播站值班记录（誊抄）',
+    body: `【蚀湾广播站　值班登记　十一月三日】
 
-"……沿海渔船请注意，今夜有强台风过境，
-琅屿以东海面阵风十一级，所有船只回港避风……
-重复，所有船只回港避……避……"
+18:40　转播酒店喜宴实况，线路正常。
+19:05　喜歌《渔家嫁女调》，磁带 A 面。
+19:32　……磁带走完了。歌没停。
 
 【以下为当值员手写】
-警报念到一半，喇叭里进来了别的声音。
-不是串台。那声音是从海里灌上来的，
-是唱歌。调子我认得，是小满姑娘的调子。
-可小满前年就沉在东礁了。
+我把放音机的电源拔了。歌没停。
+歌从线里来。不是我们的线——
+是埋在填湾地基底下的那些"旧线"。
 
-我把广播关了。歌没停。
-喇叭明明断了电，歌没停。
+司仪每报一次时辰，全镇的喇叭一起响。
+我对了表：他开口，比我这边的信号
+早半秒钟。
 
-我最后广播一句话，谁听到谁记住：
-锁潮祭没锁住东西，是把东西请进来了。`,
+广播是跟着他念的。不是他跟着广播。`,
   },
   {
-    id: 'note5', title: '⑤ 祭师忏悔文（潮母宫偏殿）',
-    body: `罪人闫守潮，叩首血书。
+    id: 'note5', title: '⑤ 酒店登记簿（总台）',
+    body: `【南方大酒店　客房登记　十一月三日】
 
-甲子大祭，我改了祭文。
-锁潮祭本意：沉铃赎喉，锁潮于外。
-我把"送"字全改成了"迎"字，
-倒点三炷香，把我女儿小满的名字，
-写进了请神的位置。
+103　周宅亲眷　　已到
+105　周宅亲眷　　已到
+107　县里来宾　　未到（钥匙未取）
+109　渔业社　　　已到
+104　——　　　　（本页被水渍洇开）
+106　——　　　　（本页被水渍洇开）
 
-我只想让她回来唱一句。一句就好。
+807　新房　　　　【备注栏字迹工整】
+　　三楼尽头挂八楼的门牌，是老师傅的意思：
+　　"喜房要高过水面。这个数是量过的。"
 
-潮母应了。
-潮母把全村的喉咙都应给了她。
-
-如今满村都是她的声音，
-唯独没有一张嘴是她的。
-
-要止潮，须补祭：
-倒香复正——先北，再南，后中。
-取回喉铃，送还海心。
-若无人送铃，则满村永不退潮，
-若有人送铃——送铃的人，替全村唱下去。
-
-罪人叩首。叩首。叩首。`,
+【登记簿最后一栏，笔迹与所有人都不同】
+上宾　壹位　　席设宴会厅正中
+　　到时自来　毋须引路`,
   },
   {
-    id: 'note6', title: '⑥ 小满的歌词册（潮母宫后廊）',
-    body: `【一本晒盐女工的手抄歌册，纸页被海水泡涨】
+    id: 'note6', title: '⑥ 保卫科值班日志',
+    body: `十月廿八　夜班　老鲁记
 
-《咸水谣》　盐门村调
+监控是新装的，九个头。夜里看屏幕，
+七号头（宴会厅）拍到有人摆桌。
+我下去看——厅里是空的，桌子没摆。
+第二天一早，桌子摆好了。跟屏幕里一模一样。
 
-　　潮水涨，涨过窗，
-　　阿妹梳头对海望。
-　　潮水落，落过堤，
-　　阿哥摇橹不回西。
+十月三十　夜班
 
-【下面一首的字迹不一样。很旧，像是很多年前就写在这里等着】
+想明白了。这九个屏幕放的不是"现在"，
+是"接下来"。电视先播，现实照着做。
 
-　　潮水涨，涨过喉，
-　　替我唱歌的人不用愁。
-　　一人唱，全村和，
-　　海底点灯十万座。
+试出来一个法子，记在这里，给接班的：
+屏幕里播了什么，你抢在前头把它改了——
+比如它播"灯亮着"，你去把总闸拉了——
+那一段录像就作废，重播。
+老师傅管这叫"破像"。一晚上只敢用一回。
 
-【页脚小字】
-这不是我写的。这本子买来就有这一页。
-我唱给爹听，爹把本子抢去烧了三次，
-三次都完完整整回到我枕头底下。
-它想让我学会。`,
+十一月三日　加一句
+海洋馆的钥匙我挂在柜里了。
+今晚谁也别去西边。展缸里那个东西，
+这几天不怎么沉底了。`,
   },
   {
-    id: 'note7', title: '⑦ 灯塔看守日志（末页）',
-    body: `第 41 夜。
+    id: 'note7', title: '⑦ 海洋馆巡检单（末次）',
+    body: `【蚀湾海洋馆　闭馆巡检单　2001.9.30】
 
-灯油还够。眼药水没了。
-我现在不敢眨眼。眨眼的功夫他们就换姿势。
+一、主展缸水位：未测（水位计读数为负）
+二、增氧机：停（缸内含氧量恒定，来源不明）
+三、照明：停
+四、展品：白化珊瑚群　沉积柱×6　　均在
+　　"镇馆之物"：在。姿势与昨日不同。
 
-白天从塔顶往下看，村里人都在干活：
-补网的补网，晒盐的晒盐，谁都不闲着。
-可你盯住任何一个人看足一炷香，
-就会发现他手里的活永远差最后一针。
-永远差一针。他们不是在干活，
-他们是被钉在"干活"里。
+五、其他：
+　　彩排录像母带（周宅喜宴，试机拍摄）
+　　存值班室铁柜。周家的人说过两天来取，
+　　叮嘱：不要在馆里放这盘带子。
+　　它拍到了不该拍的东西——
+　　摄像师没说是什么。摄像师第二天就退了押金走了。
 
-海上今夜有灯。不是渔火。
-渔火不会排成那么长的一条线，
-渔火也不会随着歌声一明一灭。
-
-如果有人看到这本日志：
-别灭塔灯。塔灯一灭，她就知道岸上没人守着了。
-
-【字迹到此为止。桌上有半杯水，是咸的。】`,
+【单末盖章处没有章，只有一圈盐霜】`,
   },
   {
-    id: 'note8', title: '⑧ 海洋站电报（未发出）',
-    body: `【电报底稿　加急】
+    id: 'note8', title: '⑧ 许潮旧俗（从母带里抄下的话）',
+    body: `【母带 00:41:17 起，是一段老人的画外音。
+录像里，彩排的新娘坐在三面镜前。】
 
-致县海洋站：
+"许潮不是嫁人，是嫁影。
+海要的从来不是新娘——
+新娘是正主，动了正主，喜事就不成了。
 
-盐门村海域观测异常如下——
-一、该海域潮位连续三十七个月无落潮记录。
-二、水温恒定，与人体温相同。
-三、水下测音器录得连续声源，
-　　频谱分析结果为人声，女性，单一声部。
-　　注：声源深度九百米。
-　　注：九百米无光无氧。
-　　注：唱的人不需要换气。
+海收的是影子。
+上头那天，镜子里坐着两个人：
+一个是新娘，一个是陪坐的。
 
-四、建议海图将本村标注为——
+海若受了这门亲，两个都留下。
+海若不受——
+它就把镜子里那个陪坐的收走。
+名字都想好了，就写在空席的桌牌上。
 
-【电报未写完。落款处只有一行小字】
+所以伴娘要挑外乡人。
+外乡人走了，镇上不用挂白。"
 
-查无此村。查无此村。查无此村。`,
+【00:43:02，画外音停了。
+录像里，镜中的全福婆转过头来，看镜头。
+现实里的全福婆，晚了一拍才转。】`,
   },
 ];
 
 // 石碑铭文（气氛互动，不计入文书）
-const STELE_TEXT = '碑文风化难辨，只余八字——「潮起还人　潮落收喉」';
+const STELE_TEXT = '碑文风化难辨，只余八字——「许潮以女　潮平人安」';
 
 function angleWrap(a) {
   while (a > Math.PI) a -= Math.PI * 2;
@@ -185,59 +188,64 @@ function angleWrap(a) {
 // ---------------- 主控 ----------------
 export class Story {
   constructor(game) {
-    this.g = game; // {scene,engine,world,player,hud,audio,enemies,byId,sightjack,stealth,ocean,sky,M}
+    this.g = game; // {scene,engine,world,player,hud,audio,enemies,byId,sightjack,stealth,ocean,sky,M,crt,agenda,guest,gaze,floaters}
     this.flags = {
       intro: false, stealthTip: false, sightjackTip: false,
       knowKeySpot: false, hasKey: false, gateOpen: false,
-      radioOn: true, radioHeard: false,
-      puzzleProgress: 0, puzzleSolved: false, bellTaken: false,
-      bloodTide: false, wreckTip: false, breakerOn: false,
-      atTop: false, ended: false, singerTip: false,
+      radioOn: true, knowHotel: false,
+      inHotel: false, metBride: false, hasMirror: false,
+      crtTip: false, leaked: false,
+      namedByCrt: false, imageBroken: false,
+      hasAquaKey: false, hasTape: false, tapeSeen: false,
+      matronChase: false, finaleBroken: false,
+      ended: false, breakerCut: false,
     };
     this.notesFound = new Set();
     this.checkpoint = null;
-    this.deathSeq = null;   // 死亡协程状态
+    this.deathSeq = null;
     this.endSeq = null;
-    this.introSeq = null;   // 开场运镜
-    this.caughtSeq = null;  // 被抓演出
+    this.introSeq = null;
+    this.caughtSeq = null;
+    this.tapeSeq = null;
     this.deathCount = 0;
     this.drownTimer = 0;
-    this.ritual = { seq: [2, 0, 1], idx: 0, t: 0, phase: 'gaze' }; // 先北(2) 再南(0) 后中(1)
     this.time = 0;
+    this.phoneT = -1;      // 前台电话调虎离山计时
 
     this.interactables = [];
     this.triggers = [];
     this.noteMeshes = new Map();
 
     this.buildNotes();
+    this.buildCast();
+    this.buildForetellProps();
     this.buildInteractables();
     this.buildTriggers();
-    this.buildTideMother();
-    this.setupGhostFlames();
 
-    // —— 环境氛围调度：脚本化一次性拍(填充20分钟节奏) + 低频随机远景声 ——
+    // 议程联动
+    this.g.agenda.onStage = (stage) => this.applyStage(stage);
+
+    // —— 环境氛围调度 ——
     this.ambient = {
-      next: 40,
-      idx: 0,
+      next: 40, idx: 0,
       pool: ['horn', 'gull', 'creak', 'buoy'],
       beats: [
-        { at: 60, act: () => { this.g.audio.hornDistant(); this.g.hud.subtitle('远处有船螺。三年了，没有一条船靠过这座港。', 5); } },
-        { at: 170, cond: () => !this.flags.gateOpen, act: () => this.g.hud.subtitle('海鸟只在高处盘，不落下来。', 4) },
-        { at: 300, cond: () => this.flags.gateOpen && !this.flags.bloodTide, act: () => this.g.hud.subtitle('谁家的灶还温着。碗筷摆了三副，齐齐整整。', 5) },
-        { at: 460, cond: () => !this.flags.puzzleSolved, act: () => this.g.hud.subtitle('香灰积得很厚。有人每夜都来续，从没断过。', 5) },
-        { at: 620, cond: () => this.flags.bloodTide, act: () => this.g.hud.subtitle('咸味重得像含着一口海。', 4, 'song') },
-        { at: 760, cond: () => this.flags.bloodTide && !this.flags.breakerOn, act: () => this.g.hud.subtitle('歌声换了一段。像在点名。', 4.5, 'song') },
+        { at: 55, act: () => { this.g.audio.hornDistant(); this.g.hud.subtitle('渡船搁在滩上。今晚不会再有船离开蚀湾。', 5); } },
+        { at: 170, cond: () => !this.flags.gateOpen, act: () => this.g.hud.subtitle('镇里在放喜歌。调子飘过堤来，潮声一顿一顿地和。', 5, 'song') },
+        { at: 320, cond: () => this.flags.gateOpen && !this.flags.inHotel, act: () => this.g.hud.subtitle('家家门上贴着囍。可街上一个人也没有——都赴宴去了。', 5.5) },
+        { at: 520, cond: () => this.flags.inHotel && !this.flags.leaked, act: () => this.g.hud.subtitle('酒店里很暖。暖得像是楼在替什么东西焐着。', 5) },
+        { at: 700, cond: () => this.flags.leaked, act: () => this.g.hud.subtitle('墙纸在鼓包。楼是干的，可它在承受水压。', 5, 'song') },
       ],
     };
 
     // 海的视角（终局强制视奸载体）
-    const lp = this.g.world.locations.bellTop;
+    const lp = this.g.world.locations.lighthouseDoor;
     this.seaViewer = {
       id: 'sea', label: '海', kind: 'sea', enabled: true, pos: new THREE.Vector3(118, 2, -168),
       viewPos: (out) => (out ?? new THREE.Vector3()).set(118, 6, -168),
       viewYawPitch: () => {
         const yaw = Math.atan2(lp.x - 118, lp.z - (-168)) + Math.PI;
-        return { yaw, pitch: 0.12 };
+        return { yaw, pitch: 0.1 };
       },
       update: () => {},
       setEnabled: () => {},
@@ -246,187 +254,349 @@ export class Story {
     this.saveCheckpoint('spawn');
   }
 
+  // ---------- 人群与角色 ----------
+  /** 把多个摆好姿势的人形烘焙成一组按材质合并的网格（全场人群 ≈ 15 draw call） */
+  bakeCrowd(defs) {
+    const byMat = new Map();
+    for (const d of defs) {
+      const h = new Humanoid(this.g.M, { role: d.role, seed: d.seed, light: false });
+      poseAs(d.pose ?? 'sit', d.phase ?? Math.random() * 6)(h);
+      h.group.position.set(d.x, d.y, d.z);
+      h.group.rotation.y = d.ry ?? 0;
+      h.group.updateMatrixWorld(true);
+      h.group.traverse((o) => {
+        if (!o.isMesh) return;
+        let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        geo = geo.clone();
+        geo.applyMatrix4(o.matrixWorld);
+        if (!geo.attributes.uv) {
+          geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+        }
+        if (!byMat.has(o.material)) byMat.set(o.material, []);
+        byMat.get(o.material).push(geo);
+      });
+    }
+    const grp = new THREE.Group();
+    for (const [mat, geos] of byMat) {
+      const mg = BufferGeometryUtils.mergeGeometries(geos, false);
+      if (!mg) continue;
+      const mesh = new THREE.Mesh(mg, mat);
+      mesh.castShadow = true;
+      grp.add(mesh);
+    }
+    return grp;
+  }
+
+  buildCast() {
+    const L = this.g.world.locations;
+    const D = this.g.world.dynamic;
+    const HI = D.hotelInfo;
+    const hb = HI.origin.y;
+
+    // —— 宴会厅满员（正常态·敬酒前）：每桌 5 客围坐 ——
+    const roles = ['guest_m', 'guest_f', 'guest_m2', 'guest_m', 'guest_f'];
+    const defs = [];
+    let seed = 40001;
+    for (const t of D.banquetTables) {
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2 + 0.4;
+        defs.push({
+          role: roles[k % roles.length], seed: seed++, pose: 'sit', phase: k * 1.3,
+          x: t.x + Math.sin(a) * 1.06, y: hb + 0.02, z: t.z + Math.cos(a) * 1.06,
+          ry: a + Math.PI,
+        });
+      }
+    }
+    // 大堂里三两站着寒暄的
+    for (const [lx, lz, ry] of [[-2.2, 7.6, 0.6], [-1.4, 7.2, -2.4], [2.6, 3.5, 1.8], [3.3, 3.9, -1.2]]) {
+      defs.push({ role: seed % 2 ? 'guest_m' : 'guest_m2', seed: seed++, pose: 'idle', x: HI.origin.x + lx, y: hb + 0.02, z: HI.origin.z + lz, ry });
+    }
+    this.crowdNormal = this.bakeCrowd(defs);
+    this.g.scene.add(this.crowdNormal);
+
+    // —— 渗漏态人群（敬酒后）：席位不空，人却"浮"了——脚尖离地的静止宾客 ——
+    const leakDefs = [];
+    for (const t of D.banquetTables) {
+      for (let k = 0; k < 3; k++) {
+        const a = (k / 3) * Math.PI * 2 + 1.1;
+        leakDefs.push({
+          role: roles[(k + 1) % roles.length], seed: seed++, pose: 'float', phase: k * 2.1,
+          x: t.x + Math.sin(a) * 1.15, y: hb + 0.02, z: t.z + Math.cos(a) * 1.15,
+          ry: a + Math.PI,
+        });
+      }
+    }
+    this.crowdLeak = this.bakeCrowd(leakDefs);
+    this.crowdLeak.visible = false;
+    this.g.scene.add(this.crowdLeak);
+
+    // —— 新娘周絮：807 梳妆台前坐着（上头位） ——
+    this.bride = new Humanoid(this.g.M, { role: 'bride', seed: 8807 });
+    this.bride.group.position.set(L.dresser807.x, HI.origin.y + HI.F3 + 0.02, L.dresser807.z + 0.75);
+    this.bride.group.rotation.y = Math.PI; // 面向三面镜（朝南）
+    this.g.scene.add(this.bride.group);
+  }
+
+  // ---------- CRT 预现内容 ----------
+  buildForetellProps() {
+    const g = this.g;
+    const L = g.world.locations;
+    const M = g.M;
+    const D = g.world.dynamic;
+    const HI = D.hotelInfo;
+    const hb = HI.origin.y;
+
+    // 预现①（渗漏态预告）：服务走廊口立着一名侍应，正对镜头；沉积更厚
+    this.ftWaiter = this.bakeCrowd([{
+      role: 'waiter', seed: 7101, pose: 'post',
+      x: HI.origin.x - 4.3, y: hb + 0.02, z: HI.origin.z - 8.6, ry: Math.PI / 2,
+    }]);
+    const sed1 = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.2, 0.16), M.sediment);
+    sed1.position.set(HI.origin.x + 1.5, hb + 1.1, HI.origin.z - 10.7);
+    const sed2 = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.4, 0.13), M.sediment);
+    sed2.position.set(HI.origin.x - 5.5, hb + 0.7, HI.origin.z - 10.72);
+    this.ftSediment = new THREE.Group();
+    this.ftSediment.add(sed1, sed2);
+
+    // 预现②（点名）：上宾空席上坐着一个人——衣服和你一样
+    this.ftSeated = this.bakeCrowd([{
+      role: 'bride', seed: 9001, pose: 'sit',
+      x: L.guestSeat.x, y: hb + 0.02, z: L.guestSeat.z - 0.6, ry: 0,
+    }]);
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.3),
+      new THREE.MeshBasicMaterial({ color: 0xd8b060 }));
+    plate.position.set(L.guestSeat.x, hb + 1.05, L.guestSeat.z + 0.42);
+    plate.rotation.x = -0.4;
+    this.ftSeated.add(plate);
+
+    // 初始预现：渗漏态预告（对照现实找差异）
+    g.crt.setForetell([this.ftWaiter, this.ftSediment], [this.crowdNormal]);
+  }
+
   // ---------- 文书可视化 ----------
   buildNotes() {
     const L = this.g.world.locations;
     const spots = {
-      note1: L.luggage, note2: L.note2, note3: L.note3,
-      note5: L.note5, note6: L.note6, note7: L.note7, note8: L.note8,
+      note1: L.luggage, note2: L.note2,
+      note5: L.registry, note6: L.securityDesk, note7: L.tapeCabinet,
     };
     for (const [id, pos] of Object.entries(spots)) {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.42), this.g.M.paperGlow);
       m.position.copy(pos);
+      m.position.y += 0.03;
       m.rotation.x = -Math.PI / 2 + 0.25;
       m.rotation.z = Math.random() * 3;
       this.g.scene.add(m);
       this.noteMeshes.set(id, m);
     }
-    // note4 在收音机上，无纸张
+    // note3 公告栏 / note4 收音机 / note8 母带播放，无纸张网格
   }
 
-  notePickupAction(id) {
+  notePickupAction(id, after) {
     return () => {
       const note = NOTES.find((n) => n.id === id);
       this.notesFound.add(id);
       this.noteMeshes.get(id)?.removeFromParent();
       this.g.audio.paper();
       this.g.openNote(note);
+      after?.();
     };
   }
 
   // ---------- 互动点 ----------
   buildInteractables() {
-    const L = this.g.world.locations;
+    const g = this.g;
+    const L = g.world.locations;
     const F = this.flags;
     const add = (o) => this.interactables.push(o);
 
-    // 文书
-    const noteSpots = { note1: L.luggage, note2: L.note2, note3: L.note3, note5: L.note5, note6: L.note6, note7: L.note7, note8: L.note8 };
-    for (const [id, pos] of Object.entries(noteSpots)) {
-      add({
-        id, pos, r: 2.0, prompt: '拾取文书',
-        cond: () => !this.notesFound.has(id),
-        act: this.notePickupAction(id),
-      });
-    }
+    // —— 文书 ——
+    add({
+      id: 'note1', pos: L.luggage, r: 2.0, prompt: '打开行李箱',
+      cond: () => !this.notesFound.has('note1'),
+      act: this.notePickupAction('note1', () => {
+        g.hud.objective('沿滩涂进镇——喜宴在南方大酒店');
+      }),
+    });
+    add({
+      id: 'note2', pos: L.note2, r: 2.0, prompt: '翻看日记',
+      cond: () => !this.notesFound.has('note2'),
+      act: this.notePickupAction('note2'),
+    });
+    add({
+      id: 'note3', pos: L.noticeBoard, r: 2.2, prompt: '看公告栏',
+      cond: () => !this.notesFound.has('note3'),
+      act: this.notePickupAction('note3', () => {
+        F.knowHotel = true;
+        g.hud.objective('去镇南的南方大酒店赴宴');
+      }),
+    });
+    add({
+      id: 'note5', pos: L.registry, r: 2.0, prompt: '翻登记簿',
+      cond: () => F.inHotel && !this.notesFound.has('note5'),
+      act: this.notePickupAction('note5'),
+    });
+    add({
+      id: 'note6', pos: L.securityDesk, r: 2.2, prompt: '读值班日志',
+      cond: () => !this.notesFound.has('note6'),
+      act: this.notePickupAction('note6'),
+    });
+    add({
+      id: 'note7', pos: L.tapeCabinet, r: 2.0, prompt: F.hasAquaKey ? '开铁柜' : '开铁柜',
+      cond: () => !this.notesFound.has('note7'),
+      act: () => {
+        if (!F.hasAquaKey) {
+          g.hud.subtitle('铁柜锁着。柜面上一圈盐霜，像有人反复摸过。', 4);
+          if (!F.aquaKeyTip) {
+            F.aquaKeyTip = true;
+            g.hud.subtitle('保卫科的日志提过钥匙——挂在二楼的柜子里。', 4.5);
+          }
+          return;
+        }
+        this.notePickupAction('note7', () => this.takeTape())();
+      },
+    });
 
-    // 石碑
+    // —— 石碑 ——
     add({
       id: 'stele', pos: L.stele, r: 2.2, prompt: '辨认碑文',
       cond: () => true,
-      act: () => { this.g.hud.subtitle(STELE_TEXT, 5); this.g.audio.paper(); },
+      act: () => { g.hud.subtitle(STELE_TEXT, 5); g.audio.paper(); },
     });
 
-    // 堤门
+    // —— 堤门（视奸教学：巡堤人管钥匙） ——
     add({
       id: 'gate', pos: L.gate, r: 3.4, prompt: '推门',
       cond: () => !F.gateOpen,
       act: () => {
         if (F.hasKey) {
           F.gateOpen = true;
-          this.g.audio.doorCreak();
-          this.g.stealth.emitNoise(L.gate.x, L.gate.z, 18);
-          this.g.hud.subtitle('锈锁应声而开。门轴的吱呀声传得很远。', 4);
-          this.g.hud.objective('穿过村子，寻找还醒着的声音');
+          g.audio.doorCreak();
+          g.stealth.emitNoise(L.gate.x, L.gate.z, 18);
+          g.hud.subtitle('锈锁应声而开。门里飘来喜歌，和着潮声。', 4.5);
+          g.hud.objective('进镇——找人问路，或看公告栏');
           this.saveCheckpoint('gate', L.gate.x, L.gate.z + 3);
+          if (g.agenda.stage < 0) g.agenda.advance(); // 迎宾
         } else {
-          this.g.hud.subtitle('锁着。锁眼里塞满了盐粒。', 3.5);
+          g.hud.subtitle('锁着。赴宴的人走正街——你从滩涂来，只有这道堤门。', 4);
           if (!F.sightjackTip) {
             F.sightjackTip = true;
-            this.g.hud.subtitle('堤上有个提灯的人来回走。他生前管这道门。', 4.5);
-            this.g.hud.subtitle('静下来，按 Q ——借他的眼睛看。', 5);
-            this.g.hud.objective('视奸提灯人，找到堤门钥匙');
+            g.hud.subtitle('堤上有个提灯的人来回走。守堤是他的职。', 4.5);
+            g.hud.subtitle('静下来，按 Q ——借他的眼睛看。', 5);
+            g.hud.objective('视奸提灯人，找到堤门钥匙');
           }
         }
       },
     });
 
-    // 水缸下的钥匙（必须先视奸获知）
+    // 水缸下的钥匙（须先视奸获知）
     add({
-      id: 'vat', pos: () => this.g.world.dynamic.hut2.local(-1.35, 0.6, 1.0), r: 1.8,
+      id: 'vat', pos: () => g.world.dynamic.hut2.local(-1.35, 0.6, 1.0), r: 1.8,
       prompt: '搬开水缸',
       cond: () => F.knowKeySpot && !F.hasKey,
       act: () => {
         F.hasKey = true;
-        this.g.audio.blip(500, 0.1, 0.2);
-        this.g.hud.subtitle('缸底压着一把黄铜钥匙，缠着红线。', 4);
-        this.g.hud.objective('打开堤门');
+        g.audio.blip(500, 0.1, 0.2);
+        g.hud.subtitle('缸底压着一把黄铜钥匙，缠着红线。', 4);
+        g.hud.objective('打开堤门');
       },
     });
 
-    // 收音机
+    // —— 广播站收音机 ——
     add({
       id: 'radio', pos: L.radio, r: 2.2, prompt: '调收音机',
       cond: () => !this.notesFound.has('note4'),
       act: () => {
         this.notesFound.add('note4');
-        this.g.audio.paper();
-        this.g.hud.subtitle('喇叭里的警报是三年前的。桌上压着当值员的誊抄稿。', 4.5, 'radio');
-        this.g.openNote(NOTES.find((n) => n.id === 'note4'));
-        this.g.hud.objective('去潮母宫，补完那场锁潮祭');
+        g.audio.paper();
+        g.hud.subtitle('喇叭里在转播酒店的喜宴。桌上压着当值员的记录。', 4.5, 'radio');
+        g.openNote(NOTES.find((n) => n.id === 'note4'));
+        if (!F.knowHotel) {
+          F.knowHotel = true;
+          g.hud.objective('去镇南的南方大酒店赴宴');
+        }
         this.saveCheckpoint('radio');
       },
     });
 
-    // 三只香炉（谜题）
-    this.g.world.dynamic.censers.forEach((c, i) => {
-      add({
-        id: `censer${i}`, pos: c.pos, r: 1.7, prompt: '点香',
-        cond: () => !F.puzzleSolved,
-        act: () => this.lightCenser(i),
-      });
+    // —— 807：陪新娘上头（持镜教学） ——
+    add({
+      id: 'bride807', pos: L.dresser807, r: 2.6, prompt: '在梳妆台边坐下',
+      cond: () => F.inHotel && !F.metBride,
+      act: () => this.brideScene(),
     });
 
-    // 喉铃
+    // —— 服务走廊 CRT（预现教学） ——
     add({
-      id: 'bell', pos: L.altar, r: 2.0, prompt: '请下喉铃',
-      cond: () => F.puzzleSolved && !F.bellTaken,
-      act: () => this.takeBell(),
-    });
-
-    // 灯塔电闸
-    add({
-      id: 'breaker', pos: L.breaker, r: 1.8, prompt: '合上电闸',
-      cond: () => !F.breakerOn,
+      id: 'crtCorridor', pos: L.crtCorridor, r: 2.2, prompt: '凑近看屏幕',
+      cond: () => !F.crtTip && F.metBride,
       act: () => {
-        F.breakerOn = true;
-        this.g.audio.blip(120, 0.25, 0.5);
-        this.g.audio.blip(1900, 0.06, 0.4, 0.3);
-        const d = this.g.world.dynamic;
-        d.lighthouseLamp.material.emissiveIntensity = 2.6;
-        d.lighthouseBeam.children[0].material.opacity = 0.16;
-        this.g.hud.subtitle('发电机咳嗽了几声，活了过来。塔灯亮了。', 4);
-        this.g.hud.subtitle('歌声顿了一拍——她知道岸上还有人。', 4.5, 'song');
-        this.saveCheckpoint('lighthouse');
+        F.crtTip = true;
+        g.audio.tvBlip();
+        g.hud.subtitle('屏幕里是这条走廊。但不是现在的这条——', 4.5);
+        g.hud.subtitle('墙上的沉积更厚。走廊口立着一名侍应，面朝镜头。', 5);
+        g.hud.subtitle('电视先播，现实照做。记住屏幕里的样子。', 5);
+        g.hud.objective('去宴会厅——敬酒快开始了');
+        this.saveCheckpoint('crtTip');
       },
     });
 
-    // 梯子（上/下）
+    // —— 保卫科钥匙柜 ——
     add({
-      id: 'ladderUp', pos: L.ladderBottom, r: 1.6, prompt: '攀上灯塔',
-      cond: () => this.flags.breakerOn,
+      id: 'keyCabinet', pos: L.keyCabinet, r: 1.8, prompt: '开钥匙柜',
+      cond: () => F.leaked && !F.hasAquaKey,
       act: () => {
-        const t = L.ladderTopSpot;
-        this.teleport(t.x, t.z, t.yaw, () => {
-          this.flags.atTop = true;
-          if (!this.flags.ended) {
-            this.g.hud.subtitle('风从四面八方来。海在下面看着你。', 4);
-            this.g.hud.objective('敲响喉铃');
-          }
-        });
-      },
-    });
-    add({
-      id: 'ladderDown', pos: () => {
-        const t = L.ladderTopSpot;
-        return new THREE.Vector3(t.x, this.g.world.heightAt(t.x, t.z), t.z);
-      },
-      r: 1.5, prompt: '爬下灯塔',
-      cond: () => this.flags.atTop && !this.flags.ended,
-      act: () => {
-        // 落点在塔顶补丁范围之外，避免多层高度歧义
-        this.teleport(72.6, -115.4, 2.4, () => { this.flags.atTop = false; });
+        F.hasAquaKey = true;
+        g.audio.blip(700, 0.08, 0.15);
+        g.hud.subtitle('海洋馆值班室的钥匙。牌子上写着「西馆·铁柜」。', 4.5);
+        this.nameByCrt();
       },
     });
 
-    // 终局铃架
+    // —— 配电间总闸（破像） ——
     add({
-      id: 'bellTop', pos: L.bellTop, r: 2.0, prompt: '把喉铃挂上，敲响',
-      cond: () => this.flags.atTop && this.flags.bellTaken && !this.flags.ended,
-      act: () => this.beginEnding(),
+      id: 'mainBreaker', pos: L.mainBreaker, r: 1.9, prompt: '拉下总闸（破像）',
+      cond: () => F.namedByCrt && !F.imageBroken,
+      act: () => this.breakImage(),
+    });
+
+    // —— 807 电视（播母带） ——
+    add({
+      id: 'tv807', pos: L.tv807, r: 2.2, prompt: '把母带塞进录像机',
+      cond: () => F.hasTape && !F.tapeSeen,
+      act: () => this.playTape(),
+    });
+
+    // —— 宴会厅囍匾（终局大破像） ——
+    add({
+      id: 'xiPanel', pos: new THREE.Vector3(L.stageMic.x, L.stageMic.y, L.stageMic.z - 1.6), r: 3.0,
+      prompt: '扯下囍字金匾（大破像）',
+      cond: () => F.tapeSeen && !F.finaleBroken,
+      act: () => this.beginFinale(),
+    });
+
+    // —— 前台电话（可选：调虎离山） ——
+    add({
+      id: 'frontPhone', pos: L.frontPhone, r: 1.8, prompt: '拨内线电话',
+      cond: () => F.leaked && this.phoneT < 0,
+      act: () => {
+        this.phoneT = 1.2;
+        g.hud.subtitle('你拨了厨房的内线，把听筒搁在台上。', 4);
+      },
     });
   }
 
   // ---------- 触发区 ----------
   buildTriggers() {
-    const Z = this.g.world.zones;
+    const g = this.g;
+    const Z = g.world.zones;
     const add = (o) => this.triggers.push(o);
 
     add({
       zone: Z.dikeArea, once: true,
       act: () => {
-        this.g.hud.subtitle('堤上有人。是熟面孔——李家的三叔，三年前就该下葬的三叔。', 5);
-        this.g.hud.subtitle('他还在补网。按住 Shift 放低身子，别让他直起腰。', 5.5);
+        g.hud.subtitle('堤上有人。渔寮的灯还亮着——喜宴之夜，还有人在补网。', 5);
+        g.hud.subtitle('按住 Shift 放低身子。别惊动干活的人：他们手里的活不能停。', 5.5);
         this.flags.stealthTip = true;
         this.saveCheckpoint('dike');
       },
@@ -434,178 +604,395 @@ export class Story {
     add({
       zone: Z.villageCenter, once: true, cond: () => this.flags.gateOpen,
       act: () => {
-        this.g.hud.subtitle('村子还是老样子。太"老样子"了——香烛没灭，灶台温着，广播响着。', 6);
-        this.g.hud.subtitle('三年，没有一样东西敢动。', 4);
+        g.hud.subtitle('满街的囍。灶是温的，碗筷齐整——人全在酒店。', 5.5);
       },
     });
     add({
       zone: Z.saltField, once: true,
-      act: () => this.g.hud.subtitle('盐田里的盐摆成鳞片的纹路。有人在夜里一片一片摆好。', 5),
+      act: () => g.hud.subtitle('盐田干着。盐霜自己排成鳞片的纹路，一夜一换。', 5),
     });
     add({
       zone: Z.temple, once: true,
       act: () => {
-        this.g.hud.subtitle('潮母宫。祭师还跪在里面，重复着三年前没做完的动作。', 5);
-        this.g.hud.subtitle('他在演练点香的次序。借他的眼睛（Q），看清楚。', 5.5);
-        this.saveCheckpoint('temple');
+        g.hud.subtitle('旧海祀。填湾之前，许潮的规矩从这里出。', 4.5);
+        g.hud.subtitle('守祀人还跪在里面。他不看人——借他的眼睛（Q）也无妨。', 5);
       },
     });
     add({
-      zone: Z.wreckBay, once: true, cond: () => this.flags.bloodTide,
+      zone: Z.wreckBay, once: true,
       act: () => {
-        this.flags.wreckTip = true;
-        this.g.hud.subtitle('湾里的水涨红了。走沉船的龙骨——别碰水，水里有手。', 5.5);
+        g.hud.subtitle('湾里的沉船翻着龙骨。走龙骨过谷地——别下水。', 5);
       },
     });
     add({
-      zone: Z.lighthouse, once: true,
+      zone: Z.lighthouse, once: true, cond: () => !this.flags.finaleBroken,
       act: () => {
-        this.g.hud.subtitle('灯塔是黑的。守塔人说过：塔灯一灭，她就知道岸上没人了。', 5.5);
-        this.g.hud.objective('让灯塔重新亮起来');
+        g.hud.subtitle('灯塔是黑的。塔下的浪很稳，稳得像屏住呼吸。', 5),
+        this.saveCheckpoint('lighthouse');
+      },
+    });
+    // —— 酒店节拍 ——
+    add({
+      zone: Z.hotelFront, once: true,
+      act: () => {
+        g.hud.subtitle('南方大酒店。一九九八年填湾起楼，建材取自古海床。', 5);
+        g.hud.subtitle('整面楼都亮着。囍字灯箱把台阶照成红的。', 4.5);
+        this.saveCheckpoint('hotelFront');
+      },
+    });
+    add({
+      zone: Z.hotelLobby, once: true,
+      act: () => {
+        this.flags.inHotel = true;
+        g.hud.subtitle('大堂满员。水磨石地面，红毯直铺到大楼梯。', 4.5);
+        g.hud.subtitle('总台的登记簿开着。你的房号——伴娘随新娘，807。', 5);
+        g.hud.objective('上三楼 807 新房，陪新娘上头');
+        if (g.agenda.stage < 1) g.agenda.advance(); // 入席
+        g.crt.setEnabled(true);
+        this.saveCheckpoint('lobby');
+      },
+    });
+    add({
+      zone: Z.banquet, once: true, cond: () => this.flags.crtTip && !this.flags.leaked,
+      act: () => {
+        // 敬酒 = 返潮点火
+        if (this.g.agenda.stage < 3) this.g.agenda.advance(); // → 敬酒（applyStage 触发渗漏）
+      },
+    });
+    add({
+      zone: Z.serviceCorridor, once: true, cond: () => this.flags.metBride,
+      act: () => {
+        g.hud.subtitle('服务走廊。推车上有台电视——没接天线，屏幕却亮着。', 5);
+      },
+    });
+    add({
+      zone: Z.annex, once: true, cond: () => this.flags.imageBroken,
+      act: () => {
+        g.hud.subtitle('玻璃连廊。展缸的方向传来一声很低的嗡。', 4.5);
+        this.saveCheckpoint('annex');
       },
     });
   }
 
-  // ---------- 鬼火（只在视奸相机可见 → 强制机制#2） ----------
-  setupGhostFlames() {
-    for (const c of this.g.world.dynamic.censers) {
-      c.flames.traverse((o) => o.layers.set(1));
-      c.flames.visible = true;
-      c.ghostOn = false;
-      c.lit = false;
-      this.setFlameVisual(c);
-    }
-    this.g.sightjack.camera.layers.enable(1);
-  }
-
-  setFlameVisual(c) {
-    // 烟只跟随真实点燃状态（鬼火是残象，无烟）
-    c.smoke?.set(!!c.lit);
-    // lit: 主相机+视奸都可见; ghost: 仅视奸(layer1); off: 隐藏
-    if (c.lit) {
-      c.flames.traverse((o) => o.layers.enableAll());
-      c.flames.visible = true;
-    } else if (c.ghostOn) {
-      c.flames.traverse((o) => { o.layers.set(1); });
-      c.flames.visible = true;
-    } else {
-      c.flames.visible = false;
-    }
-  }
-
-  lightCenser(i) {
-    const F = this.flags;
-    const censers = this.g.world.dynamic.censers;
-    if (F.puzzleSolved) return;
-    const expect = this.ritual.seq[F.puzzleProgress];
-    if (i === expect) {
-      F.puzzleProgress++;
-      censers[i].lit = true;
-      this.setFlameVisual(censers[i]);
-      this.g.audio.incense();
-      if (F.puzzleProgress >= 3) {
-        F.puzzleSolved = true;
-        this.g.audio.bellSmall();
-        this.g.hud.subtitle('三炷香复正。神台后传来一声轻响，像什么东西松开了。', 5);
-        this.g.hud.subtitle('神台上——喉铃。', 3);
-      } else {
-        this.g.hud.subtitle(`香点着了。（${F.puzzleProgress} / 3）`, 2.5);
-      }
-    } else {
-      F.puzzleProgress = 0;
-      for (const c of censers) { c.lit = false; this.setFlameVisual(c); }
-      this.g.audio.wrong();
-      this.g.stealth.emitNoise(censers[i].pos.x, censers[i].pos.z, 22);
-      this.g.hud.subtitle('香一齐灭了。风是从殿里往外吹的。', 4);
-      this.g.hud.subtitle('顺序不对。祭师每晚都在演练——用他的眼睛看（Q）。', 5);
-    }
-  }
-
-  takeBell() {
-    const F = this.flags;
-    F.bellTaken = true;
-    this.g.world.dynamic.altarBell.visible = false;
-    this.g.audio.bellSmall();
-    this.g.hud.subtitle('铃很轻。轻得像一截空了的喉咙。', 4);
-    // —— 血潮 ——
-    setTimeout(() => this.beginBloodTide(), 2500);
-  }
-
-  beginBloodTide() {
-    const F = this.flags;
-    if (F.bloodTide) return;
-    F.bloodTide = true;
+  // ---------- 节拍：807 上头 ----------
+  brideScene() {
     const g = this.g;
-    g.audio.setBloodTide(true);
-    g.ocean.setBloodTide(true, 1.8);
+    const F = this.flags;
+    F.metBride = true;
+    g.player.frozen = true;
+    g.hud.setLetterbox(true);
+    g.hud.subtitle('絮絮看见你，肩膀松了半寸。', 4);
+    g.hud.subtitle('「阿澄。你坐我边上。」', 3.5);
+    g.hud.subtitle('三面镜里坐着你们两个。梳头的手还没来。', 4.5, null);
+    setTimeout(() => {
+      g.hud.subtitle('絮絮往你手里塞了面小镜子，掌心全是汗——', 4.5);
+      g.hud.subtitle('「拿着。镜子里的事，比外头早一拍。看镜子，别看人。」', 5.5);
+    }, 8000);
+    setTimeout(() => {
+      F.hasMirror = true;
+      g.audio.bellSmall();
+      g.hud.setLetterbox(false);
+      g.player.frozen = false;
+      g.hud.subtitle('（获得伴娘手镜：镜中之物先于现实半拍）', 4);
+      g.hud.objective('下楼——去服务走廊，找那台亮着的电视');
+      if (g.agenda.stage < 2) g.agenda.advance(); // 上菜
+      this.saveCheckpoint('suite807');
+    }, 13500);
+  }
+
+  // ---------- 节拍：敬酒 → 渗漏态 ----------
+  beginLeak() {
+    const F = this.flags;
+    if (F.leaked) return;
+    F.leaked = true;
+    const g = this.g;
+    g.audio.setBloodTide(true);   // 深海轰鸣一记（无水的潮）
+    g.audio.setSongWarp(true);    // 喜歌换了唱法
+    g.ocean.setBloodTide(true, 1.2);
     g.sky.setBloodTide(true);
-    g.stealth.resonanceActive = true;
-    g.stealth.envSightFactor = 0.8;
-    g.hud.subtitle('潮来了。不是涨——是整个海往村里挪。', 5, 'song');
-    g.hud.subtitle('全村的喉咙一起响了。她们在和。', 5, 'song');
-    g.hud.objective('去灯塔——把铃还给海');
-    // 敌人变化：劳作者起身巡游，歌唱者与看守者入场
+    g.stealth.envSightFactor = 0.85;
+    g.hud.subtitle('敬酒的杯子还举着——整栋楼往下沉了一寸。没有水。来的是深度。', 6, 'song');
+    g.hud.subtitle('大堂的人不见了。席上的人还在——脚尖离了地。', 5.5, 'song');
+    // 人群切换：满员正常态 → 浮客
+    this.crowdNormal.visible = false;
+    this.crowdLeak.visible = true;
+    for (const f of g.floaters) f.setEnabled(true);
+    // 预现层兑现：现实长出沉积（把预现①搬进现实）
+    this.ftSediment.traverse((o) => { o.visible = true; });
+    g.scene.add(this.ftSediment);
+    // 新预现：还没有内容（点名要等你拿钥匙——它在等你的名字）
+    g.crt.setForetell([], []);
+    // 敌人变化：侍应转为警戒巡逻，保卫科上岗
     const byId = g.byId;
-    byId.netMender.kind = 'patrol';
-    byId.netMender.def.waypoints = [[12, 47], [4, 56], [18, 60], [26, 50]];
-    byId.netMender.state = 'PATROL';
-    byId.saltWorker.kind = 'patrol';
-    byId.saltWorker.def.waypoints = [[-44, 4], [-30, 12], [-24, -4], [-40, -8]];
-    byId.saltWorker.state = 'PATROL';
-    byId.singer.setEnabled(true);
-    byId.warden.setEnabled(true);
-    // 祭师瘫在原地(他的祭做完了)
-    byId.priest.def.workMode = 'idle';
-    this.saveCheckpoint('bloodtide', -50, -66);
+    for (const id of ['waiterBanquet', 'waiterLobby', 'waiterEast']) {
+      const w = byId[id];
+      if (w) { w.sightRange += 2; w.walkSpeed = 1.15; }
+    }
+    byId.security?.setEnabled(true);
+    // 灯光：荧光变冷、闪烁加剧
+    for (const hl of g.world.dynamic.hotelLights ?? []) {
+      hl.flicker = Math.min(2.4, (hl.flicker ?? 0) + 0.8);
+      hl.base *= 0.72;
+    }
+    // 画面：轻微冷绿下沉（不是红滤镜）
+    g.engine.finalPass.uniforms.uTint.value.set(0.94, 1.0, 0.97);
+    g.hud.objective('去二楼保卫科——拿海洋馆的钥匙');
+    this.saveCheckpoint('leak', g.world.locations.kitchen.x, g.world.locations.kitchen.z);
   }
 
-  // ---------- 演练仪式（祭师） ----------
-  updateRitual(dt) {
-    if (this.flags.puzzleSolved || this.flags.bloodTide) return;
-    const priest = this.g.byId.priest;
-    if (!priest || priest.state !== 'WORK') {
-      // 被惊动时鬼火全灭
-      for (const c of this.g.world.dynamic.censers) { c.ghostOn = false; if (!c.lit) this.setFlameVisual(c); }
-      return;
-    }
-    const R = this.ritual;
-    const censers = this.g.world.dynamic.censers;
-    R.t += dt;
-    if (R.phase === 'gaze') {
-      const target = censers[R.seq[R.idx]];
-      // 祭师面向当前香炉；鬼火亮（只在视奸中可见）
-      priest.def.workYaw = Math.atan2(target.pos.x - priest.pos.x, target.pos.z - priest.pos.z);
-      if (!target.ghostOn) {
-        target.ghostOn = true;
-        if (!target.lit) this.setFlameVisual(target);
-      }
-      if (R.t > 2.4) {
-        target.ghostOn = false;
-        if (!target.lit) this.setFlameVisual(target);
-        R.t = 0;
-        R.idx++;
-        if (R.idx >= 3) { R.idx = 0; R.phase = 'bow'; }
-      }
-    } else {
-      // 叩拜间歇
-      priest.def.workYaw = Math.atan2(this.g.world.locations.altar.x - priest.pos.x,
-        this.g.world.locations.altar.z - priest.pos.z);
-      if (R.t > 3.2) { R.t = 0; R.phase = 'gaze'; }
-    }
-    // 玩家在视奸祭师时给一次提示
-    if (!this.flags.ritualTip && this.g.sightjack.active && this.g.sightjack.current === priest) {
-      this.flags.ritualTip = true;
-      this.g.hud.subtitle('他在看香炉——记住次序。', 4);
+  // ---------- 节拍：CRT 点名 → 破像 ----------
+  nameByCrt() {
+    const F = this.flags;
+    if (F.namedByCrt || F.imageBroken) return;
+    F.namedByCrt = true;
+    const g = this.g;
+    g.audio.tvBlip();
+    g.crt.setForetell([this.ftSeated], []);
+    g.hud.subtitle('身后的九个屏幕同时换了画面——宴会厅，上宾的空席。', 5);
+    g.hud.subtitle('席上坐了个人。那身衣服……是你的。', 5, 'song');
+    g.hud.subtitle('电视先播，现实照做。除非——现实先不认账。', 5);
+    g.hud.objective('去一楼配电间拉总闸：让现实与录像不符（破像）');
+    this.saveCheckpoint('named');
+  }
+
+  breakImage() {
+    const F = this.flags;
+    F.imageBroken = true;
+    F.namedByCrt = false;
+    F.breakerCut = true;
+    const g = this.g;
+    g.audio.breakerClunk(false);
+    g.crt.breakImage(30);
+    g.crt.setForetell([], []);
+    g.agenda.delay(30);
+    // 灯光骤暗几秒
+    const lights = g.world.dynamic.hotelLights ?? [];
+    const bases = lights.map((l) => l.base);
+    for (const l of lights) l.base = 0.06;
+    setTimeout(() => {
+      lights.forEach((l, i) => { l.base = bases[i] * 0.55; });
+      g.audio.breakerClunk(true);
+      if (!g.player.dead) g.hud.subtitle('应急电上来了。灯只剩一半。', 4);
+    }, 5000);
+    g.hud.subtitle('总闸落下。整栋楼黑了一拍——屏幕里的画面撕成雪花。', 5.5);
+    g.hud.subtitle('录像作废了。这一次点名不算。', 4.5, 'song');
+    g.hud.subtitle('但大堂里进来了别的东西。走红毯。硬地会把你的脚步传给它。', 6);
+    g.hud.objective('穿过大堂去东廊，从玻璃连廊进海洋馆取母带');
+    // 上宾入场
+    g.guest.setEnabled(true);
+    g.stealth.vibrationActive = true;
+    this.saveCheckpoint('broken');
+  }
+
+  // ---------- 节拍：取母带 ----------
+  takeTape() {
+    const F = this.flags;
+    F.hasTape = true;
+    const g = this.g;
+    g.hud.subtitle('母带很沉，像吸饱了水——可它是干的。', 4.5);
+    g.hud.objective('回三楼 807，用房里的录像机放母带');
+    if (g.agenda.stage < 4) g.agenda.advance(); // 上头
+    this.saveCheckpoint('tape');
+  }
+
+  // ---------- 节拍：播母带 + 全福婆 ----------
+  playTape() {
+    const F = this.flags;
+    F.tapeSeen = true;
+    const g = this.g;
+    g.player.frozen = true;
+    g.audio.tvBlip();
+    g.hud.setLetterbox(true);
+    this.tapeSeq = { t: 0, stage: 0 };
+  }
+
+  updateTape(dt) {
+    if (!this.tapeSeq) return;
+    const s = this.tapeSeq;
+    const g = this.g;
+    s.t += dt;
+    switch (s.stage) {
+      case 0:
+        if (s.t > 0.5) {
+          s.stage = 1;
+          g.hud.subtitle('雪花。然后是宴会厅——彩排那天的宴会厅。', 4.5);
+          g.hud.subtitle('画外音是个老人。他在讲许潮的规矩。', 4);
+        }
+        break;
+      case 1:
+        if (s.t > 8.5) {
+          s.stage = 2;
+          this.notesFound.add('note8');
+          g.openNote(NOTES.find((n) => n.id === 'note8'));
+        }
+        break;
+      case 2:
+        if (this.g.state === 'PLAY') { // 文书已合上
+          s.stage = 3; s.t = 0;
+          g.player.frozen = true;
+          g.hud.subtitle('……收影。收的是影子。伴娘要挑外乡人。', 5.5, 'song');
+          g.hud.subtitle('絮絮知道。她把镜子塞给你的时候，手在抖。', 5);
+        }
+        break;
+      case 3:
+        if (s.t > 6) {
+          this.tapeSeq = null;
+          g.hud.setLetterbox(false);
+          g.player.frozen = false;
+          this.beginMatronChase();
+        }
+        break;
     }
   }
 
-  // ---------- 视奸获知钥匙 ----------
+  beginMatronChase() {
+    const F = this.flags;
+    if (F.matronChase) return;
+    F.matronChase = true;
+    const g = this.g;
+    const matron = g.byId.matron;
+    if (matron) {
+      matron.setEnabled(true);
+      matron.permAlertBonus = 6;
+      matron.enterAlert(g.player, g.audio, null);
+    }
+    g.audio.bellSmall();
+    g.hud.subtitle('走廊尽头的镜子里——全福婆已经站在你门口了。', 5, 'song');
+    g.hud.subtitle('现实里她还没到。镜子早一拍。趁这一拍，走。', 5);
+    g.hud.objective('甩开全福婆，下楼去宴会厅——扯下囍匾，大破像');
+    this.saveCheckpoint('tape807');
+  }
+
+  // ---------- 终局 ----------
+  beginFinale() {
+    const F = this.flags;
+    F.finaleBroken = true;
+    const g = this.g;
+    g.audio.bellBig();
+    g.crt.breakImage(9999);
+    g.agenda.advanceTo(5); // 送入洞房（广播在雪花里变形）
+    // 匾落下：席位的名字没了着落
+    const plate = g.world.dynamic.guestSeatPlate;
+    if (plate) plate.visible = false;
+    g.hud.subtitle('金匾砸在舞台上。囍字断成两半。', 4.5);
+    g.hud.subtitle('全楼的屏幕一起转成雪花——没有下一个画面了。', 5, 'song');
+    g.hud.subtitle('司仪还举着杯。他的嘴被鱼籽封着，声音却没停：——送入洞房——', 6, 'song');
+    // 全体警觉但失去目标：搜索状态
+    for (const e of g.enemies) {
+      if (!e.enabled || !e.lastSeenPos) continue;
+      e.lastSeenPos.set(g.world.locations.banquetCenter.x, 0, g.world.locations.banquetCenter.z);
+      if (e.state === 'ALERT') { e.state = 'SEARCH'; e.stateTimer = 0; e.searchTotal = 0; e.searchTarget = null; }
+    }
+    g.hud.objective('离开酒店——去灯塔，等海雾散');
+    this.saveCheckpoint('finale');
+  }
+
+  tryEnd() {
+    if (this.flags.ended || !this.flags.finaleBroken) return;
+    const p = this.g.player.pos;
+    const Z = this.g.world.zones.lighthouse;
+    if (p.x >= Z.minX && p.x <= Z.maxX && p.z >= Z.minZ && p.z <= Z.maxZ) {
+      this.beginEnding();
+    }
+  }
+
+  beginEnding() {
+    const g = this.g;
+    this.flags.ended = true;
+    g.player.frozen = true;
+    g.hud.prompt(null);
+    this.endSeq = { t: 0, stage: 0 };
+    g.hud.clearSubtitles();
+    g.hud.subtitle('潮声退了半拍。像一场宴席撤了席。', 5);
+  }
+
+  updateEnding(dt) {
+    if (!this.endSeq) return;
+    const g = this.g;
+    const s = this.endSeq;
+    s.t += dt;
+    switch (s.stage) {
+      case 0:
+        if (s.t > 4) {
+          s.stage = 1; s.t = 0;
+          g.ocean.setBloodTide(false);
+          g.sky.setBloodTide(false);
+          g.audio.setSongWarp(false);
+          g.engine.finalPass.uniforms.uTint.value.set(1, 1, 1);
+          g.hud.subtitle('海雾散了。楼里的灯一层一层地灭，像退潮。', 5.5);
+        }
+        break;
+      case 1:
+        if (s.t > 5.5) {
+          s.stage = 2; s.t = 0;
+          g.sightjack.forceView(this.seaViewer, 6.0, () => {});
+          g.hud.subtitle('最后你借了一次海的眼睛。它看了看灯塔上的你——', 5.5, 'song');
+          g.hud.subtitle('然后收回了视线。今晚点到的名字，不是你的。', 5.5, 'song');
+        }
+        break;
+      case 2:
+        if (s.t > 7) {
+          s.stage = 3; s.t = 0;
+          g.hud.fade(true);
+        }
+        break;
+      case 3:
+        if (s.t > 2.5) {
+          s.stage = 4;
+          g.sightjack.exit();
+          g.sightjack.restorePost();
+          g.player.frozen = true;
+          g.hud.showEnding(
+            ['潮退了半寸。', '絮絮还在楼里。你还欠她一场喜酒。', '', '—— Demo 结束 ——'],
+            `返潮 FANCHAO · 蚀湾 2001<br/>
+             文书拾获：${this.notesFound.size} / 8 · 被引座 ${this.deathCount} 次<br/><br/>
+             「电视先播，现实照做。喜事不许退席。」<br/><br/>
+             按 F5 重新赴宴`
+          );
+          g.onEnded?.();
+        }
+        break;
+    }
+  }
+
+  // ---------- 议程 → 世界状态 ----------
+  applyStage(stage) {
+    const g = this.g;
+    switch (stage) {
+      case 0: // 迎宾：酒店灯箱更亮
+        break;
+      case 1: // 入席
+        break;
+      case 2: { // 上菜：侍应加速
+        for (const id of ['waiterBanquet', 'waiterLobby']) {
+          const w = g.byId[id];
+          if (w) w.walkSpeed = 1.1;
+        }
+        break;
+      }
+      case 3: // 敬酒 = 返潮点火
+        this.beginLeak();
+        break;
+      case 4: { // 上头：全福婆上三楼（等母带播完转为追）
+        const matron = g.byId.matron;
+        if (matron) matron.setEnabled(true);
+        g.hud.subtitle('楼上传来梳齿过发的声音。一下，一下。', 5, 'song');
+        break;
+      }
+      case 5: // 送入洞房（终局压力）
+        for (const e of g.enemies) {
+          if (e.enabled && e.permAlertBonus !== undefined) e.permAlertBonus = Math.min(9, e.permAlertBonus + 2);
+        }
+        break;
+    }
+  }
+
+  // ---------- 视奸获知钥匙（堤门） ----------
   updateKeySpy() {
     const F = this.flags;
     if (F.knowKeySpot || !this.g.sightjack.active) return;
     const patrol = this.g.byId.dikePatrol;
     if (this.g.sightjack.current !== patrol) return;
-    // 巡堤人走进渔寮二的路段（路点 5~7 段）
     if (patrol.state === 'PATROL' && patrol.wpIndex >= 5 && patrol.wpIndex <= 7) {
       const d = Math.hypot(patrol.pos.x - 20, patrol.pos.z - 59);
       if (d < 4.5) {
@@ -622,18 +1009,16 @@ export class Story {
     if (F.intro) return;
     F.intro = true;
     const hud = this.g.hud;
-    // 电影运镜：从天到眼——被冲上岸的人睁开眼睛
     this.introSeq = { t: 0, dur: 9.5 };
     hud.setLetterbox(true);
     this.g.player.frozen = true;
-    hud.subtitle('……沿海渔船请注意……阵风十一级……所有船只回港避风……', 5, 'radio');
-    hud.subtitle('……重复……盐门村渡口……停航……停航……', 4.5, 'radio');
-    hud.subtitle('渡船在礁上撞碎的时候，收音机还在念三年前的台风警报。', 5);
-    hud.subtitle('姐姐的信在口袋里泡咸了。邮戳永远是同一天：四月初八。', 5.5);
-    hud.subtitle('潮声里有人在唱歌。调子很熟，像小时候听过。', 5, 'song');
+    hud.subtitle('二〇〇一年，秋。蚀湾。', 4);
+    hud.subtitle('……喜宴实况转播……南方大酒店……全镇同贺……', 5, 'radio');
+    hud.subtitle('末班渡船在滩涂搁了浅。船老大说：今晚的潮不对，你自己走过去吧。', 6);
+    hud.subtitle('絮絮的喜帖在行李箱里。她只求了你一件事：上头的时候，别出声。', 6);
     setTimeout(() => {
-      hud.objective('沿礁滩上岸，找到进村的路');
-    }, 12000);
+      hud.objective('从行李箱里取回喜帖');
+    }, 11000);
   }
 
   updateIntro(dt) {
@@ -645,7 +1030,6 @@ export class Story {
     const cam = g.engine.camera;
     const T = Math.min(1, s.t / s.dur);
     const ease = T * T * (3 - 2 * T);
-    // 高处俯瞰礁滩 → 缓缓落回搁浅者的眼睛
     const yaw = p.yaw + (1 - ease) * 2.3;
     const pitch = -(1 - ease) * 0.6;
     const back = (1 - ease) * 4.2;
@@ -658,7 +1042,6 @@ export class Story {
     cam.rotation.set(0, 0, 0);
     cam.rotateY(yaw);
     cam.rotateX(pitch);
-    // 湿透的人站不稳——轻微的摇晃随落地收敛
     cam.rotateZ(Math.sin(s.t * 0.8) * 0.05 * (1 - ease));
     if (T >= 1) this.endIntro();
   }
@@ -677,7 +1060,7 @@ export class Story {
     this.checkpoint = {
       name,
       x: x ?? p.pos.x, z: z ?? p.pos.z, yaw: p.yaw,
-      y: x !== undefined ? undefined : p.pos.y, // 自定义坐标时按最高面解析
+      y: x !== undefined ? undefined : p.pos.y,
     };
     if (this.time > 4) this.g.hud.checkpointToast();
   }
@@ -688,21 +1071,21 @@ export class Story {
     g.player.setPosition(c.x, c.z, c.yaw, c.y);
     g.player.dead = false;
     g.player.frozen = false;
-    // 敌人复位（保留 permAlertBonus——永不忘记）
     for (const e of g.enemies) e.reset?.();
-    g.stealth.resonance = 0;
+    g.guest?.reset?.();
+    g.stealth.vibration = 0;
     g.stealth.danger = 0;
     this.drownTimer = 0;
     g.hud.setDeath(false);
     g.hud.fade(false);
   }
 
-  // ---------- 被抓演出（近身掐喉） ----------
+  // ---------- 被抓演出（引座） ----------
   beginCaught(enemy) {
     if (this.g.player.dead || this.flags.ended || this.caughtSeq) return;
     const g = this.g;
     this.caughtSeq = { t: 0, enemy };
-    enemy.grabbing = true;
+    if (enemy.grabbing !== undefined) enemy.grabbing = true;
     g.player.frozen = true;
     g.sightjack.exit();
     g.sightjack.restorePost();
@@ -717,24 +1100,26 @@ export class Story {
     const g = this.g;
     const p = g.player;
     const e = s.enemy;
-    // 视线被拽向那张凑过来的脸
-    const targetYaw = Math.atan2(-(e.pos.x - p.pos.x), -(e.pos.z - p.pos.z));
+    const ex = e.pos?.x ?? p.pos.x, ez = e.pos?.z ?? p.pos.z;
+    const targetYaw = Math.atan2(-(ex - p.pos.x), -(ez - p.pos.z));
     p.yaw += angleWrap(targetYaw - p.yaw) * Math.min(1, dt * 10);
     p.pitch += (-0.08 - p.pitch) * Math.min(1, dt * 8);
     p.syncCamera(dt);
-    // 挤压感：畸变 + 心跳 + 漫红一起收紧
     const u = g.engine.finalPass.uniforms;
     u.uPulse.value = Math.min(1.5, s.t * 2.2);
     u.uDistort.value = Math.min(0.55, s.t * 0.5);
-    u.uRedShift.value = Math.min(0.55, s.t * 0.5);
     if (s.t > 1.45) {
       this.caughtSeq = null;
-      e.grabbing = false;
-      this.kill('溺', `${e.label}把你按进了水里。—— 回到检查点`);
+      if (e.grabbing !== undefined) e.grabbing = false;
+      const isGuest = e.kind === 'guest';
+      this.kill('席',
+        isGuest
+          ? '前肢在你头顶合拢。等你能动的时候，你坐在空席上，桌牌写着——「上宾」。—— 回到检查点'
+          : `${e.label}把你引回了宴会厅。空席的桌牌翻了过来——是你的名字。—— 回到检查点`);
     }
   }
 
-  // ---------- 死亡 ----------
+  // ---------- 死亡（引座失败态） ----------
   kill(reason, sub, force = false) {
     if ((this.g.player.dead && !force) || this.flags.ended) return;
     const g = this.g;
@@ -746,18 +1131,18 @@ export class Story {
     g.sightjack.restorePost();
     g.hud.clearSubtitles();
     this.deathSeq = { t: 0, reason, sub };
-    g.engine.finalPass.uniforms.uRedShift.value = 0.5;
-    document.getElementById('death-text').textContent = reason ?? '溺';
+    g.engine.finalPass.uniforms.uRedShift.value = 0.35;
+    document.getElementById('death-text').textContent = reason ?? '席';
     const m = Math.floor(this.time / 60);
-    const stats = `入村 ${m} 分 · 文书 ${this.notesFound.size}/8 · 第 ${this.deathCount} 次被收走`;
-    g.hud.setDeath(true, sub ?? '潮水替你记住了这里 —— 正在回到检查点', stats);
+    const stats = `入镇 ${m} 分 · 文书 ${this.notesFound.size}/8 · 第 ${this.deathCount} 次被引座`;
+    g.hud.setDeath(true, sub ?? '喜事不许退席 —— 正在回到检查点', stats);
   }
 
   updateDeath(dt) {
     if (!this.deathSeq) return;
     this.deathSeq.t += dt;
     const t = this.deathSeq.t;
-    this.g.engine.finalPass.uniforms.uRedShift.value = Math.min(0.75, 0.5 + t * 0.1);
+    this.g.engine.finalPass.uniforms.uRedShift.value = Math.min(0.6, 0.35 + t * 0.08);
     if (t > 2.2 && !this.deathSeq.faded) {
       this.deathSeq.faded = true;
       this.g.hud.fade(true);
@@ -765,7 +1150,7 @@ export class Story {
     if (t > 4.2) {
       this.deathSeq = null;
       const u = this.g.engine.finalPass.uniforms;
-      u.uRedShift.value = this.flags.bloodTide ? 0.12 : 0;
+      u.uRedShift.value = 0;
       u.uDistort.value = 0;
       u.uPulse.value = 0;
       this.respawn();
@@ -780,9 +1165,9 @@ export class Story {
       this.drownTimer += dt;
       if (this.drownTimer > 0.4 && !this._drownWarned) {
         this._drownWarned = true;
-        this.g.hud.subtitle('水下有手在拽你的裤脚。', 3);
+        this.g.hud.subtitle('水下有东西托了你一把——往深处托。', 3);
       }
-      if (this.drownTimer > 2.0) this.kill('溺', '海把你收下了。—— 回到检查点');
+      if (this.drownTimer > 2.0) this.kill('沉', '海把你收去入席了。—— 回到检查点');
     } else {
       this.drownTimer = Math.max(0, this.drownTimer - dt * 2);
       if (this.drownTimer === 0) this._drownWarned = false;
@@ -790,82 +1175,41 @@ export class Story {
     this.drownView = Math.min(1, this.drownTimer / 2);
   }
 
-  // ---------- 共鸣崩溃 ----------
-  updateResonance() {
+  // ---------- 振动警告 ----------
+  updateVibration() {
     const g = this.g;
-    if (g.stealth.resonance >= 1 && !g.player.dead && !this.flags.ended) {
-      if (!this.flags.singerTip) this.flags.singerTip = true;
-      // 强制视奸：被拽进歌唱者的眼睛
-      g.stealth.resonance = 0.99;
-      g.player.dead = true;
-      g.player.frozen = true;
-      g.hud.clearSubtitles();
-      g.hud.subtitle('歌词突然听清了。每一个字都是你的名字。', 4, 'song');
-      g.sightjack.forceView(g.byId.singer, 3.2, () => {
-        g.sightjack.exit();
-        g.sightjack.restorePost();
-        this.kill('和', '你差点跟着唱出来。—— 回到检查点', true);
-      });
+    const v = g.stealth.vibration;
+    if (v > 0.4 && !this._vibWarned && g.stealth.vibrationActive) {
+      this._vibWarned = true;
+      g.hud.subtitle('地面在把你的脚步一格一格递过去。走红毯。慢下来。', 5);
     }
-    // 首次共鸣警告
-    if (g.stealth.resonance > 0.35 && !this._resonanceWarned) {
-      this._resonanceWarned = true;
-      g.hud.subtitle('喉咙在自己发痒。离那个红衣服的声音远一点。', 4.5, 'song');
-    }
+    if (v < 0.15) this._vibWarned = false;
   }
 
-  // ---------- 传送（梯子等） ----------
-  teleport(x, z, yaw, after) {
-    const g = this.g;
-    g.player.frozen = true;
-    g.hud.fade(true);
-    setTimeout(() => {
-      g.player.setPosition(x, z, yaw);
-      g.hud.fade(false);
-      g.player.frozen = false;
-      after?.();
-    }, 900);
-  }
-
-  // ---------- 潮母 ----------
-  buildTideMother() {
-    const grp = new THREE.Group();
-    const dark = new THREE.MeshBasicMaterial({ color: 0x0a0d12, fog: false });
-    const mk = (geo, x, y, z, sx, sy, sz) => {
-      const m = new THREE.Mesh(geo, dark);
-      m.position.set(x, y, z); m.scale.set(sx, sy, sz);
-      grp.add(m);
-    };
-    // 山一样的轮廓：驼峰 + 抬起的"头"
-    mk(new THREE.SphereGeometry(1, 24, 16), 0, 0, 0, 42, 30, 30);
-    mk(new THREE.SphereGeometry(1, 24, 16), -30, 12, 4, 22, 26, 18);
-    mk(new THREE.SphereGeometry(1, 20, 14), -46, 34, 6, 9, 14, 8);
-    // 鳞＝成串灯笼
-    const lm = new THREE.MeshBasicMaterial({ color: 0xff9440, fog: false });
-    for (let i = 0; i < 14; i++) {
-      const a = i / 14;
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.9, 6, 6), lm);
-      m.position.set(-44 + a * 80, 16 + Math.sin(a * Math.PI) * 16 + Math.sin(i * 2.7) * 2, 10 - a * 6);
-      grp.add(m);
+  // ---------- 前台电话（调虎离山） ----------
+  updatePhone(dt) {
+    if (this.phoneT < 0) return;
+    this.phoneT -= dt;
+    if (this.phoneT <= 0) {
+      this.phoneT = -999; // 一次性
+      const g = this.g;
+      const L = g.world.locations;
+      g.audio.phoneRing();
+      g.stealth.emitNoise(L.frontPhone.x, L.frontPhone.z, 20);
+      g.hud.subtitle('前台的电话响了。侍应的头一起转过去。', 4.5);
     }
-    grp.position.set(150, -70, -215);
-    grp.visible = false;
-    this.g.scene.add(grp);
-    this.tideMother = grp;
   }
 
   // ---------- 环境氛围 ----------
   updateAmbient() {
     const g = this.g;
     const a = this.ambient;
-    // 脚本化一次性拍：时间到 且 条件满足才触发（条件不满足则继续等；窗口过期的条件永不满足，等待无害）
     for (const b of a.beats) {
       if (b.done || this.time < b.at) continue;
       if (b.cond && !b.cond()) continue;
       b.done = true;
       b.act();
     }
-    // 低频随机远景声（紧张时不投放，避免污染听觉信息）
     if (this.time >= a.next) {
       a.next = this.time + 45 + Math.random() * 30;
       if (g.stealth.danger < 0.25 && !g.sightjack.active) {
@@ -873,12 +1217,18 @@ export class Story {
         if (kind === 'horn') g.audio.hornDistant();
         else if (kind === 'gull') g.audio.gullDistant();
         else if (kind === 'creak') g.audio.doorCreak();
-        else g.audio.bell(820, 2.4, 0.055); // 远处浮标铃
+        else g.audio.bell(820, 2.4, 0.055);
       }
+    }
+    // 海洋馆展缸低鸣
+    if (this.flags.imageBroken && !this.flags.ended) {
+      const L = this.g.world.locations;
+      const d = Math.hypot(L.aquaHall.x - g.player.pos.x, L.aquaHall.z - g.player.pos.z);
+      if (d < 16) g.audio.tankHum(d);
     }
   }
 
-  // ---------- 望海者（环境叙事） ----------
+  // ---------- 望潮者（环境叙事） ----------
   updateWatchers() {
     const ws = this.g.watchers;
     if (!ws) return;
@@ -887,104 +1237,40 @@ export class Story {
     for (const w of ws) {
       const d = Math.hypot(w.pos.x - p.x, w.pos.z - p.z);
       if (d > 26) continue;
-      if (!this.flags.bloodTide && !this._watcherSeen) {
+      if (!this.flags.leaked && !this._watcherSeen) {
         this._watcherSeen = true;
         this.g.hud.subtitle('滩尾的水里站着人。不上岸，也不回头。', 5);
-        this.g.hud.subtitle('他们在等潮水点到自己的名字。', 4.5);
-      } else if (this.flags.bloodTide && !this._watcherTurnSeen) {
+        this.g.hud.subtitle('他们在等宴席开始。', 4);
+      } else if (this.flags.leaked && !this._watcherTurnSeen) {
         this._watcherTurnSeen = true;
-        this.g.hud.subtitle('……望海的人转过身来了。', 4.5, 'song');
-        this.g.hud.subtitle('现在他们望着村子。望着你。', 4.5, 'song');
+        this.g.hud.subtitle('……望潮的人转过身来了。', 4.5, 'song');
+        this.g.hud.subtitle('敬酒之后，他们望着酒店。望着你。', 4.5, 'song');
       }
     }
   }
 
-  // ---------- 终局 ----------
-  beginEnding() {
+  // ---------- 回眸客指路 ----------
+  updateGaze() {
     const g = this.g;
-    this.flags.ended = true;
-    g.player.frozen = true;
-    g.hud.prompt(null);
-    g.audio.bellBig();
-    this.endSeq = { t: 0, stage: 0 };
-    g.hud.clearSubtitles();
-    g.hud.subtitle('铃声出去了。海面安静了一秒。', 4);
-  }
-
-  updateEnding(dt) {
-    if (!this.endSeq) return;
-    const g = this.g;
-    const s = this.endSeq;
-    s.t += dt;
-
-    // 潮母上升贯穿阶段1~2（仅阶段1不够升到位）
-    if (s.stage >= 1 && s.stage <= 2) {
-      this.tideMother.position.y = Math.min(-6, this.tideMother.position.y + dt * 7);
+    const gz = g.gaze;
+    if (!gz) return;
+    const L = g.world.locations;
+    const F = this.flags;
+    // 分阶段出现在关键路口，回眸指向下一个目标
+    let want = null;
+    if (F.inHotel && !F.metBride) {
+      want = { x: L.stairwell1F.x, z: L.stairwell1F.z + 2.5, target: new THREE.Vector3(L.stairwell1F.x + 2, L.stairwell1F.y + 4, L.stairwell1F.z), floorY: L.stairwell1F.y };
+    } else if (F.leaked && !F.hasAquaKey) {
+      want = { x: L.lobbyCenter.x + 3, z: L.lobbyCenter.z - 3, target: new THREE.Vector3(L.securityDesk.x, L.securityDesk.y, L.securityDesk.z), floorY: L.lobbyCenter.y };
+    } else if (F.imageBroken && !F.hasTape) {
+      want = { x: L.lobbyCenter.x + 5.5, z: L.lobbyCenter.z + 1, target: new THREE.Vector3(L.aquaHall.x, L.aquaHall.y, L.aquaHall.z), floorY: L.lobbyCenter.y };
     }
-    // 塔灯的光在她面前一寸寸矮下去——被海吞掉（也避免光锥糊住剪影）
-    if (s.stage >= 1) {
-      const beamMat = g.world.dynamic.lighthouseBeam.children[0].material;
-      beamMat.opacity = Math.max(0, beamMat.opacity - dt * 0.05);
-      const lamp = g.world.dynamic.lighthouseLamp;
-      lamp.material.emissiveIntensity = Math.max(0.5, lamp.material.emissiveIntensity - dt * 0.6);
-    }
-
-    switch (s.stage) {
-      case 0:
-        if (s.t > 3) {
-          s.stage = 1; s.t = 0;
-          this.tideMother.visible = true;
-          g.scene.fog.density = 0.006; // 让海平线的轮廓显形
-          g.hud.subtitle('然后，海平线站了起来。', 5, 'song');
-          g.audio.setBloodTide(true);
-        }
-        break;
-      case 1: {
-        // 玩家视线被拽向它
-        const p = g.player;
-        const dx = this.tideMother.position.x - p.pos.x;
-        const dz = this.tideMother.position.z - p.pos.z;
-        const targetYaw = Math.atan2(-dx, -dz);
-        p.yaw += (((targetYaw - p.yaw + Math.PI) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 1.5);
-        p.pitch += (0.08 - p.pitch) * Math.min(1, dt * 2);
-        p.syncCamera(dt);
-        if (s.t > 7) {
-          s.stage = 2; s.t = 0;
-          g.hud.subtitle('那些灯不是灯。是鳞。每一片鳞里都点着一户人家。', 6, 'song');
-        }
-        break;
+    if (want) {
+      if (!gz.enabled || Math.hypot(gz.pos.x - want.x, gz.pos.z - want.z) > 1) {
+        gz.appearAt(want.x, want.z, want.target, want.floorY);
       }
-      case 2:
-        if (s.t > 5) {
-          s.stage = 3; s.t = 0;
-          g.hud.subtitle('喉咙里涌上咸水。不疼。像回家。', 5, 'song');
-          // 强制视奸：从海的视角看灯塔上的自己
-          g.sightjack.forceView(this.seaViewer, 6.5, () => {});
-        }
-        break;
-      case 3:
-        if (s.t > 6.8) {
-          s.stage = 4; s.t = 0;
-          g.hud.fade(true);
-          g.audio.songGain?.gain.setTargetAtTime(0.7, g.audio.ctx.currentTime, 1.5);
-        }
-        break;
-      case 4:
-        if (s.t > 3) {
-          s.stage = 5;
-          g.sightjack.exit();
-          g.sightjack.restorePost();
-          g.player.frozen = true;
-          g.hud.showEnding(
-            ['你也开始唱了。', '', '—— Demo 结束 ——'],
-            `咸潮 SALT TIDE · 中式民俗海洋恐怖<br/>
-             文书拾获：${this.notesFound.size} / 8<br/><br/>
-             「潮起还人，潮落收喉。」<br/><br/>
-             按 F5 重新入村`
-          );
-          g.onEnded?.();
-        }
-        break;
+    } else if (gz.enabled) {
+      gz.setEnabled(false);
     }
   }
 
@@ -996,15 +1282,18 @@ export class Story {
     this.updateIntro(dt);
     this.updateCaught(dt);
     this.updateDeath(dt);
+    this.updateTape(dt);
     if (this.flags.ended) { this.updateEnding(dt); return; }
-    if (g.player.dead || this.caughtSeq) return;
+    if (g.player.dead || this.caughtSeq || this.tapeSeq) return;
 
     this.updateDrown(dt);
-    this.updateRitual(dt);
     this.updateKeySpy();
-    this.updateResonance();
+    this.updateVibration();
+    this.updatePhone(dt);
     this.updateAmbient();
     this.updateWatchers();
+    this.updateGaze();
+    this.tryEnd();
 
     // 触发区
     const p = g.player.pos;
@@ -1022,18 +1311,18 @@ export class Story {
     const d = g.world.dynamic;
     if (this.flags.gateOpen && d.gateDoor.rotation.y > -1.9) {
       d.gateDoor.rotation.y = Math.max(-1.9, d.gateDoor.rotation.y - dt * 1.4);
-      d.gateCollider.maxY = -Infinity; // 失效
+      d.gateCollider.maxY = -Infinity;
       d.gateCollider.minX = 9999; d.gateCollider.maxX = 9999;
     }
 
-    // 收音机刻度盘闪烁
+    // 收音机刻度盘
     if (d.radioDial) {
       d.radioDial.material.color.setHSL(0.08, 0.9, 0.4 + Math.sin(this.time * 7) * 0.12);
     }
 
-    // 灯塔光束旋转
-    if (this.flags.breakerOn) {
-      d.lighthouseBeam.rotation.y += dt * 0.5;
+    // 新娘小动作
+    if (this.bride && this.bride.group.visible) {
+      this.bride.animate('sit', dt, 0.6);
     }
 
     // 文书纸片轻微浮动

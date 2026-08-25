@@ -31,6 +31,7 @@ export class Agenda {
     const st = AGENDA_STAGES[this.stage];
     // 收声：全镇声音同时按下去两拍——比任何响声都吓人
     this.silence = 2.4;
+    this.g.audio.hushAll?.(2.4);
     this.pendingLine = st;
     this.g.hud.agenda?.(this.stage, st.name);
   }

@@ -57,8 +57,8 @@ export class Sky {
         void main() {
           float h = clamp(vDir.y, -0.1, 1.0);
           // 青灰阴天：地平线亮灰 → 顶部铅蓝
-          vec3 horizon = mix(vec3(0.52, 0.56, 0.57), vec3(0.30, 0.16, 0.19), uBlood);
-          vec3 zenith  = mix(vec3(0.16, 0.20, 0.24), vec3(0.10, 0.05, 0.10), uBlood);
+          vec3 horizon = mix(vec3(0.52, 0.56, 0.57), vec3(0.16, 0.215, 0.205), uBlood);
+          vec3 zenith  = mix(vec3(0.16, 0.20, 0.24), vec3(0.045, 0.075, 0.082), uBlood);
           vec3 col = mix(horizon, zenith, pow(max(h, 0.0), 0.55));
 
           // 隔湿布的月亮：清晰盘面 + 两级光晕；血潮后翻成锈红的月
@@ -66,7 +66,7 @@ export class Sky {
           float md = max(dot(normalize(vDir), moonDir), 0.0);
           float disk = smoothstep(0.99938, 0.99972, md);
           float halo = pow(md, 90.0) * 0.30 + pow(md, 14.0) * 0.10;
-          vec3 moonCol = mix(vec3(0.85, 0.89, 0.90), vec3(0.72, 0.26, 0.18), uBlood);
+          vec3 moonCol = mix(vec3(0.85, 0.89, 0.90), vec3(0.58, 0.70, 0.62), uBlood);
           // 月面暗斑（简单噪声侵蚀盘面）
           float mare = fbm(vDir.xz * 40.0 + vec2(3.7, 9.2));
           col += moonCol * (disk * (0.85 - mare * 0.38) + halo) * (1.0 - uBlood * 0.35);
@@ -80,8 +80,8 @@ export class Sky {
             float n3 = fbm(cp * 6.4 + vec2(drift * 2.6, -drift * 1.4));
             float cloud = smoothstep(0.42, 0.78, n * 0.62 + n2 * 0.27 + n3 * 0.11);
             // 云底更暗，云隙微亮；血潮后云翻成瘀紫
-            vec3 cloudDark = mix(vec3(0.115, 0.145, 0.170), vec3(0.115, 0.05, 0.085), uBlood);
-            vec3 cloudLit  = mix(vec3(0.30, 0.335, 0.35),  vec3(0.24, 0.10, 0.13),  uBlood);
+            vec3 cloudDark = mix(vec3(0.115, 0.145, 0.170), vec3(0.06, 0.095, 0.095), uBlood);
+            vec3 cloudLit  = mix(vec3(0.30, 0.335, 0.35),  vec3(0.15, 0.21, 0.20),  uBlood);
             vec3 cloudCol = mix(cloudLit, cloudDark, smoothstep(0.35, 0.95, n));
             // 月亮附近的云被从背后照亮（银边）
             cloudCol += moonCol * pow(md, 10.0) * 0.16 * (1.0 - uBlood * 0.6);

@@ -315,7 +315,8 @@ export class AudioEngine {
 
   /**
    * 脚步：按地面材质分层合成
-   * surface: 'wet'(水洼溅) | 'sand'(闷沙擦) | 'stone'(石板叩) —— 兼容旧布尔(wet)
+   * surface: 'wet'(水洼溅) | 'sand'(闷沙擦) | 'stone'(石板叩)
+   *        | 'carpet'(红毯闷) | 'tile'(瓷砖脆响·传远) | 'wood'(舞台木板) —— 兼容旧布尔(wet)
    */
   footstep(intensity = 1, surface = 'sand') {
     if (!this.started) return;
@@ -324,16 +325,23 @@ export class AudioEngine {
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const wet = surface === 'wet';
-    const stone = surface === 'stone';
+    const stone = surface === 'stone' || surface === 'tile';
+    const carpet = surface === 'carpet';
+    const wood = surface === 'wood';
     // 主体：噪声踏地
     const src = ctx.createBufferSource();
     src.buffer = this.makeNoiseBuffer(0.2);
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = wet ? 2400 : stone ? 1600 + Math.random() * 500 : 750 + Math.random() * 300;
+    lp.frequency.value = wet ? 2400
+      : surface === 'tile' ? 2600 + Math.random() * 700
+      : stone ? 1600 + Math.random() * 500
+      : carpet ? 380 + Math.random() * 120
+      : wood ? 900 + Math.random() * 300
+      : 750 + Math.random() * 300;
     const g = ctx.createGain();
-    g.gain.setValueAtTime((stone ? 0.09 : 0.11) * intensity, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + (wet ? 0.22 : stone ? 0.09 : 0.15));
+    g.gain.setValueAtTime((carpet ? 0.045 : stone ? 0.1 : 0.11) * intensity, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + (wet ? 0.22 : stone ? 0.08 : carpet ? 0.12 : 0.15));
     src.connect(lp).connect(g).connect(this.sfxGroup);
     src.start(t); src.stop(t + 0.25);
     if (wet) {
@@ -348,15 +356,25 @@ export class AudioEngine {
       sp.connect(bp).connect(g2).connect(this.sfxGroup);
       sp.start(t); sp.stop(t + 0.2);
     } else if (stone) {
-      // 石板短促的"叩"——一记低频敲击
+      // 硬地短促的"叩"——瓷砖比石板更亮、带一点空间回声
       const k = ctx.createOscillator();
-      k.frequency.setValueAtTime(150 + Math.random() * 40, t);
+      k.frequency.setValueAtTime((surface === 'tile' ? 210 : 150) + Math.random() * 40, t);
       k.frequency.exponentialRampToValueAtTime(70, t + 0.06);
       const kg = ctx.createGain();
-      kg.gain.setValueAtTime(0.05 * intensity, t);
+      kg.gain.setValueAtTime((surface === 'tile' ? 0.07 : 0.05) * intensity, t);
       kg.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
       k.connect(kg).connect(this.sfxGroup);
+      if (surface === 'tile') kg.connect(this.reverb);
       k.start(t); k.stop(t + 0.09);
+    } else if (wood) {
+      const k = ctx.createOscillator();
+      k.frequency.setValueAtTime(110 + Math.random() * 30, t);
+      k.frequency.exponentialRampToValueAtTime(55, t + 0.09);
+      const kg = ctx.createGain();
+      kg.gain.setValueAtTime(0.07 * intensity, t);
+      kg.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+      k.connect(kg).connect(this.sfxGroup);
+      k.start(t); k.stop(t + 0.13);
     }
   }
 
@@ -676,6 +694,164 @@ export class AudioEngine {
     ng.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
     n.connect(bp).connect(ng).connect(this.musGroup);
     n.start(t); n.stop(t + 0.1);
+  }
+
+  // ---------------- 返潮 · 蚀湾专用 ----------------
+
+  /** 司仪广播：全镇喇叭同步的含混男声（先啸叫半声，再一句一句压下来） */
+  broadcast() {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    // PA 啸叫半声
+    const w = ctx.createOscillator();
+    w.type = 'sine';
+    w.frequency.setValueAtTime(2600, t);
+    w.frequency.exponentialRampToValueAtTime(1400, t + 0.35);
+    const wg = ctx.createGain();
+    wg.gain.setValueAtTime(0.0, t);
+    wg.gain.linearRampToValueAtTime(0.05, t + 0.08);
+    wg.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    w.connect(wg).connect(this.sfxGroup);
+    w.start(t); w.stop(t + 0.45);
+    // 含混人声：一句一句的语调（听不清词，只有抑扬）
+    const phrases = 4 + Math.floor(Math.random() * 2);
+    let at = t + 0.5;
+    for (let p = 0; p < phrases; p++) {
+      const len = 0.8 + Math.random() * 0.9;
+      const syll = Math.floor(len / 0.16);
+      for (let s = 0; s < syll; s++) {
+        const st2 = at + s * 0.16;
+        const o = ctx.createOscillator();
+        o.type = 'square';
+        o.frequency.setValueAtTime(120 + Math.random() * 70 + (s === syll - 1 ? -30 : 0), st2);
+        const f = ctx.createBiquadFilter();
+        f.type = 'bandpass'; f.frequency.value = 800 + Math.random() * 400; f.Q.value = 4;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.001, st2);
+        g.gain.linearRampToValueAtTime(0.085, st2 + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, st2 + 0.14);
+        o.connect(f).connect(g).connect(this.sfxGroup);
+        g.connect(this.reverb);
+        o.start(st2); o.stop(st2 + 0.16);
+      }
+      at += len + 0.35 + Math.random() * 0.3;
+    }
+  }
+
+  /** 收声：全部环境与音乐层同时按下去，再缓缓浮回来——议程切换的一拍 */
+  hushAll(dur = 2.2) {
+    if (!this.started) return;
+    const now = this.ctx.currentTime;
+    for (const grp of [this.ambGroup, this.musGroup]) {
+      grp.gain.cancelScheduledValues(now);
+      grp.gain.setTargetAtTime(0.02, now, 0.12);
+      grp.gain.setTargetAtTime(grp === this.ambGroup ? 0.9 : 0.9, now + dur, 0.8);
+    }
+  }
+
+  /** 喜歌变调：敬酒(返潮点火)之后，泛音失谐、颤音变慢——同一支歌换了唱法 */
+  setSongWarp(on) {
+    this.songWarp = on;
+    if (!this.started) return;
+    const now = this.ctx.currentTime;
+    // 泛音从纯八度滑向增八度（微失谐的"湿"）
+    this.songHarm.detune?.setTargetAtTime(on ? 65 : 0, now, 2.0);
+  }
+
+  /** 上宾板材蠕变：深压下木板相互咬合的呻吟 */
+  woodStrain(dist = 8) {
+    if (!this.started) return;
+    const vol = Math.max(0, 1 - dist / 26) * 0.34;
+    if (vol <= 0.01) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    const f0 = 70 + Math.random() * 60;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.linearRampToValueAtTime(f0 * (1.3 + Math.random() * 0.4), t + 0.5);
+    o.frequency.linearRampToValueAtTime(f0 * 0.9, t + 0.9);
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 480 + Math.random() * 500; f.Q.value = 7;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.2);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+    o.connect(f).connect(g).connect(this.sfxGroup);
+    g.connect(this.reverb);
+    o.start(t); o.stop(t + 1.1);
+  }
+
+  /** 前台电话铃（2001 年的机械铃） */
+  phoneRing() {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    for (let r = 0; r < 2; r++) {
+      const t = ctx.currentTime + r * 0.5;
+      // 双铃快速交替
+      for (let i = 0; i < 14; i++) {
+        const st2 = t + i * 0.028;
+        const o = ctx.createOscillator();
+        o.frequency.value = i % 2 ? 1180 : 1420;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.05, st2);
+        g.gain.exponentialRampToValueAtTime(0.001, st2 + 0.026);
+        o.connect(g).connect(this.sfxGroup);
+        o.start(st2); o.stop(st2 + 0.03);
+      }
+    }
+  }
+
+  /** 总闸合/断：沉重的机械咔哒 + 电流嗡的起落 */
+  breakerClunk(on) {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const k = ctx.createOscillator();
+    k.frequency.setValueAtTime(220, t);
+    k.frequency.exponentialRampToValueAtTime(60, t + 0.08);
+    const kg = ctx.createGain();
+    kg.gain.setValueAtTime(0.4, t);
+    kg.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    k.connect(kg).connect(this.sfxGroup);
+    k.start(t); k.stop(t + 0.15);
+    const hum = ctx.createOscillator();
+    hum.frequency.value = 100;
+    const hg = ctx.createGain();
+    if (on) {
+      hg.gain.setValueAtTime(0.001, t + 0.1);
+      hg.gain.exponentialRampToValueAtTime(0.05, t + 0.5);
+      hg.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+    } else {
+      hg.gain.setValueAtTime(0.05, t);
+      hg.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    }
+    hum.connect(hg).connect(this.sfxGroup);
+    hum.start(t); hum.stop(t + 2.4);
+  }
+
+  /** CRT 开屏/雪花刺 */
+  tvBlip() {
+    this.blip(15734 / 8, 0.03, 0.3); // 行频的低八度暗示
+    this.blip(320, 0.06, 0.12, 0.02);
+  }
+
+  /** 玻璃展缸低鸣（海洋馆） */
+  tankHum(dist) {
+    if (!this.started) return;
+    const vol = Math.max(0, 1 - dist / 16) * 0.05;
+    if (vol < 0.005 || (this._tankT ?? 0) > this.ctx.currentTime) return;
+    this._tankT = this.ctx.currentTime + 2.5;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.frequency.value = 62;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.8);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 2.4);
+    o.connect(g).connect(this.ambGroup);
+    o.start(t); o.stop(t + 2.5);
   }
 
   /**
