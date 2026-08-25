@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { Batcher, GEO } from './batcher.js';
 import { mulberry32 } from './textures.js';
+import { makeLightCone } from './materials.js';
 
 // ---------------- 地形 ----------------
 
@@ -355,6 +356,10 @@ export function buildVillage(scene, M) {
       pl.position.set(x + 0.7, base + 2.7, z);
       scene.add(pl);
       lights.push(pl);
+      // 灯下拖出一段被盐雾抓住的光
+      const cone = makeLightCone(0xff8438, 0.05, 0.2, 1.9, base + 2.55 - g(x, z) + 0.15);
+      cone.position.set(x + 0.7, base + 2.55, z);
+      scene.add(cone);
     }
     circle(x, z, 0.2, base + 3.2, { noSightBlock: true });
     return lan;
@@ -689,13 +694,18 @@ export function buildVillage(scene, M) {
     bell.visible = true;
     scene.add(bell);
     dynamic.altarBell = bell;
-    // 殿内烛光(真实光×2)
+    // 殿内烛光(真实光×2 + 香火光雾)
     const c1 = new THREE.PointLight(0xff8a3a, 10, 12, 2);
     c1.position.set(tx - 1, hb + 1.8, tz - 2.8);
     scene.add(c1); lights.push(c1);
     const c2 = new THREE.PointLight(0xff8a3a, 10, 12, 2);
     c2.position.set(tx - 1, hb + 1.8, tz + 2.8);
     scene.add(c2); lights.push(c2);
+    for (const czn of [tz - 2.8, tz + 2.8]) {
+      const cone = makeLightCone(0xff8a3a, 0.06, 0.1, 1.1, 1.8);
+      cone.position.set(tx - 1, hb + 1.7, czn);
+      scene.add(cone);
+    }
     // 烛台
     B.add(GEO.cyl, M.ironDark, tx - 1, hb + 0.7, tz - 2.8, 0, 0.1, 1.4, 0.1);
     B.add(GEO.cyl, M.ironDark, tx - 1, hb + 0.7, tz + 2.8, 0, 0.1, 1.4, 0.1);

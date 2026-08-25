@@ -20,6 +20,7 @@ const FinalShader = {
     uPulse: { value: 0.0 },         // 心跳脉冲(视奸/共鸣)
     uDistort: { value: 0.0 },       // 桶形畸变(借来的眼睛不合自己的眼眶)
     uFlash: { value: 0.0 },         // 远处无声闪电
+    uTint: { value: new THREE.Vector3(1, 1, 1) }, // 借眼色偏(每种载体的眼睛看到的世界不一样)
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -28,6 +29,7 @@ const FinalShader = {
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uTime, uGrain, uVignette, uAberration, uDesat, uLift, uRedShift, uPulse, uDistort, uFlash;
+    uniform vec3 uTint;
     varying vec2 vUv;
 
     float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
@@ -67,6 +69,9 @@ const FinalShader = {
 
       // 血潮 / 受伤偏红
       col = mix(col, col * vec3(1.25, 0.62, 0.55) + vec3(0.03,0.0,0.0), uRedShift);
+
+      // 借眼色偏（视奸载体）
+      col *= uTint;
 
       // 远处无声闪电：整屏抬亮一瞬，偏冷
       col += uFlash * vec3(0.42, 0.48, 0.56) * (0.5 + 0.5 * (1.0 - r2 * 2.0));

@@ -45,15 +45,30 @@ export async function run(page, h) {
   await look('l9-wreck', 30, -60, 37, -72);
   await look('l10-spawn-boat', 80, 108, 92, 122);
 
-  // 视奸海鸟（俯瞰全村）
+  // 望海者（滩尾站在水里的人）
+  await look('l12-watcher', 100, 127, 104, 131);
+
+  // 歌唱者（临时启用到近处拍一张特写）
   await page.evaluate(() => {
     const g = window.__game;
-    g.player.setPosition(2, 10, 0);
+    const s = g.byId.singer;
+    s.setEnabled(true);
+    s.pos.set(-2, 0, -8);
+    s.pos.y = g.world.heightAt(-2, -8);
+  });
+  await h.sleep(1200);
+  await look('l13-singer', -5, -5, -2, -8);
+  await page.evaluate(() => window.__game.byId.singer.setEnabled(false));
+
+  // 视奸海鸟（俯瞰全村）——站到空地上，避开巡逻线
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.player.setPosition(50, 20, 0);
   });
   await h.sleep(300);
   await h.tapKey('KeyQ');
   // 切到海鸟信道（多按几次）
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 10; i++) {
     const label = await page.evaluate(() => window.__game.sightjack.current?.label);
     if (label === '海鸟群') break;
     await h.tapKey('KeyQ');

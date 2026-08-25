@@ -61,10 +61,15 @@ export class Sky {
           vec3 zenith  = mix(vec3(0.16, 0.20, 0.24), vec3(0.10, 0.05, 0.10), uBlood);
           vec3 col = mix(horizon, zenith, pow(max(h, 0.0), 0.55));
 
-          // 隔湿布的白斑太阳
-          vec3 sunDir = normalize(vec3(-0.4, 0.35, -0.6));
-          float sun = pow(max(dot(normalize(vDir), sunDir), 0.0), 18.0);
-          col += vec3(0.20, 0.19, 0.17) * sun * (1.0 - uBlood * 0.8);
+          // 隔湿布的月亮：清晰盘面 + 两级光晕；血潮后翻成锈红的月
+          vec3 moonDir = normalize(vec3(-0.4, 0.35, -0.6));
+          float md = max(dot(normalize(vDir), moonDir), 0.0);
+          float disk = smoothstep(0.99938, 0.99972, md);
+          float halo = pow(md, 90.0) * 0.30 + pow(md, 14.0) * 0.10;
+          vec3 moonCol = mix(vec3(0.85, 0.89, 0.90), vec3(0.72, 0.26, 0.18), uBlood);
+          // 月面暗斑（简单噪声侵蚀盘面）
+          float mare = fbm(vDir.xz * 40.0 + vec2(3.7, 9.2));
+          col += moonCol * (disk * (0.85 - mare * 0.38) + halo) * (1.0 - uBlood * 0.35);
 
           // 分形云层：投影到天顶平面上缓慢推移，低垂、压顶
           if (h > 0.02) {
@@ -72,11 +77,14 @@ export class Sky {
             float drift = uTime * (0.006 + uBlood * 0.010);
             float n = fbm(cp * 1.35 + vec2(drift, drift * 0.6));
             float n2 = fbm(cp * 3.1 - vec2(drift * 1.7, drift));
-            float cloud = smoothstep(0.42, 0.78, n * 0.72 + n2 * 0.28);
+            float n3 = fbm(cp * 6.4 + vec2(drift * 2.6, -drift * 1.4));
+            float cloud = smoothstep(0.42, 0.78, n * 0.62 + n2 * 0.27 + n3 * 0.11);
             // 云底更暗，云隙微亮；血潮后云翻成瘀紫
             vec3 cloudDark = mix(vec3(0.115, 0.145, 0.170), vec3(0.115, 0.05, 0.085), uBlood);
             vec3 cloudLit  = mix(vec3(0.30, 0.335, 0.35),  vec3(0.24, 0.10, 0.13),  uBlood);
             vec3 cloudCol = mix(cloudLit, cloudDark, smoothstep(0.35, 0.95, n));
+            // 月亮附近的云被从背后照亮（银边）
+            cloudCol += moonCol * pow(md, 10.0) * 0.16 * (1.0 - uBlood * 0.6);
             float fade = smoothstep(0.02, 0.24, h);           // 地平线附近云被雾吃掉
             col = mix(col, cloudCol, cloud * fade * 0.85);
             // 闪电照亮云底
@@ -92,6 +100,80 @@ export class Sky {
     });
     this.dome = new THREE.Mesh(new THREE.SphereGeometry(800, 24, 16), skyMat);
     scene.add(this.dome);
+
+    // ---- 闪电分叉：一道贴在远天的白色裂纹，只在闪的那一瞬显形 ----
+    {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 256;
+      const cx = c.getContext('2d');
+      const bolt = (x0, y0, len, ang, w) => {
+        cx.strokeStyle = 'rgba(235,242,255,0.95)';
+        cx.lineWidth = w;
+        cx.shadowColor = 'rgba(160,190,255,0.9)';
+        cx.shadowBlur = 6;
+        cx.beginPath();
+        cx.moveTo(x0, y0);
+        let x = x0, y = y0;
+        const steps = 14;
+        for (let i = 0; i < steps; i++) {
+          const t = i / steps;
+          x += Math.sin(ang) * (len / steps) + (Math.random() - 0.5) * 14;
+          y += Math.cos(ang) * (len / steps);
+          cx.lineTo(x, y);
+          if (w > 1.4 && Math.random() < 0.3 && t > 0.2) {
+            bolt(x, y, len * (0.35 - t * 0.2), ang + (Math.random() - 0.5) * 1.6, w * 0.5);
+            cx.moveTo(x, y);
+          }
+        }
+        cx.stroke();
+      };
+      bolt(64, 4, 240, 0.06, 2.6);
+      const tex = new THREE.CanvasTexture(c);
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex, transparent: true, opacity: 0, fog: false,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+      });
+      this.boltMesh = new THREE.Mesh(new THREE.PlaneGeometry(46, 130), mat);
+      this.boltMesh.visible = false;
+      scene.add(this.boltMesh);
+    }
+
+    // ---- 程序化环境反射（equirect）：给 PBR 材质一层阴天海面的 IBL ----
+    {
+      const makeEnv = (blood) => {
+        const c = document.createElement('canvas');
+        c.width = 128; c.height = 64;
+        const cx = c.getContext('2d');
+        const grad = cx.createLinearGradient(0, 0, 0, 64);
+        if (!blood) {
+          grad.addColorStop(0, '#2c3a44');
+          grad.addColorStop(0.42, '#5a666b');
+          grad.addColorStop(0.5, '#78827f');
+          grad.addColorStop(0.56, '#2c3a3a');
+          grad.addColorStop(1, '#0c1416');
+        } else {
+          grad.addColorStop(0, '#221018');
+          grad.addColorStop(0.42, '#4a2226');
+          grad.addColorStop(0.5, '#6a3030');
+          grad.addColorStop(0.56, '#301012');
+          grad.addColorStop(1, '#0c0406');
+        }
+        cx.fillStyle = grad;
+        cx.fillRect(0, 0, 128, 64);
+        // 月位亮斑
+        cx.fillStyle = blood ? 'rgba(190,90,60,0.5)' : 'rgba(210,220,225,0.6)';
+        cx.beginPath(); cx.arc(34, 22, 5, 0, 6.28); cx.fill();
+        const t = new THREE.CanvasTexture(c);
+        t.mapping = THREE.EquirectangularReflectionMapping;
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      };
+      this.envNormal = makeEnv(false);
+      this.envBlood = makeEnv(true);
+      scene.environment = this.envNormal;
+      scene.environmentIntensity = 0.34;
+      this._envSwapped = false;
+    }
 
     // ---- 光照 ----
     this.hemi = new THREE.HemisphereLight(0x9db0b8, 0x39424a, 1.0);
@@ -175,12 +257,14 @@ export class Sky {
     this.blood += (this._bloodTarget - this.blood) * Math.min(1, dt * 0.06);
     this.uniforms.uBlood.value = this.blood;
 
-    // ---- 远处无声闪电（双闪） ----
+    // ---- 远处无声闪电（双闪 + 一道贴天的裂纹） ----
     this.flashTimer -= dt;
     if (this.flashTimer <= 0 && !this.flashSeq) {
       this.flashSeq = { t: 0, strikes: [0, 0.18 + Math.random() * 0.2] };
       this.flashTimer = 26 + Math.random() * 34;
       this.thunderQueued = 1; // 数秒后隔海传来的一声闷雷（由 main 触发）
+      this._boltAz = Math.random() * Math.PI * 2;
+      this.boltMesh.visible = true;
     }
     if (this.flashSeq) {
       this.flashSeq.t += dt;
@@ -190,11 +274,19 @@ export class Sky {
         if (lt > 0) f = Math.max(f, Math.exp(-lt * 14) * 0.9);
       }
       this.flash = f * (1 - this.blood * 0.5);
-      if (this.flashSeq.t > 1.2) { this.flashSeq = null; this.flash = 0; }
+      if (this.flashSeq.t > 1.2) { this.flashSeq = null; this.flash = 0; this.boltMesh.visible = false; }
     } else {
       this.flash = 0;
     }
     this.uniforms.uFlash.value = this.flash;
+    this.boltMesh.material.opacity = this.flash * 0.85;
+
+    // 环境反射随血潮换调
+    if (this.blood > 0.5 && !this._envSwapped) {
+      this._envSwapped = true;
+      this.scene.environment = this.envBlood;
+    }
+    this.scene.environmentIntensity = 0.34 - this.blood * 0.1;
 
     // 雾密度/颜色随血潮变化
     const fog = this.scene.fog;
@@ -216,6 +308,15 @@ export class Sky {
       this.dome.position.set(playerPos.x, 0, playerPos.z);
       this.sun.position.set(playerPos.x - 60, 80, playerPos.z - 90);
       this.sun.target.position.set(playerPos.x, 0, playerPos.z);
+      // 闪电裂纹立在远海上，正对玩家
+      if (this.boltMesh.visible) {
+        this.boltMesh.position.set(
+          playerPos.x + Math.sin(this._boltAz) * 620,
+          52,
+          playerPos.z + Math.cos(this._boltAz) * 620
+        );
+        this.boltMesh.lookAt(playerPos.x, 30, playerPos.z);
+      }
 
       // 雾卡缓慢爬行，绕着玩家循环
       for (const f of this.fogCards) {

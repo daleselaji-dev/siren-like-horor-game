@@ -4,6 +4,16 @@ import * as THREE from 'three';
 
 const RANGE = 55; // 可感知信道的半径
 
+// 每种载体的眼睛看到的世界不一样：视场角 / 色偏 / 去饱和 / 呼吸频率
+const CARRIER_FX = {
+  default: { fov: 74, tint: [0.85, 1.0, 0.94], desat: 0.34, breath: 1.15 },  // 潮尸：泡绿的浑浊
+  dog: { fov: 88, tint: [1.0, 0.95, 0.74], desat: 0.55, breath: 3.4 },       // 犬：色盲的暖黄，喘得急
+  birds: { fov: 96, tint: [0.86, 0.94, 1.08], desat: 0.18, breath: 0 },      // 鸟：高冷通透的广角
+  singer: { fov: 64, tint: [1.14, 0.76, 0.8], desat: 0.08, breath: 0.8 },    // 歌唱者：泛红的窄视野
+  watcher: { fov: 70, tint: [0.8, 0.92, 1.0], desat: 0.42, breath: 0.6 },    // 望海者：褪色的凝视
+  sea: { fov: 58, tint: [0.78, 0.94, 1.06], desat: 0.28, breath: 0.5 },      // 海：它的眼睛
+};
+
 export class SightjackSystem {
   constructor(engine, player, audio) {
     this.engine = engine;
@@ -98,13 +108,27 @@ export class SightjackSystem {
     this.camera.rotation.set(0, 0, 0);
     this.camera.rotateY(yaw);
     this.camera.rotateX(pitch);
+    // 借体滤镜：不同的眼睛有不同的视场与色觉
+    const fx = CARRIER_FX[this.current.kind] ?? CARRIER_FX.default;
+    this._fx = fx;
+    this.camera.fov = fx.fov;
+    this.camera.aspect = this.engine.camera.aspect;
+    this.camera.updateProjectionMatrix();
+    this.engine.finalPass.uniforms.uTint.value.set(fx.tint[0], fx.tint[1], fx.tint[2]);
+    this.engine.finalPass.uniforms.uDesat.value = fx.desat;
   }
 
   update(dt, elapsed) {
     if (!this.active || !this.current) return;
 
+    // 窗口比例变化时同步借眼相机
+    if (this.camera.aspect !== this.engine.camera.aspect) {
+      this.camera.aspect = this.engine.camera.aspect;
+      this.camera.updateProjectionMatrix();
+    }
+
     // 相机跟随载体头部（平滑）+ 借来的肺在呼吸
-    this.breathT += dt * (this.current.kind === 'dog' ? 3.4 : this.current.kind === 'birds' ? 0 : 1.15);
+    this.breathT += dt * (this._fx?.breath ?? 1.15);
     const breathe = Math.sin(this.breathT * 2.2);
     this.current.viewPos(this._headPos);
     this._headPos.y += breathe * 0.014;
@@ -154,6 +178,8 @@ export class SightjackSystem {
     this.engine.finalPass.uniforms.uPulse.value = 0;
     this.engine.finalPass.uniforms.uAberration.value = 0.0009;
     this.engine.finalPass.uniforms.uDistort.value = 0;
+    this.engine.finalPass.uniforms.uTint.value.set(1, 1, 1);
+    this.engine.finalPass.uniforms.uDesat.value = 0.12;
   }
 
   drawStatic(intensity, t) {

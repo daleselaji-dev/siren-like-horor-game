@@ -878,6 +878,27 @@ export class Story {
     }
   }
 
+  // ---------- 望海者（环境叙事） ----------
+  updateWatchers() {
+    const ws = this.g.watchers;
+    if (!ws) return;
+    if (this._watcherSeen && this._watcherTurnSeen) return;
+    const p = this.g.player.pos;
+    for (const w of ws) {
+      const d = Math.hypot(w.pos.x - p.x, w.pos.z - p.z);
+      if (d > 26) continue;
+      if (!this.flags.bloodTide && !this._watcherSeen) {
+        this._watcherSeen = true;
+        this.g.hud.subtitle('滩尾的水里站着人。不上岸，也不回头。', 5);
+        this.g.hud.subtitle('他们在等潮水点到自己的名字。', 4.5);
+      } else if (this.flags.bloodTide && !this._watcherTurnSeen) {
+        this._watcherTurnSeen = true;
+        this.g.hud.subtitle('……望海的人转过身来了。', 4.5, 'song');
+        this.g.hud.subtitle('现在他们望着村子。望着你。', 4.5, 'song');
+      }
+    }
+  }
+
   // ---------- 终局 ----------
   beginEnding() {
     const g = this.g;
@@ -983,6 +1004,7 @@ export class Story {
     this.updateKeySpy();
     this.updateResonance();
     this.updateAmbient();
+    this.updateWatchers();
 
     // 触发区
     const p = g.player.pos;

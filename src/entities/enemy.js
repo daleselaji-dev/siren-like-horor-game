@@ -33,10 +33,31 @@ export class Enemy {
 
     this.body = new Humanoid(M, {
       cloth: def.cloth, hat: def.hat, lantern: def.lantern, tool: def.tool,
-      light: def.lanternLight,
+      light: def.lanternLight, seed: (def.id ?? '').split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0,
     });
     scene.add(this.body.group);
     this.body.group.visible = this.enabled;
+
+    // 歌唱者：歌声可视化——从她喉咙里荡出去的涟漪
+    if (def.kind === 'singer') {
+      this.songFx = new THREE.Group();
+      const ringGeo = new THREE.RingGeometry(0.94, 1.0, 40);
+      ringGeo.rotateX(-Math.PI / 2);
+      this.songRings = [];
+      for (let i = 0; i < 3; i++) {
+        const rm = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+          color: 0xb84052, transparent: true, opacity: 0,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+          side: THREE.DoubleSide, fog: false,
+        }));
+        rm.renderOrder = 6;
+        this.songFx.add(rm);
+        this.songRings.push(rm);
+      }
+      this.songFx.visible = this.enabled;
+      scene.add(this.songFx);
+      this.songT = 0;
+    }
 
     this.pos = new THREE.Vector3();
     if (def.workPos) this.pos.set(def.workPos[0], 0, def.workPos[1]);
@@ -76,6 +97,7 @@ export class Enemy {
   setEnabled(on) {
     this.enabled = on;
     this.body.group.visible = on;
+    if (this.songFx) this.songFx.visible = on;
   }
 
   /** 检查点重试：复位位置与状态（保留 permAlertBonus——永不忘记） */
@@ -338,6 +360,17 @@ export class Enemy {
           anim = distToPlayer < 20 ? 'sing' : 'walk';
           if (anim === 'walk') animSpeed = 0.5;
         }
+        // 歌声涟漪：一圈圈荡到共鸣半径的边上
+        if (this.songFx) {
+          this.songT += dt;
+          this.songFx.position.set(this.pos.x, this.pos.y + 1.35, this.pos.z);
+          for (let i = 0; i < this.songRings.length; i++) {
+            const t = (this.songT * 0.22 + i / this.songRings.length) % 1;
+            const s = 0.6 + t * 16.4;
+            this.songRings[i].scale.set(s, 1, s);
+            this.songRings[i].material.opacity = (1 - t) * (1 - t) * 0.28;
+          }
+        }
         break;
       }
     }
@@ -486,6 +519,51 @@ export class Dog {
     this.tail.rotation.y = Math.sin(this.phase * 0.7) * 0.2;
     this.group.position.copy(this.pos);
     this.group.rotation.y = this.yaw;
+  }
+}
+
+// ---------------- 望海者（滩涂尽头站在水里的人） ----------------
+// 不巡逻、不追人、不说话。只是站着，面向海。
+// 血潮之后再看——他们全体转过身来，面向村子。
+export class Watcher {
+  constructor(scene, world, M, def) {
+    this.world = world;
+    this.id = def.id;
+    this.label = def.label ?? '望海的人';
+    this.kind = 'watcher';
+    this.enabled = true;
+    this.visibilityOfPlayer = 0;
+    this.body = new Humanoid(M, { cloth: def.cloth ?? 'grey', seed: def.seed });
+    scene.add(this.body.group);
+    this.pos = new THREE.Vector3(def.x, 0, def.z);
+    this.pos.y = world.heightAt(def.x, def.z);
+    this.yaw = def.yaw ?? 0;
+    this._turned = false;
+    this.targetYaw = this.yaw;
+    this.body.group.position.copy(this.pos);
+    this.body.group.rotation.y = this.yaw;
+  }
+
+  setEnabled(on) { this.enabled = on; this.body.group.visible = on; }
+
+  viewPos(out) {
+    const v = this.body.headWorldPos(out);
+    v.x += Math.sin(this.yaw) * 0.22;
+    v.z += Math.cos(this.yaw) * 0.22;
+    return v;
+  }
+  viewYawPitch() { return { yaw: this.yaw + Math.PI, pitch: -0.03 }; }
+
+  update(ctx) {
+    const { dt } = ctx;
+    // 血潮之夜：一夜之间换了姿势
+    if (ctx.bloodTide && !this._turned) {
+      this._turned = true;
+      this.targetYaw = this.yaw + Math.PI;
+    }
+    this.yaw += angleWrap(this.targetYaw - this.yaw) * Math.min(1, dt * 0.5);
+    this.body.animate('watch', dt, 1);
+    this.body.group.rotation.y = this.yaw;
   }
 }
 
