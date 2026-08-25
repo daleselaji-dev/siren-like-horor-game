@@ -86,11 +86,17 @@ export function hasLineOfSight(a, b, colliders, heightAt) {
     if (c.noSightBlock) continue;
     const hit = c.r !== undefined ? segCircle(ax, az, bx, bz, c) : segAABB(ax, az, bx, bz, c);
     if (hit) {
-      // 遮挡体的高度是否挡住视线（在相交点处的视线高度）
-      const eyeY = a.y + (b.y - a.y) * hit.t;
       const topY = c.maxY ?? Infinity;
       const botY = c.minY ?? -Infinity;
-      if (topY > eyeY - 0.1 && botY < eyeY + 0.1) return false;
+      if (c.slab) {
+        // 水平楼板：视线在其 XZ 覆盖内竖直跨过楼板高度带 → 遮挡
+        const yLo = Math.min(a.y, b.y), yHi = Math.max(a.y, b.y);
+        if (yHi > botY && yLo < topY) return false;
+      } else {
+        // 墙体：相交点处的视线高度落在墙的高度带内 → 遮挡
+        const eyeY = a.y + (b.y - a.y) * hit.t;
+        if (topY > eyeY - 0.1 && botY < eyeY + 0.1) return false;
+      }
     }
   }
   // 地形遮挡：沿线采样
