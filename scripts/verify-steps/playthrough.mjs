@@ -439,12 +439,17 @@ export async function run(page, h) {
   await h.sleep(1500);
   await h.shot('p25-finale-break');
 
-  // 出酒店去灯塔
+  // 出酒店去灯塔（触发区判定在 story.update 里——低帧率下轮询快进等它跑到）
   await tp(30, -80, -2.4);
   await h.sleep(500);
   await tp(75, -118, -2.4);
-  await h.sleep(1000);
-  f = await flags();
+  await h.sleep(600);
+  for (let i = 0; i < 20; i++) {
+    f = await flags();
+    if (f.ended) break;
+    await ff(0.5);
+    await h.sleep(250);
+  }
   assert(f.ended, 'ending not triggered at lighthouse');
   console.log('[verify] ending begun, checkpoint:', f.checkpoint);
 

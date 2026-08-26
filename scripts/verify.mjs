@@ -72,10 +72,22 @@ try {
         window.dispatchEvent(new KeyboardEvent('keyup', { code: c, bubbles: true }));
       }, code);
     },
+    // 帧感知点按：按下后等游戏真的跑过 2 帧再抬起（FULLSPEC/SwiftShader 低帧率下固定毫秒等待会整帧踏空）
     tapKey: async (code) => {
       await page.evaluate((c) => {
         window.dispatchEvent(new KeyboardEvent('keydown', { code: c, bubbles: true }));
-        setTimeout(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: c, bubbles: true })), 60);
+        return new Promise((res) => {
+          let n = 0;
+          const t0 = performance.now();
+          const tick = () => {
+            n++;
+            if (n >= 2 || performance.now() - t0 > 8000) {
+              window.dispatchEvent(new KeyboardEvent('keyup', { code: c, bubbles: true }));
+              res();
+            } else requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
       }, code);
       await new Promise((r) => setTimeout(r, 120));
     },

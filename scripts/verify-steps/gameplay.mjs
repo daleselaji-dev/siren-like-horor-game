@@ -52,7 +52,39 @@ export async function run(page, h) {
     console.log('[verify] TIMEOUT waiting:', desc);
     return false;
   };
-  const caughtOk = await waitFor(() => window.__game.player.dead, 40000, 'seating kill');
+  // 帧率采样：dt 上限 0.05——FULLSPEC/SwiftShader 只有个位数帧率时游戏时间比真实时间慢一个量级,
+  // 实时追捕永远走不完 → 切确定性步进（跑同一套 AI/引座/死亡代码，只是由脚本供 dt）
+  const fpsNow = await page.evaluate(() => new Promise((res) => {
+    let n = 0;
+    const t0 = performance.now();
+    const tick = () => {
+      n++;
+      if (performance.now() - t0 > 1200) res(n / 1.2);
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }));
+  console.log('[verify] fps before chase:', fpsNow.toFixed(1));
+  const slowMode = fpsNow < 8;
+  let caughtOk;
+  if (!slowMode) {
+    caughtOk = await waitFor(() => window.__game.player.dead, 40000, 'seating kill');
+  } else {
+    caughtOk = await page.evaluate(() => {
+      const g = window.__game;
+      const e = g.byId.dikePatrol;
+      let caught = false;
+      const ctx = {
+        player: g.player, dt: 0.25, audio: null, envSightFactor: 1,
+        noiseEvents: [], onCaught: (en) => { caught = true; g.story.beginCaught(en); },
+        onAlerted: () => {},
+      };
+      for (let i = 0; i < 240 && !caught; i++) e.update(ctx);
+      for (let i = 0; i < 10 && g.story.caughtSeq; i++) g.story.updateCaught(0.25);
+      return g.player.dead;
+    });
+    console.log('[verify] deterministic chase → seated:', caughtOk);
+  }
   const dead = await page.evaluate(() => ({
     dead: window.__game.player.dead,
     deathText: document.getElementById('death-text').textContent,
@@ -67,6 +99,13 @@ export async function run(page, h) {
     dp.def.waypoints = [[50, 74], [30, 73], [50, 74], [66, 74]];
     g.stealth.danger = 0;
   });
+  if (slowMode) {
+    // 死亡演出 4.2 游戏秒——低帧率下同步快进到重生
+    await page.evaluate(() => {
+      const g = window.__game;
+      for (let i = 0; i < 24 && g.story.deathSeq; i++) g.story.updateDeath(0.5);
+    });
+  }
   const aliveOk = await waitFor(() => {
     const g = window.__game;
     return !g.player.dead && !g.story.deathSeq && !g.story.caughtSeq;
@@ -206,6 +245,12 @@ export async function run(page, h) {
   await h.shot('g11-guest-arm');
   // 真实触发一次引座演出（挂到 story），确认统一失败态
   await page.evaluate(() => window.__game.story.beginCaught(window.__game.guest));
+  if (slowMode) {
+    await page.evaluate(() => {
+      const g = window.__game;
+      for (let i = 0; i < 10 && g.story.caughtSeq; i++) g.story.updateCaught(0.25);
+    });
+  }
   const seated2 = await waitFor(() => window.__game.player.dead, 40000, 'guest seating kill');
   console.log('[verify] guest seating kill:', seated2);
   if (!seated2) throw new Error('guest seating did not kill');
