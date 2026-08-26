@@ -14,9 +14,22 @@ export async function run(page, h) {
     g.story.flags.intro = false;
     g.story.beginIntro();
   });
-  // 注：无头 SwiftShader 下每次截图约 1.2-1.5s 抓帧开销，sleep 已按墙钟扣除
-  await h.sleep(900);
-  await h.shot('intro-a0-bus-interior'); // ~0.9s 零拍：车内视角，雨刮扫挡风玻璃
+  // 零拍只有 2s：SwiftShader 帧距+截图延迟按墙钟必踩空——定帧拍（PAUSE 掉 story
+  // 驱动、手动把开场时钟拨到 0.62s 雨刮中幅重算），拍完放回真实时钟接一拍
+  await page.evaluate(() => new Promise((res) => {
+    const g = window.__game;
+    g.game.state = 'PAUSE';
+    const s = g.story.introSeq;
+    s.t0 = performance.now() - 620;
+    g.story.updateIntro(0);
+    requestAnimationFrame(() => requestAnimationFrame(res));
+  }));
+  await h.shot('intro-a0-bus-interior'); // 0.62s 零拍：车内视角，雨刮扫到中幅
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.game.state = 'PLAY';
+    g.story.introSeq.t0 = performance.now() - 2100; // 从一拍起点接回真实时钟
+  });
   await h.sleep(1000);
   await h.shot('intro-a1-bus-low');      // ~3.2s 一拍：低机位仰拍大巴（刚起步）
   await h.sleep(1000);
