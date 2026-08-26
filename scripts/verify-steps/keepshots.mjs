@@ -292,6 +292,19 @@ export async function run(page, h) {
   await look('48_leak_phantom_tide', 2, -2, 2, -30, undefined, 1.08);
   await look('49_leak_float_ropes', 2, -6, -4, -14, undefined, 0.55);
   await look('50_leak_wet_street', 12, -4, -2, -20, undefined, -0.12);
+  // 洼中镜像（轮14）：巨影与鱼群挪到主街洼口上空——低头看洼，洼里是天上那层潮
+  await page.evaluate(() => {
+    const g = window.__game;
+    const td = g.world.dynamic.leakState.tide;
+    td.giant.cx = 8; td.giant.cz = -1.2; td.giant.r = 30;
+    let i = 0;
+    for (const f of td.fishParams) {
+      if (f === td.giant) continue;
+      f.cx = 38; f.cz = -1.2; f.r = 0.5 + (i++ % 4) * 0.45;
+    }
+    g.world.updateFx(524);
+  });
+  await look('50b_puddle_mirror', 36.6, 1.4, 38.4, -1.8, undefined, -0.8);
 
   console.log('[verify] keepshots done');
 }
