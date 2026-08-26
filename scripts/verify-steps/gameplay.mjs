@@ -86,7 +86,7 @@ export async function run(page, h) {
     g.stealth.danger = 0;
   });
 
-  // 5. 拾取文书①（喜帖——车站长椅上的行李箱）
+  // 5. 拾取文书①（外证凭条——车站长椅上的行李箱）
   await page.evaluate(() => {
     const g = window.__game;
     const l = g.world.locations.luggage;
@@ -143,7 +143,7 @@ export async function run(page, h) {
   console.log('[verify] agenda:', JSON.stringify(agendaHud));
   if (!agendaHud.hudShown) throw new Error('agenda HUD not shown');
 
-  // 9. 渗漏态（敬酒=返潮点火）：人群切换 + 浮客起浮 + 海色变化
+  // 9. 渗漏态（验户=返潮点火）：人群切换 + 浮客起浮 + 海色变化
   await page.evaluate(() => window.__game.agenda.advanceTo(3));
   await h.sleep(2000);
   const leak = await page.evaluate(() => {

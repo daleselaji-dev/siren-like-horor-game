@@ -1,4 +1,4 @@
-// 蚀湾实体 AI：宴席工位（司仪/侍应/全福婆）+ 镇民/渔民 + 镇犬 + 海鸟群（视奸载体）
+// 蚀湾实体 AI：核册工位（报数员/侍应/理册婆）+ 镇民/渔民 + 镇犬 + 海鸟群（视奸载体）
 // 状态机：WORK/PATROL → SUSPECT → ALERT(追踪) → SEARCH → RETURN
 // 设计要点（死魂曲精神）：不冲刺跳脸；维持职守；被惊动后执着、永不忘记（警戒范围永久上调）
 // 特殊实体：浮客(非敌对漂浮宾客)、回眸客(非敌对指针)、上宾(房间尺度前肢，感知振动)
@@ -568,7 +568,7 @@ export class Watcher {
 
   update(ctx) {
     const { dt } = ctx;
-    // 敬酒（返潮点火）之后：一夜之间换了姿势
+    // 验户（返潮点火）之后：一夜之间换了姿势
     if (ctx.leaked && !this._turned) {
       this._turned = true;
       this.targetYaw = this.yaw + Math.PI;
@@ -580,7 +580,7 @@ export class Watcher {
 }
 
 // ---------------- 浮客（脚尖离地半寸的宾客·非敌对·视奸载体） ----------------
-// 他们真心来吃喜酒。只是脚忘了落地。
+// 他们真心来吃这顿还地饭。只是脚忘了落地。
 export class Floater {
   constructor(scene, world, M, def) {
     this.world = world;

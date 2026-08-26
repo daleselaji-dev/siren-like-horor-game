@@ -1,5 +1,5 @@
 // 蚀湾大地图：地形 + 六区（滩涂搁浅点/石堤渔寮/镇中心市场/旧海祀/灯塔沉船湾/南方大酒店）
-// 2001 年秋，沿海县镇。填湾造地上建了南方大酒店与蚀湾海洋馆。今晚全镇办喜事。
+// 2001 年秋，沿海县镇。填湾造地上建了南方大酒店与蚀湾海洋馆。今晚全镇核册还地。
 // 输出：场景网格、碰撞体、heightAt、互动点位 locations、巡逻路点 patrols、动态对象 dynamic
 import * as THREE from 'three';
 import { Batcher, GEO } from './batcher.js';
@@ -372,7 +372,7 @@ export function buildTown(scene, M) {
     circle(x, z, 0.35, base + 2.1, { noSightBlock: true });
   }
 
-  // 灯笼杆（optLight: 挂真实点光）——喜事之夜，全镇挂囍
+  // 灯笼杆（optLight: 挂真实点光）——核册之夜，全镇挂「名」灯
   function lanternPole(x, z, optLight = false, char = 'chao') {
     const base = g(x, z);
     B.add(GEO.cyl, M.woodDark, x, base + 1.6, z, 0, 0.14, 3.2, 0.14);
@@ -1250,7 +1250,7 @@ export function buildTown(scene, M) {
       scene.add(pl);
       lights.push(pl);
     }
-    // —— 市场（喜宴前收摊了一半的摊位）——
+    // —— 市场（核册前收摊了一半的摊位）——
     {
       const stall = (x, z, ry, wares) => {
         const base = g(x, z);
@@ -1279,7 +1279,7 @@ export function buildTown(scene, M) {
       stall(6, -12, 0.3, 'fish');
       stall(10, -16, 0.25, 'salt');
       stall(2, -16, -0.2, 'red');
-      // 公告栏（婚宴通知——文书②）
+      // 公告栏（核册告示——文书③）
       const nb = g(12, -8);
       B.add(GEO.cyl, M.woodDark, 11.2, nb + 1.1, -8, 0, 0.09, 2.2, 0.09);
       B.add(GEO.cyl, M.woodDark, 12.8, nb + 1.1, -8, 0, 0.09, 2.2, 0.09);
@@ -1290,7 +1290,7 @@ export function buildTown(scene, M) {
       circle(12, -8, 0.35, nb + 2.2, { noSightBlock: true });
       locations.noticeBoard = new THREE.Vector3(12, nb + 1.4, -7.9);
     }
-    // 镇口广场灯笼(真实光×2) + 幡 ——今晚全镇挂囍
+    // 镇口广场灯笼(真实光×2) + 幡 ——今晚全镇挂「名」灯
     lanternPole(-2, 8, true, 'xi');
     lanternPole(14, -10, true, 'xi');
     lanternPole(-16, -20, false, 'xi');
@@ -1660,7 +1660,7 @@ export function buildTown(scene, M) {
   patrols.saltWorkerWork = [-44, 4];     // 晒盐工工位
   patrols.priestWork = [-64.4, -74];     // 守祀人(殿内)
   patrols.dogWander = [[6, 6], [-8, 0], [2, -10], [14, 2]];
-  // 镇街→酒店正门一线（喜宴当值的镇民）
+  // 镇街→酒店正门一线（核册当值的镇民）
   patrols.townStreet = [[6, -14], [-2, -28], [-4, -38], [2, -30], [10, -18]];
 
   // ================= 雨遮蔽（棚/檐/屋顶下不出现雨丝） =================

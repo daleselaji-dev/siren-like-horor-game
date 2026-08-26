@@ -77,7 +77,7 @@ export function buildMaterials(lowspec = false) {
     skinPhys(T.skinOld, { color: 0xdcc2ac, normalScale: 1.2, envInt: 0.6, cc: 0.18, ccRough: 0.48, poreScale: 1.25 }), // 晒褐的老年
     skinPhys(T.skinOld, { color: 0xe4dcc6, normalScale: 1.1, envInt: 0.55, cc: 0.14, ccRough: 0.52, poreScale: 1.25 }),// 蜡黄的老年
   ];
-  // 失血皮池（酒店员工：司仪/侍应/岗亭员）——湿、青、油光浮起
+  // 失血皮池（酒店员工：报数员/侍应/岗亭员）——湿、青、油光浮起
   M.skinPales = [
     M.skinPale,
     skinPhys(T.skinB, { color: 0xd2dce2, envInt: 0.95, cc: 0.5, ccRough: 0.22 }),
@@ -101,7 +101,7 @@ export function buildMaterials(lowspec = false) {
   M.poreplate = new THREE.MeshStandardMaterial({
     map: T.poreplate, roughness: 0.5, metalness: 0.15,
     emissive: 0x1a2224, emissiveIntensity: 0.25,
-  }); // 全福婆第三眼矿物孔板
+  }); // 理册婆第三眼矿物孔板
 
   // ===== 蚀湾 · 南方大酒店 =====
   M.terrazzo = std(T.terrazzo, { normalScale: 0.8, envInt: 1.5, roughness: 0.9 });
@@ -128,7 +128,7 @@ export function buildMaterials(lowspec = false) {
   M.tungsten = new THREE.MeshBasicMaterial({ color: 0xffd9a0 }); // 钨丝灯罩发光面
   M.xiPanel = new THREE.MeshStandardMaterial({
     map: T.xiPanel, roughness: 0.6, emissive: 0x841818, emissiveMap: T.xiPanel, emissiveIntensity: 0.22,
-  }); // 红金囍屏
+  }); // 红金「還」字屏
   M.lanternPaperXi = new THREE.MeshStandardMaterial({
     map: T.lanternXi, emissive: 0xff4030, emissiveMap: T.lanternXi, emissiveIntensity: 1.7, roughness: 0.8,
   });

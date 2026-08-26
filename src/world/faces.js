@@ -21,7 +21,7 @@ const R0 = 0.098;                                     // 前脸平均半径
 // 每张脸的照片标定（画面比例 0..1）：眼线 y / 左右瞳 x / 嘴线 y / 下巴 y
 // browY=眉中线 / noseY=鼻底孔线——3D 眉贴片与鼻件按此逐脸落位（消双眉/双鼻影残留）
 // hairY=正中发际线 / hairSag=发际线向两鬓下垂量（抛物线，单位=瞳距平方系数）——
-// 烘焙时发际以上像素一律 gate 掉：照片头发不再涂上头皮与 3D 发壳打成双重发际
+// 烘焙时发际以上像素一律 gate 掉：照片头发不再涂到头皮上、与 3D 发壳打成双重发际
 // （由人工读图标定；照片要求正面、平光、中性表情）
 const FACE_DEFS = {
   m: {
@@ -264,7 +264,7 @@ function compositeFace(M, job, img) {
   const eax = ioPx * 1.18, eay = mePx * 2.12;
   const chinPy = D.chinY * S;
   // 发际线 gate（照片空间）：正中 hairY、向两鬓按抛物线下垂——
-  // 发际线及以上的照片头发一个像素都不许烘上头皮（双重发际涂鸦的根治）。
+  // 发际线及以上的照片头发一个像素都不许烘到头皮上（双重发际涂鸦的根治）。
   // 羽化带整个落在发际线以下（向皮肤渐入 ~4% 画幅）：底皮→照片的过渡是坡不是坎
   const hairGate = (spx, spy) => {
     const dxn = (spx - cx) / ioPx;
@@ -344,7 +344,7 @@ function compositeFace(M, job, img) {
         if (spx > 1 && spx < S - 2 && spy > 1 && spy < S - 2) {
           const frontW = sstep(0.14, 0.48, dz);
           const gate = hairGate(spx, spy);
-          // 发际以上头皮压暗一档（发根阴影）：发壳羽化边下露出的头皮不是亮粉的秃皮
+          // 发际以上的头皮压暗一档（发根阴影）：发壳羽化边下露出的头皮不是亮粉的秃皮
           const rootDk = 1 - (1 - gate) * 0.13 * frontW;
           r *= rootDk; g *= rootDk; b *= rootDk;
           // 权重：朝前 × 椭圆 × 下巴截止 × 发际线 gate

@@ -1,13 +1,13 @@
 // 程序化人形 v4（蚀湾）：先真实后异常 · 逐种子独特面孔
-// 美术铁律：6 米外是具体的 2001 年中国人（工装/司仪西装/白衬衫黑马甲/枣红缎袄），
+// 美术铁律：6 米外是具体的 2001 年中国人（工装/西装/白衬衫黑马甲/枣红缎袄），
 //           2 米内才读出「唯一主异常」。禁止方块人剪影，禁止一张脸复制粘贴。
 // v4 要点：
 //   头部：逐种子参数化雕刻（头宽/面长/下颌/下巴/颧骨/颊陷/眉弓/眼距/鼻唇/耳/不对称翘曲）
 //   眼睛：湿润高反光巩膜+虹膜、左右眼睑不对称下垂、眨眼
 //   躯干：Lathe 车削轮廓按服装换型 + 逐种子肩宽/胸厚；男性喉结、连衣裙锁骨
 //   四肢：16 段车削（肌腹起伏、腕踝收细）、分指手、皮鞋/布鞋
-//   工位异常：司仪(口部鱼籽钙化)、侍应(浮木颈臂+沉积托盘+传送带步态)、
-//             全福婆(第三眼矿物孔板+倒退步)、岗亭员(投币口嘴+大檐帽)、
+//   工位异常：报数员(口部鱼籽钙化)、侍应(浮木颈臂+沉积托盘+传送带步态)、
+//             理册婆(第三眼矿物孔板+倒退步)、岗亭员(投币口嘴+大檐帽)、
 //             理骨员(胶皮围裙长手套+永久歪头听缸)、浮客(脚尖离地)、回眸客(残影)
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
@@ -461,7 +461,7 @@ function hairGeo(style = 'crop', variant = 'm', P = null) {
         cap(0.96, 0, 0.1065);
         break;
       }
-      case 'back': { // 大背头（司仪）
+      case 'back': { // 大背头（报数员）
         cap(1.02, 0.006);
         parts.push(fadeRim(xform(new THREE.SphereGeometry(0.07, 12, 8), 0, 0.06, -0.075, 0.3, 0, 0, 1.16, 0.8, 1.1)));
         break;
@@ -473,7 +473,7 @@ function hairGeo(style = 'crop', variant = 'm', P = null) {
           0, 0.03, -0.012, 0.16, 0, 0, 1.0, 0.97, 1.0), rimV(0.9, 1.0)));
         break;
       }
-      case 'bun': { // 盘发髻（全福婆）：壳贴颅、向后拢，束发圈勒出髻根
+      case 'bun': { // 盘发髻（理册婆）：壳贴颅、向后拢，束发圈勒出髻根
         cap(0.9, 0, 0.104);
         parts.push(fadeRim(xform(new THREE.SphereGeometry(0.04, 14, 10), 0, 0.026, -0.099, 0, 0, 0, 1, 0.78, 0.95)));
         parts.push(fadeRim(xform((() => { const t = new THREE.TorusGeometry(0.028, 0.0055, 6, 14); return t; })(),
@@ -490,7 +490,7 @@ function hairGeo(style = 'crop', variant = 'm', P = null) {
         cap(0.92, 0, 0.105);
         break;
       }
-      case 'long': { // 长直发（新娘/伴娘）：球壳下半直接拉伸成垂帘——贴颅、无缝、发梢微撇
+      case 'long': { // 长直发（周絮/女客）：球壳下半直接拉伸成垂帘——贴颅、无缝、发梢微撇
         cap(0.97, 0, 0.1055);
         // φ 0.72π..2.28π = 后半球+两侧（前脸留开口）；θ 到 0.8π 提供可拉伸的下摆
         const shell = new THREE.SphereGeometry(0.1075, 26, 18, Math.PI * 0.72, Math.PI * 1.56, 0, Math.PI * 0.8);
@@ -548,7 +548,7 @@ function peakedCapGeo(variant = 'gaunt', P = null) {
   ]), variant, FP, { weight: 0.7 }));
 }
 
-/** 长发前帘（新娘/长发客）：垂在颊侧的曲面发帘——横向 10 段绕颊弧内扣、
+/** 长发前帘（周絮/长发客）：垂在颊侧的曲面发帘——横向 10 段绕颊弧内扣、
  *  纵向 6 段供垂坠弯；前缘向脸内收（帘是「拢」在脸侧的，不是一块悬板）。
  *  枢轴在帘顶（挂点），配合锯齿 alpha 贴图与 animate 里的微摆。 */
 function hairCurtainGeo(w = 0.052, h = 0.22) {
@@ -787,7 +787,7 @@ function bootGeo() {
 }
 
 // ================= 工位异常部件 =================
-/** 司仪：口部鱼籽状钙化封死（成串小球覆住下半脸） */
+/** 报数员：口部鱼籽状钙化封死（成串小球覆住下半脸） */
 function roeSealGeo() {
   return G('roeSeal', () => {
     const parts = [];
@@ -804,7 +804,7 @@ function roeSealGeo() {
   });
 }
 
-/** 全福婆：第三眼矿物孔板（额头正中、眉心上方） */
+/** 理册婆：第三眼矿物孔板（额头正中、眉心上方） */
 function poreplateDiscGeo() {
   return G('poreDisc', () => {
     const g = new THREE.CylinderGeometry(0.02, 0.022, 0.008, 16);
@@ -921,7 +921,7 @@ const ROLE_DEFS = {
   guest_m:  { torso: 'suit', hairChoices: ['side', 'crop', 'back'], face: 'm', skin: 'skin', photo: 'm', shoe: 'leather', lapel: true, tie: true, pants: 'suit' },
   guest_m2: { torso: 'work', hairChoices: ['crop', 'side'], face: 'm', skin: 'skin', photo: 'm', shoe: 'leather', pants: 'work' },
   guest_f:  { torso: 'dress', hairChoices: ['perm', 'bun', 'long'], face: 'f', skin: 'skin', photo: 'f', shoe: 'leather', skirt: true, clavicle: true },
-  // 新娘：主异常=盐霜附居痕迹沿左脸不对称蔓延（结晶从颌角爬到额角——她在被慢慢腌成礁石）
+  // 周絮：主异常=盐霜附居痕迹沿左脸不对称蔓延（结晶从颌角爬到额角——她在被慢慢腌成礁石）
   bride:    { torso: 'satin', hair: 'long', face: 'f', skin: 'skin', photo: 'f', shoe: 'cloth', knots: true, pants: 'satin', saltFrost: true },
   townsman: { torso: 'work', hairChoices: ['crop', 'side'], face: 'm', skin: 'skin', photo: 'm', shoe: 'cloth', pants: 'work' },
   fisher:   { torso: 'work', hair: 'crop', face: 'old', skin: 'skin', photo: 'oldm', shoe: 'cloth', pants: 'work' },
@@ -1839,7 +1839,7 @@ export class Humanoid {
       this.eyeGL.rotation.x = this.gzP * gw;
       this.eyeGR.rotation.x = this.gzP * gw;
     }
-    // 偶发颈部微动（活人的小动作；司仪/侍应频率低到诡异）
+    // 偶发颈部微动（活人的小动作；报数员/侍应频率低到诡异）
     this.twitchT -= dt;
     if (this.twitchT <= 0) {
       this.twitchT = (this.conveyor ? 11 : 5) + Math.random() * 8;
@@ -1959,7 +1959,7 @@ export class Humanoid {
         break;
       }
       case 'mc': {
-        // 司仪：左手持麦贴近封死的口部；右臂周期性抬起「宣布」——声音先于手势
+        // 报数员：左手持麦贴近封死的口部；右臂周期性抬起「宣布」——声音先于手势
         this.phase += dt * 0.8;
         lerp(this.torso.rotation, 'x', 0.02, 4);
         lerp(this.neck.rotation, 'x', 0.04, 4);
@@ -2005,7 +2005,7 @@ export class Humanoid {
         break;
       }
       case 'backstep': {
-        // 全福婆：面朝你倒退着走，头完全不动
+        // 理册婆：面朝你倒退着走，头完全不动
         this.phase += dt * 3.6 * speed;
         const sw = Math.sin(this.phase);
         lerp(this.torso.rotation, 'x', -0.02, 8);

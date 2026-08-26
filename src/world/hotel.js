@@ -1,5 +1,5 @@
 // 南方大酒店（1998 年落成，填湾地基）+ 蚀湾海洋馆售票厅连廊
-// 2001 年中国县镇酒店：水磨石+金不锈钢包边+红漆总台+红毯大楼梯+镜面柱+囍
+// 2001 年中国县镇酒店：水磨石+金不锈钢包边+红漆总台+红毯大楼梯+镜面柱+核册红妆
 // 结构（局部坐标，+z 朝北面向镇中心，原点在酒店平面中心）：
 //   1F: 大堂(挑空)/宴会厅(西翼)/服务走廊(南)/备餐间(东南)/楼梯间(东)/配电间/东廊→海洋馆连廊
 //   2F: 回廊(环挑空)/南走廊/保卫科监控室(东南)/棋牌室/布草间
@@ -306,7 +306,7 @@ export function buildHotel(ctx) {
     box(M.crtGlass, 4.2, 1.35, 11, 3.5, 2.7, 0.05);
     colliders.push({ minX: hx + 2.45, maxX: hx + 5.95, minZ: hz + 10.9, maxZ: hz + 11.1, maxY: hb + 2.7, noSightBlock: true });
     for (const px of [-2.45, 2.45, -5.95, 5.95]) box(M.brass, px, 1.35, 11, 0.1, 2.7, 0.1);
-    // 囍字红灯笼一对（真实光）
+    // 「名」字红灯笼一对（真实光）
     for (const px of [-3.4, 3.4]) {
       const lan = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.55, 12), M.lanternPaperXi);
       lan.position.copy(world(px, 2.55, 12.6));
@@ -425,9 +425,9 @@ export function buildHotel(ctx) {
     colliders.push({ minX: hx - 5.6, maxX: hx - 2.2, minZ: hz + 9.2, maxZ: hz + 10.3, minY: hb, maxY: hb + 0.9, noSightBlock: true });
     // 大堂山水壁画（南墙上方，跨楼梯口）
     box(M.mural, 0, 4.6, 0.18, 7.5, 2.4, 0.08);
-    // 婚宴指示水牌
+    // 核册指示水牌
     box(M.brass, 3.2, 0.8, 9.0, 0.05, 1.6, 0.05);
-    box(plateMat('周宅喜宴 · 宴会厅', { w: 256, h: 128, bg: '#8c1616', fg: '#f0d28c' }), 3.2, 1.35, 9.0, 0.9, 0.62, 0.05);
+    box(plateMat('核册 · 宴会厅', { w: 256, h: 128, bg: '#8c1616', fg: '#f0d28c' }), 3.2, 1.35, 9.0, 0.9, 0.62, 0.05);
     colliders.push({ x: hx + 3.2, z: hz + 9.0, r: 0.2, maxY: hb + 1.6, noSightBlock: true });
     // 挂钟（停在 11:47）
     cyl(M.brass, -7.85, 2.6, 8.0, 0.45, 0.1, 0.45, 0, 0, Math.PI / 2);
@@ -479,9 +479,9 @@ export function buildHotel(ctx) {
     // 舞台红幕（背景）+ 金布褶
     box(M.curtain, -12.5, 2.0, -10.6, 8.4, 3.2, 0.22);
     colliders.push({ minX: hx - 16.7, maxX: hx - 8.3, minZ: hz - 10.75, maxZ: hz - 10.45, minY: hb, maxY: hb + 3.4 });
-    // 囍字金匾（幕中央）
+    // 「還」字金匾（幕中央）
     box(M.xiPanel, -12.5, 2.1, -10.4, 2.2, 2.2, 0.1);
-    // 立式麦克风（司仪位）：线没入舞台
+    // 立式麦克风（报数员位）：线没入舞台
     cyl(M.ironDark, -12.5, 1.0, -8.6, 0.03, 1.1, 0.03);
     B.add(GEO.sphere, M.ironDark, hx - 12.5, hb + 1.62, hz - 8.6, 0, 0.05, 0.05, 0.05);
     box(M.ironDark, -12.4, 0.46, -8.4, 0.02, 0.02, 0.5, 0.4);
@@ -539,7 +539,7 @@ export function buildHotel(ctx) {
     addLight(0xffd9a0, 14, 14, -12.5, F2 - 1.35, 0.5, 0.2);
     addLight(0xff5040, 8, 10, -12.5, F2 - 1.1, 4.5, 0.3);
     addLight(0xffd9a0, 12, 12, -12.5, F2 - 1.0, -7, 0.15);
-    // 墙面囍剪纸 + 红幔围边（东墙内侧原本是裸灰泥，喜宴要挂红）
+    // 墙面「還」字红板 + 红幔围边（东墙内侧原本是裸灰泥，核册之夜要挂红）
     box(M.xiPanel, -16.85, 1.9, 2, 0.06, 1.2, 1.2);
     box(M.xiPanel, -16.85, 1.9, -4, 0.06, 1.2, 1.2);
     box(M.xiPanel, -8.15, 1.9, -1, 0.06, 1.2, 1.2);
@@ -579,7 +579,7 @@ export function buildHotel(ctx) {
     for (const px of [-5, 0.5, 6]) box(M.fluorescent, px, F2 - 0.06, -9.5, 1.4, 0.05, 0.14);
     addLight(0xdfe8d8, 9, 11, 0.5, F2 - 0.9, -9.5, 0.8);
     // 员工告示 + 员工须知（文书⑤：空托盘规则）
-    box(plateMat('今晚喜宴 全员留守', { w: 256, h: 96, bg: '#c8bfa8', fg: '#4a3428', font: 0.36 }), -1.5, 1.6, -8.16, 0.9, 0.4, 0.04);
+    box(plateMat('今晚核册 全员留守', { w: 256, h: 96, bg: '#c8bfa8', fg: '#4a3428', font: 0.36 }), -1.5, 1.6, -8.16, 0.9, 0.4, 0.04);
     {
       const memo = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.66), M.notice);
       memo.position.copy(world(-2.6, 1.45, -8.17));
@@ -626,7 +626,7 @@ export function buildHotel(ctx) {
     locations.mainBreaker = world(14, 1.5, 4.7);
     box(plateMat('配电重地', { w: 160, h: 64, bg: '#7a2020', fg: '#e8d8b8', font: 0.4 }), 11.16, 1.9, 4.6, 0.05, 0.36, 0.8);
     addLight(0xffc880, 3, 5, 14, 2.4, 4.5, 0.6);
-    // 卫生间：隔断+洗手台+镜(全福婆镜像点位①)
+    // 卫生间：隔断+洗手台+镜(理册婆镜像点位①)
     box(M.tile, 14, 0.02, 7.6, 5.9, 0.045, 3.1);
     box(M.marble, 12.5, 0.75, 8.9, 2.2, 0.1, 0.55);
     colliders.push({ minX: hx + 11.4, maxX: hx + 13.6, minZ: hz + 8.6, maxZ: hz + 9.2, minY: hb, maxY: hb + 0.8, noSightBlock: true });
@@ -775,7 +775,7 @@ export function buildHotel(ctx) {
     }
     addLight(0xffc880, 7, 9, -5, F3 + 2.2, 1.5, 0.12);
     addLight(0xffc880, 7, 9, 5, F3 + 2.2, 1.5, 0.12);
-    // 走廊尽头镜（全福婆早一拍点位②）
+    // 走廊尽头镜（理册婆早一拍点位②）
     mirror('corridor3F', -12.9, F3 + 1.5, 1.5, Math.PI / 2, 1.4, 1.8);
     // 门与门牌
     const doorAt = (px, pz, num, open = 0) => {
@@ -816,7 +816,7 @@ export function buildHotel(ctx) {
       locations.room107 = world(2, F3 + 0.8, 7);
       addLight(0xffc880, 4, 6, 2, F3 + 2.3, 7, 0.1);
     }
-    // 807 套房：外间(圆桌茶具) + 卧室(喜床/三面镜梳妆台/CRT 电视)
+    // 807 照影房：外间(圆桌茶具) + 卧室(缎面大床/三面镜梳妆台/CRT 电视)
     {
       box(M.carpet, -12.5, F3 + 0.03, -5.5, 8.9, 0.03, 10.9);
       // 墙纸衬板：外墙内面是白瓷砖（外立面材质），客房里要读成墙纸
@@ -831,15 +831,15 @@ export function buildHotel(ctx) {
       cyl(M.clothShirt, -10.5, F3 + 0.88, -1.8, 0.3, 0.04, 0.3); // 茶盘
       // 红枣花生盘（撒了一半在桌上）
       for (let i = 0; i < 7; i++) B.add(GEO.sphere, M.clothRed, hx - 10.5 + Math.sin(i * 2.1) * 0.2, hb + F3 + 0.92, hz - 1.8 + Math.cos(i * 1.7) * 0.18, 0, 0.03, 0.025, 0.03);
-      // 卧室：喜床
+      // 卧室：缎面大床
       box(M.veneerRed, -14, F3 + 0.3, -8.5, 2.3, 0.6, 2.6);
       box(M.satin, -14, F3 + 0.66, -8.5, 2.26, 0.16, 2.5);
       box(M.satin, -14, F3 + 0.78, -9.4, 2.2, 0.3, 0.7);
       box(M.veneerRed, -14, F3 + 1.3, -9.75, 2.3, 1.4, 0.12);
       colliders.push({ minX: hx - 15.2, maxX: hx - 12.8, minZ: hz - 9.85, maxZ: hz - 7.2, minY: hb + F3, maxY: hb + F3 + 0.85, noSightBlock: true });
-      // 囍字贴床头
+      // 「還」字红板贴床头
       box(M.xiPanel, -14, F3 + 1.7, -9.68, 0.9, 0.9, 0.05);
-      // 三面镜梳妆台（上头仪式位）
+      // 三面镜梳妆台（照影仪式位）
       box(M.veneerRed, -9.5, F3 + 0.4, -9.2, 1.5, 0.8, 0.55);
       colliders.push({ minX: hx - 10.25, maxX: hx - 8.75, minZ: hz - 9.5, maxZ: hz - 8.9, minY: hb + F3, maxY: hb + F3 + 0.85, noSightBlock: true });
       mirror('dresserC', -9.5, F3 + 1.45, -9.42, 0, 0.85, 1.05);

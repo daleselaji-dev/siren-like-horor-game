@@ -698,7 +698,7 @@ export class AudioEngine {
 
   // ---------------- 返潮 · 蚀湾专用 ----------------
 
-  /** 司仪广播：全镇喇叭同步的含混男声（先啸叫半声，再一句一句压下来） */
+  /** 报数员广播：全镇喇叭同步的含混男声（先啸叫半声，再一句一句压下来） */
   broadcast() {
     if (!this.started) return;
     const ctx = this.ctx;
@@ -750,7 +750,7 @@ export class AudioEngine {
     }
   }
 
-  /** 喜歌变调：敬酒(返潮点火)之后，泛音失谐、颤音变慢——同一支歌换了唱法 */
+  /** 点名谣变调：验户(返潮点火)之后，泛音失谐、颤音变慢——同一支歌换了唱法 */
   setSongWarp(on) {
     this.songWarp = on;
     if (!this.started) return;

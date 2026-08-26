@@ -1,8 +1,8 @@
 // 《返潮》全流程通关验证（传送加速位移，交互全部真实按键）
 // 车站行李 → 视奸岗亭员开栅门 → 告示墙(规则) → 电话亭 → 街心公告/广播站
-// → 规则一(广播望海=死/背海=活) → 堤门支线(渔民日记) → 酒店807上头 → CRT教学
-// → 敬酒渗漏 → 规则三(空盘见手) → 保卫科钥匙(点名) → 规则二(倒计时超时=死)
-// → 总闸破像 → 巨物厅母带 → 807播带 → 全福婆 → 囍匾大破像 → 灯塔终局
+// → 规则一(广播望海=死/背海=活) → 堤门支线(渔民日记) → 酒店807照影 → CRT教学
+// → 验户渗漏 → 规则三(空盘见手) → 保卫科钥匙(点名) → 规则二(倒计时超时=死)
+// → 总闸破像 → 巨物厅母带 → 807播带 → 理册婆 → 「還」匾大破像 → 灯塔终局
 export async function run(page, h) {
   const flags = () => page.evaluate(() => {
     const s = window.__game.story;
@@ -98,7 +98,7 @@ export async function run(page, h) {
   await h.tapKey('Space'); // 跳过开场运镜
   await h.sleep(500);
 
-  // ---- 节拍1：长途车站 · 文书①喜帖（长椅上的行李箱） ----
+  // ---- 节拍1：长途车站 · 文书①外证凭条（长椅上的行李箱） ----
   const lug = await loc('luggage');
   await tp(lug.x, lug.z - 1.2, Math.PI);
   await h.sleep(300);
@@ -109,7 +109,7 @@ export async function run(page, h) {
   assert(await pickNote('note1'), 'note1 not picked');
   let f = await flags();
 
-  // ---- 节拍1b：牌坊栅门落闩 → 视奸岗亭员 → 小窗拨闩（议程·迎宾） ----
+  // ---- 节拍1b：牌坊栅门落闩 → 视奸岗亭员 → 小窗拨闩（议程·起雾） ----
   const tg = await loc('townGate');
   await tp(tg.x + 2.2, tg.z, Math.PI / 2); // 站门外，面朝栅门(-x)
   await h.sleep(300);
@@ -141,7 +141,7 @@ export async function run(page, h) {
   await h.sleep(1200);
   await h.shot('p04-towngate-open');
   f = await flags();
-  assert(f.agenda >= 0, 'agenda not at 迎宾');
+  assert(f.agenda >= 0, 'agenda not at 起雾');
 
   // ---- 节拍2：告示墙(文书②规则) → 电话亭 → 街心公告(③) → 广播站(④) ----
   const rb = await loc('ruleBoard');
@@ -239,7 +239,7 @@ export async function run(page, h) {
   await h.sleep(200);
   assert(await pickNote('note2'), 'note2 not picked');
 
-  // ---- 节拍3：进酒店 → 大堂(议程·入席/CRT上电) → 登记簿(⑥) → 807 上头 ----
+  // ---- 节拍3：进酒店 → 大堂(议程·收港/CRT上电) → 登记簿(⑥) → 807 照影 ----
   await tp(-4, -42, 0, 3.5);
   await h.sleep(800); // hotelFront 触发
   await h.shot('p11-hotel-front');
@@ -278,7 +278,7 @@ export async function run(page, h) {
   }
   assert(gotMirror, 'mirror not given');
 
-  // ---- 节拍4：服务走廊 CRT 教学 → 员工须知(⑤) → 宴会厅敬酒 = 返潮点火 ----
+  // ---- 节拍4：服务走廊 CRT 教学 → 员工须知(⑤) → 宴会厅验户 = 返潮点火 ----
   await ensureAlive();
   const crtc = await loc('crtCorridor');
   await tp(crtc.x - 0.3, crtc.z + 1.6, Math.PI, 3.5);
@@ -292,7 +292,7 @@ export async function run(page, h) {
   await h.tapKey('KeyE');
   await h.sleep(200);
   assert(await pickNote('note10'), 'note10 (staff rules) not picked');
-  // 进宴会厅触发敬酒（议程收声 2.4s 后 applyStage → 渗漏）
+  // 进宴会厅触发验户（议程收声 2.4s 后 applyStage → 渗漏）
   await tp(-14, -56, 0.6, 3.5);
   await h.sleep(1200);
   await ff(4);
@@ -396,9 +396,9 @@ export async function run(page, h) {
   assert(await pickNote('note7'), 'note7 not picked');
   f = await flags();
   assert(f.hasTape, 'tape not taken');
-  assert(f.agenda >= 4, 'agenda not at 上头');
+  assert(f.agenda >= 4, 'agenda not at 熄灯');
 
-  // ---- 节拍7：回 807 播母带(⑨/影子规则) → 全福婆追逐 ----
+  // ---- 节拍7：回 807 播母带(⑨/空名规则) → 理册婆追逐 ----
   const tv = await loc('tv807');
   await tp(tv.x + 1.4, tv.z + 1.0, -2.2, 10.3);
   await h.sleep(400);
@@ -424,7 +424,7 @@ export async function run(page, h) {
   await h.sleep(800);
   await h.shot('p24-matron-chase');
 
-  // ---- 节拍8：下宴会厅扯囍匾(大破像) → 灯塔终局 ----
+  // ---- 节拍8：下宴会厅扯「還」字金匾(大破像) → 灯塔终局 ----
   await page.evaluate(() => {
     const g = window.__game;
     g.stealth.danger = 0;
@@ -435,7 +435,7 @@ export async function run(page, h) {
   await h.sleep(400);
   await interactUntil('finaleBroken', 'finale break failed');
   f = await flags();
-  assert(f.agenda >= 5, 'agenda not at 送入洞房');
+  assert(f.agenda >= 5, 'agenda not at 还地');
   await h.sleep(1500);
   await h.shot('p25-finale-break');
 

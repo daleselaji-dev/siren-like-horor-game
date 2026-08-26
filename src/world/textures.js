@@ -1146,7 +1146,7 @@ export function curtainTexture(seed = 361, size = 512) {
   }, 1.4);
 }
 
-/** 枣红缎（全福婆袄/嫁衣）：流动缎光 + 团寿暗纹 */
+/** 枣红缎（理册婆袄/周絮缎袄）：流动缎光 + 团寿暗纹 */
 export function satinTexture(seed = 391, size = 256) {
   const fbm = makeFbm(seed, 3);
   return buildMaps(size, (u, v, out) => {
@@ -1215,8 +1215,8 @@ export function plainClothTexture(seed, baseRGB, size = 256) {
   }, 0.9);
 }
 
-/** 红灯笼（囍/金字） */
-export function lanternRedTexture(char = '囍', size = 256) {
+/** 红灯笼（金字）：核册之夜家家挂的「名」灯 */
+export function lanternRedTexture(char = '名', size = 256) {
   const [c, ctx] = makeCanvas(size);
   const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.08, size / 2, size / 2, size * 0.72);
   grad.addColorStop(0, '#ff7a52');
@@ -1245,7 +1245,7 @@ export function lanternRedTexture(char = '囍', size = 256) {
   return t;
 }
 
-/** 囍字红板（宴会厅主背景） */
+/** 「還」字红板（宴会厅主背景金匾） */
 export function xiPanelTexture(size = 512) {
   const [c, ctx] = makeCanvas(size);
   ctx.fillStyle = '#8e1410';
@@ -1264,7 +1264,7 @@ export function xiPanelTexture(size = 512) {
   ctx.fillStyle = '#e8b64c';
   ctx.font = `700 ${size * 0.62}px "Songti SC","Noto Serif SC",serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('囍', size / 2, size / 2 + size * 0.03);
+  ctx.fillText('還', size / 2, size / 2 + size * 0.03);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -1362,7 +1362,7 @@ export function muralTexture(size = 512) {
   return t;
 }
 
-/** 矿物孔板（全福婆第三只眼）：暗青板上放射状细孔 */
+/** 矿物孔板（理册婆第三只眼）：暗青板上放射状细孔 */
 export function poreplateTexture(size = 128) {
   const [c, ctx] = makeCanvas(size);
   ctx.fillStyle = '#2c3834';
@@ -1386,7 +1386,7 @@ export function poreplateTexture(size = 128) {
   return t;
 }
 
-/** 喜事通告红纸（镇口张贴） */
+/** 核册通告红纸（镇口张贴） */
 export function noticeTexture(size = 256) {
   const [c, ctx] = makeCanvas(size);
   ctx.fillStyle = '#a8241a';
@@ -1399,10 +1399,10 @@ export function noticeTexture(size = 256) {
   ctx.fillStyle = '#f4dfa0';
   ctx.font = `700 ${size * 0.3}px "Songti SC",serif`;
   ctx.textAlign = 'center';
-  ctx.fillText('囍', size / 2, size * 0.36);
+  ctx.fillText('還', size / 2, size * 0.36);
   ctx.font = `${size * 0.105}px "Songti SC",serif`;
-  ctx.fillText('周宅嫁女 · 阖镇入席', size / 2, size * 0.6);
-  ctx.fillText('十月初六 南方大酒店', size / 2, size * 0.76);
+  ctx.fillText('核册还地 · 全镇同往', size / 2, size * 0.6);
+  ctx.fillText('九月十九 南方大酒店', size / 2, size * 0.76);
   ctx.strokeStyle = 'rgba(240,210,140,0.7)';
   ctx.lineWidth = 3;
   ctx.strokeRect(size * 0.06, size * 0.05, size * 0.88, size * 0.9);
@@ -1483,7 +1483,7 @@ export function buildTextureSet(lowspec = false) {
   set.net = netTexture();
   set.lantern = lanternTexture('潮');
   set.lanternJi = lanternTexture('祭');
-  set.lanternXi = lanternRedTexture('囍');
+  set.lanternXi = lanternRedTexture('名');
   set.talisman = talismanTexture();
   set.xiPanel = xiPanelTexture(lowspec ? 256 : 512);
   set.signSouth = signboardTexture('南方大酒店', false);

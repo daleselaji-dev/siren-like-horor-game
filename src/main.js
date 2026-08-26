@@ -42,7 +42,7 @@ player.setPosition(world.locations.spawn.x, world.locations.spawn.z, world.locat
 player.frozen = true; // 标题画面锁定
 
 // ---------------- 实体编制 ----------------
-// 镇上：还在履职的普通人；酒店：宴席工位（司仪/侍应/保卫科/全福婆）
+// 镇上：还在履职的普通人；酒店：核册工位（报数员/侍应/保卫科/理册婆）
 const P = world.patrols;
 const HFY = P.hotelFloorY; // { f1, f2, f3 }
 const enemyDefs = [
@@ -97,10 +97,10 @@ const enemyDefs = [
     waypoints: P.templeGuard, lantern: true, lanternLight: true,
     fov: 90, sightRange: 17, hearRange: 15,
   },
-  // —— 南方大酒店（宴席工位） ——
+  // —— 南方大酒店（核册工位） ——
   {
-    // 司仪不追人：他的职是念议程。全盲全聋——但他的眼睛看得见整个宴会厅（视奸侦察位）
-    id: 'emcee', label: '司仪', kind: 'worker', role: 'emcee',
+    // 报数员不追人：他的职是念议程。全盲全聋——但他的眼睛看得见整个宴会厅（视奸侦察位）
+    id: 'emcee', label: '报数员', kind: 'worker', role: 'emcee',
     workPos: P.emceeStage, workMode: 'mc', workYaw: 0, floorY: HFY.f1,
     fov: 1, sightRange: 0, hearRange: 0,
   },
@@ -125,7 +125,7 @@ const enemyDefs = [
     fov: 92, sightRange: 14, hearRange: 12, walkSpeed: 0.95, chaseSpeed: 2.7,
   },
   {
-    id: 'matron', label: '全福婆', kind: 'patrol', role: 'matron',
+    id: 'matron', label: '理册婆', kind: 'patrol', role: 'matron',
     waypoints: P.matron3F, floorY: HFY.f3, enabled: false,
     fov: 104, sightRange: 15, hearRange: 13, walkSpeed: 0.78, chaseSpeed: 2.35,
   },
@@ -141,14 +141,14 @@ const enemyDefs = [
 const enemies = enemyDefs.map((d) => new Enemy(engine.scene, world, M, d));
 const dog = new Dog(engine.scene, world, M, { id: 'dog', label: '镇犬', waypoints: P.dogWander });
 const birds = new BirdFlock(engine.scene, world, { id: 'birds', label: '海鸟群', center: [0, 0], radius: 46, height: 34 });
-// 望潮者：站在滩涂尽头的水里，面向海。敬酒（返潮点火）之后他们会转过身来。
+// 望潮者：站在滩涂尽头的水里，面向海。验户（返潮点火）之后他们会转过身来。
 const watchers = [
   new Watcher(engine.scene, world, M, { id: 'watcher1', x: 104, z: 131, yaw: 0.75, seed: 1101 }),
   new Watcher(engine.scene, world, M, { id: 'watcher2', x: 42, z: 125, yaw: 0.2, seed: 2202 }),
   new Watcher(engine.scene, world, M, { id: 'watcher3', x: 103, z: -95, yaw: 1.5, seed: 3303 }),
 ];
 
-// —— 浮客：敬酒后才浮起来的宾客（非敌对·视奸载体） ——
+// —— 浮客：验户后才浮起来的宾客（非敌对·视奸载体） ——
 const HI = world.dynamic.hotelInfo;
 const hb = HI.origin.y, hx = HI.origin.x, hz = HI.origin.z;
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -404,7 +404,7 @@ function loop() {
       audio.thunderDistant(2.5 + Math.random() * 2);
     }
 
-    // 音频：喜歌从酒店方向飘来；广播站转播实况
+    // 音频：点名谣从酒店方向飘来；广播站转播实况
     const stageP = world.locations.stageMic;
     audio.update(dt, {
       playerPos: player.pos,

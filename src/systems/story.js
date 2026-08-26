@@ -1,5 +1,6 @@
 // 《返潮》叙事与关卡逻辑：八节拍主线 · 文书 · 议程联动 · CRT 预现/破像 · 引座 · 检查点 · 终局
-// 2001 年秋，蚀湾。你是新娘周絮的伴娘。渡船在滩涂搁浅，喜宴今晚开席。
+// 2001 年秋，蚀湾。三年前填湾借地起楼，今夜「核册还地」。
+// 你是外乡人阿澄——周絮写信求你来做核册的「外证」。镇上没人看你，也没人拦你。
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { Humanoid, poseAs } from '../entities/humanoid.js';
@@ -7,23 +8,24 @@ import { Humanoid, poseAs } from '../entities/humanoid.js';
 // ---------------- 文书全文 ----------------
 export const NOTES = [
   {
-    id: 'note1', title: '① 喜帖（长途车站·行李箱）',
-    body: `谨詹于辛巳年九月十九（公历二〇〇一年十一月三日）
-为小女 周絮 于归之期
-假座 蚀湾南方大酒店一楼宴会厅 敬备喜筵
+    id: 'note1', title: '① 外证凭条（长途车站·行李箱）',
+    body: `【铅印凭条，边角盖了半枚红章】
 
-恭请　阖第光临
+兹聘　外证壹名
+辛巳年九月十九（公历二〇〇一年十一月三日）
+戌时到南方大酒店一楼宴会厅
+核册在场　毋误
 
-　　　　　　　　　　　　周宅　鞠躬
+　　　　　　　　　　蚀湾镇核册处
 
-【喜帖背面，是絮絮的字】
+【凭条背面，是絮絮的字】
 阿澄：
-你一定要来。伴娘只能是你。
+你一定要来。外证只能是你。
 镇上的规矩多，你什么都不用懂，
-全福婆让你做什么，你就做什么。
+理册婆让你做什么，你就做什么。
 只有一条是我求你的——
-上头的时候，不管镜子里有什么，
-不要出声。`,
+验户念名的时候，不管念到什么，
+不要应。`,
   },
   {
     id: 'note9', title: '② 蚀湾镇夜间告示（镇前街·告示墙）',
@@ -38,7 +40,8 @@ export const NOTES = [
 　　（供电所岁修期间映像不准，
 　　一切以画面为先。）
 
-三、婚丧宴席，全镇同往，不留人看家。
+三、核册之夜，全镇同往，不留人看家。
+　　各家灯留一盏，人走灯不灭。
 
 　　　　　　蚀湾镇人民政府（代章）
 
@@ -49,31 +52,31 @@ export const NOTES = [
 它才会作废重播。`,
   },
   {
-    id: 'note3', title: '③ 婚宴通知（镇公告栏）',
-    body: `【喜　讯】
+    id: 'note3', title: '③ 核册告示（镇公告栏）',
+    body: `【告　示】
 
-周宅嫁女，全镇同贺。
-今晚流水席设南方大酒店一楼宴会厅，
-按户入席，桌牌为准。
+蚀湾核册，全镇同往。
+今晚还地饭设南方大酒店一楼宴会厅，
+按户入席，桌牌为准。缺席者除名。
 
 议程如下：
-　酉时　迎宾
-　戌时　入席
-　戌时三刻　上菜
-　亥时　敬酒
-　亥时三刻　上头
-　子时　送入洞房
+　酉时　起雾
+　戌时　收港
+　戌时三刻　归屋
+　亥时　验户
+　亥时三刻　熄灯
+　子时　还地
 
 【页脚一行小字，墨色比正文旧得多】
-议程即许潮。时辰一到，司仪口中念的
-就不再是人写给人的话。逐条应完，海才收礼。`,
+议程即潮汛。时辰一到，报数员口中念的
+就不再是人写给人的话。逐条应完，海才销账。`,
   },
   {
     id: 'note4', title: '④ 广播站值班记录（誊抄）',
     body: `【蚀湾广播站　值班登记　十一月三日】
 
-18:40　转播酒店喜宴实况，线路正常。
-19:05　喜歌《渔家嫁女调》，磁带 A 面。
+18:40　转播酒店核册实况，线路正常。
+19:05　点名谣《数户调》，磁带 A 面。
 19:32　……磁带走完了。歌没停。
 
 【以下为当值员手写】
@@ -81,7 +84,7 @@ export const NOTES = [
 歌从线里来。不是我们的线——
 是埋在填湾地基底下的那些"旧线"。
 
-司仪每报一次时辰，全镇的喇叭一起响。
+报数员每念一条议程，全镇的喇叭一起响。
 我对了表：他开口，比我这边的信号
 早半秒钟。
 
@@ -115,9 +118,9 @@ export const NOTES = [
 104　——　　　　（本页被水渍洇开）
 106　——　　　　（本页被水渍洇开）
 
-807　新房　　　　【备注栏字迹工整】
+807　照影房　　　【备注栏字迹工整】
 　　三楼尽头挂八楼的门牌，是老师傅的意思：
-　　"喜房要高过水面。这个数是量过的。"
+　　"名要记在高过水面的地方。这个数是量过的。"
 
 【登记簿最后一栏，笔迹与所有人都不同】
 上宾　壹位　　席设宴会厅正中
@@ -163,7 +166,7 @@ export const NOTES = [
 　　骨头"越理越多"。已报馆长。
 
 六、其他：
-　　彩排录像母带（周宅喜宴，试机拍摄）
+　　核册彩排母带（试机拍摄）
 　　存处理间铁柜。周家的人说过两天来取，
 　　叮嘱：不要在馆里放这盘带子。
 　　它拍到了不该拍的东西——
@@ -172,29 +175,29 @@ export const NOTES = [
 【单末盖章处没有章，只有一圈盐霜】`,
   },
   {
-    id: 'note8', title: '⑨ 许潮旧俗（从母带里抄下的话）',
+    id: 'note8', title: '⑨ 还地旧俗（从母带里抄下的话）',
     body: `【母带 00:41:17 起，是一段老人的画外音。
-录像里，彩排的新娘坐在三面镜前。】
+录像里，彩排的持册人坐在三面镜前。】
 
-"许潮不是嫁人，是嫁影。
-海要的从来不是新娘——
-新娘是正主，动了正主，喜事就不成了。
+"还地不是还土，是销账。
+海要的从来不是在册的人——
+在册的是正主，动了正主，账就烂了。
 
-海收的是影子。
-上头那天，镜子里坐着两个人：
-一个是新娘，一个是陪坐的。
+海收的是册末那行空名。
+验户那晚，镜子里坐着两个人：
+一个是持册的，一个是陪坐的。
 
-海若受了这门亲，两个都留下。
-海若不受——
+海若认了这本册，两个都留下。
+海若不认——
 它就把镜子里那个陪坐的收走。
 名字都想好了，就写在空席的桌牌上。
 
-所以伴娘要挑外乡人。
+所以外证要挑外乡人。
 外乡人走了，镇上不用挂白。"
 
 【00:43:02，画外音停了。
-录像里，镜中的全福婆转过头来，看镜头。
-现实里的全福婆，晚了一拍才转。】`,
+录像里，镜中的理册婆转过头来，看镜头。
+现实里的理册婆，晚了一拍才转。】`,
   },
   {
     id: 'note2', title: '⑩ 渔民日记（渔寮·残页）',
@@ -216,12 +219,12 @@ export const NOTES = [
 滩涂是干的，蟹洞是干的，
 但你把耳朵贴在泥上，底下是涨潮的声音。
 
-喜宴我不去了。份子钱托人带到。`,
+核册我不去了。名字托人代画了押。`,
   },
 ];
 
 // 石碑铭文（气氛互动，不计入文书）
-const STELE_TEXT = '碑文风化难辨，只余八字——「许潮以女　潮平人安」';
+const STELE_TEXT = '碑文风化难辨，只余八字——「地借于潮　名还于海」';
 
 function angleWrap(a) {
   while (a > Math.PI) a -= Math.PI * 2;
@@ -285,8 +288,8 @@ export class Story {
       pool: ['horn', 'gull', 'creak', 'buoy'],
       beats: [
         { at: 55, act: () => { this.g.audio.hornDistant(); this.g.hud.subtitle('站牌背后就是海。今晚不会再有车进蚀湾。', 5); } },
-        { at: 170, cond: () => !this.flags.townGateOpen, act: () => this.g.hud.subtitle('镇里在放喜歌。调子从栅门里飘出来，潮声一顿一顿地和。', 5, 'song') },
-        { at: 320, cond: () => this.flags.townGateOpen && !this.flags.inHotel, act: () => this.g.hud.subtitle('家家门上贴着囍。可街上一个人也没有——都赴宴去了。', 5.5) },
+        { at: 170, cond: () => !this.flags.townGateOpen, act: () => this.g.hud.subtitle('镇里在放点名谣。调子从栅门里飘出来，潮声一顿一顿地和。', 5, 'song') },
+        { at: 320, cond: () => this.flags.townGateOpen && !this.flags.inHotel, act: () => this.g.hud.subtitle('家家门框上钉着户牌，名字用红漆新描过。街上一个人也没有。', 5.5) },
         { at: 520, cond: () => this.flags.inHotel && !this.flags.leaked, act: () => this.g.hud.subtitle('酒店里很暖。暖得像是楼在替什么东西焐着。', 5) },
         { at: 700, cond: () => this.flags.leaked, act: () => this.g.hud.subtitle('墙纸在鼓包。楼是干的，可它在承受水压。', 5, 'song') },
       ],
@@ -347,7 +350,7 @@ export class Story {
     const HI = D.hotelInfo;
     const hb = HI.origin.y;
 
-    // —— 宴会厅满员（正常态·敬酒前）：每桌 5 客围坐 ——
+    // —— 宴会厅满员（正常态·验户前）：每桌 5 客围坐 ——
     // 凳子在 hotel.js 摆在 a=(k/8)·2π、r=1.05 的 cos/sin 圆上——人要坐到凳子上
     const roles = ['guest_m', 'guest_f', 'guest_m2', 'guest_m', 'guest_f'];
     const defs = [];
@@ -371,7 +374,7 @@ export class Story {
     this.crowdNormal = this.bakeCrowd(defs);
     this.g.scene.add(this.crowdNormal);
 
-    // —— 渗漏态人群（敬酒后）：席位不空，人却"浮"了——脚尖离地的静止宾客 ——
+    // —— 渗漏态人群（验户后）：席位不空，人却"浮"了——脚尖离地的静止宾客 ——
     const leakDefs = [];
     for (const t of D.banquetTables) {
       for (let k = 0; k < 3; k++) {
@@ -387,7 +390,7 @@ export class Story {
     this.crowdLeak.visible = false;
     this.g.scene.add(this.crowdLeak);
 
-    // —— 新娘周絮：807 梳妆台前坐着（上头位） ——
+    // —— 周絮（持册人家的女儿）：807 照影房三面镜前坐着 ——
     this.bride = new Humanoid(this.g.M, { role: 'bride', seed: 8807 });
     this.bride.group.position.set(L.dresser807.x, HI.origin.y + HI.F3 + 0.02, L.dresser807.z + 0.75);
     this.bride.group.rotation.y = Math.PI; // 面向三面镜（朝南）
@@ -472,7 +475,7 @@ export class Story {
       id: 'note1', pos: L.luggage, r: 2.0, prompt: '取回行李箱',
       cond: () => !this.notesFound.has('note1'),
       act: this.notePickupAction('note1', () => {
-        g.hud.objective('过牌坊下的栅门进镇——喜宴在南方大酒店');
+        g.hud.objective('过牌坊下的栅门进镇——核册在南方大酒店');
       }),
     });
     add({
@@ -490,7 +493,7 @@ export class Story {
       cond: () => !this.notesFound.has('note3'),
       act: this.notePickupAction('note3', () => {
         F.knowHotel = true;
-        g.hud.objective('去镇南的南方大酒店赴宴');
+        g.hud.objective('去镇南的南方大酒店——核册在一楼宴会厅');
       }),
     });
     add({
@@ -555,7 +558,7 @@ export class Story {
         g.hud.subtitle('岗亭里的人没有转头。他看的还是那根已经不在了的闩。', 5, 'song');
         g.hud.objective('沿镇前街往里走——先看告示墙');
         this.saveCheckpoint('town', L.townGate.x - 3, L.townGate.z);
-        if (g.agenda.stage < 0) g.agenda.advance(); // 迎宾
+        if (g.agenda.stage < 0) g.agenda.advance(); // 起雾
       },
     });
 
@@ -565,7 +568,7 @@ export class Story {
       cond: () => !this.notesFound.has('note9'),
       act: this.notePickupAction('note9', () => {
         g.hud.subtitle('三条告示。第一条和第二条的纸比第三条新得多。', 4.5);
-        g.hud.objective('去街心公告栏——打听喜宴的地方');
+        g.hud.objective('去街心公告栏——打听核册的地方');
         this.saveCheckpoint('rules');
       }),
     });
@@ -579,7 +582,7 @@ export class Story {
         F.phoneAnswered = true;
         g.audio.blip(320, 0.25, 0.2);
         g.hud.subtitle('「……到了？」是个女声，隔着水响。', 4.5, 'radio');
-        g.hud.subtitle('「到了就往回走。宴席不缺你一双筷子。」', 5, 'radio');
+        g.hud.subtitle('「到了就往回走。还地饭不缺你一双筷子。」', 5, 'radio');
         g.hud.subtitle('电话挂了。投币口退出来一枚湿的硬币。', 4.5);
         this.saveCheckpoint('phone');
       },
@@ -616,17 +619,17 @@ export class Story {
       act: () => {
         this.notesFound.add('note4');
         g.audio.paper();
-        g.hud.subtitle('喇叭里在转播酒店的喜宴。桌上压着当值员的记录。', 4.5, 'radio');
+        g.hud.subtitle('喇叭里在转播酒店的核册实况。桌上压着当值员的记录。', 4.5, 'radio');
         g.openNote(NOTES.find((n) => n.id === 'note4'));
         if (!F.knowHotel) {
           F.knowHotel = true;
-          g.hud.objective('去镇南的南方大酒店赴宴');
+          g.hud.objective('去镇南的南方大酒店——核册在一楼宴会厅');
         }
         this.saveCheckpoint('radio');
       },
     });
 
-    // —— 807：陪新娘上头（持镜教学） ——
+    // —— 807：照影房陪周絮（持镜教学） ——
     add({
       id: 'bride807', pos: L.dresser807, r: 2.6, prompt: '在梳妆台边坐下',
       cond: () => F.inHotel && !F.metBride,
@@ -643,7 +646,7 @@ export class Story {
         g.hud.subtitle('屏幕里是这条走廊。但不是现在的这条——', 4.5);
         g.hud.subtitle('墙上的沉积更厚。走廊口立着一名侍应，面朝镜头。', 5);
         g.hud.subtitle('电视先播，现实照做。记住屏幕里的样子。', 5);
-        g.hud.objective('去宴会厅——敬酒快开始了');
+        g.hud.objective('去宴会厅——验户快开始了');
         this.saveCheckpoint('crtTip');
       },
     });
@@ -674,10 +677,10 @@ export class Story {
       act: () => this.playTape(),
     });
 
-    // —— 宴会厅囍匾（终局大破像） ——
+    // —— 宴会厅「還」字金匾（终局大破像） ——
     add({
       id: 'xiPanel', pos: new THREE.Vector3(L.stageMic.x, L.stageMic.y, L.stageMic.z - 1.6), r: 3.0,
-      prompt: '扯下囍字金匾（大破像）',
+      prompt: '扯下「還」字金匾（大破像）',
       cond: () => F.tapeSeen && !F.finaleBroken,
       act: () => this.beginFinale(),
     });
@@ -710,7 +713,7 @@ export class Story {
     add({
       zone: Z.villageCenter, once: true, cond: () => this.flags.townGateOpen,
       act: () => {
-        g.hud.subtitle('满街的囍。灶是温的，碗筷齐整——人全在酒店。', 5.5);
+        g.hud.subtitle('每扇门都上了锁，锁眼里塞着红纸。灶是温的，碗筷齐整——人全在酒店。', 5.5);
         if (!this.flags.stealthTip) {
           this.flags.stealthTip = true;
           g.hud.subtitle('街心有挑担的伙计来回走。按住 Shift 放低身子，别撞进灯里。', 5.5);
@@ -735,7 +738,7 @@ export class Story {
     add({
       zone: Z.dikeArea, once: true, cond: () => this.flags.gateOpen,
       act: () => {
-        g.hud.subtitle('石堤。提灯的人来回走——守堤是他的职，喜宴也没去。', 5);
+        g.hud.subtitle('石堤。提灯的人来回走——守堤是他的职，核册也没去。', 5);
         g.hud.subtitle('渔寮里有本没写完的日记。别惊动干活的人。', 5);
         this.saveCheckpoint('dike');
       },
@@ -754,7 +757,7 @@ export class Story {
     add({
       zone: Z.temple, once: true,
       act: () => {
-        g.hud.subtitle('旧海祀。填湾之前，许潮的规矩从这里出。', 4.5);
+        g.hud.subtitle('旧海祀。填湾之前，向潮借地的规矩从这里出。', 4.5);
         g.hud.subtitle('守祀人还跪在里面。他不看人——借他的眼睛（Q）也无妨。', 5);
       },
     });
@@ -776,7 +779,7 @@ export class Story {
       zone: Z.hotelFront, once: true,
       act: () => {
         g.hud.subtitle('南方大酒店。一九九八年填湾起楼，建材取自古海床。', 5);
-        g.hud.subtitle('整面楼都亮着。囍字灯箱把台阶照成红的。', 4.5);
+        g.hud.subtitle('整面楼都亮着。「還」字灯箱把台阶照成红的。', 4.5);
         this.saveCheckpoint('hotelFront');
       },
     });
@@ -785,9 +788,9 @@ export class Story {
       act: () => {
         this.flags.inHotel = true;
         g.hud.subtitle('大堂满员。水磨石地面，红毯直铺到大楼梯。', 4.5);
-        g.hud.subtitle('总台的登记簿开着。你的房号——伴娘随新娘，807。', 5);
-        g.hud.objective('上三楼 807 新房，陪新娘上头');
-        if (g.agenda.stage < 1) g.agenda.advance(); // 入席
+        g.hud.subtitle('总台的登记簿开着。你的房号——外证随持册人，807。', 5);
+        g.hud.objective('上三楼 807 照影房，找周絮');
+        if (g.agenda.stage < 1) g.agenda.advance(); // 收港
         g.crt.setEnabled(true);
         this.saveCheckpoint('lobby');
       },
@@ -795,8 +798,8 @@ export class Story {
     add({
       zone: Z.banquet, once: true, cond: () => this.flags.crtTip && !this.flags.leaked,
       act: () => {
-        // 敬酒 = 返潮点火
-        if (this.g.agenda.stage < 3) this.g.agenda.advance(); // → 敬酒（applyStage 触发渗漏）
+        // 验户 = 返潮点火
+        if (this.g.agenda.stage < 3) this.g.agenda.advance(); // → 验户（applyStage 触发渗漏）
       },
     });
     add({
@@ -815,7 +818,7 @@ export class Story {
     });
   }
 
-  // ---------- 节拍：807 上头 ----------
+  // ---------- 节拍：807 照影 ----------
   brideScene() {
     const g = this.g;
     const F = this.flags;
@@ -824,7 +827,7 @@ export class Story {
     g.hud.setLetterbox(true);
     g.hud.subtitle('絮絮看见你，肩膀松了半寸。', 4);
     g.hud.subtitle('「阿澄。你坐我边上。」', 3.5);
-    g.hud.subtitle('三面镜里坐着你们两个。梳头的手还没来。', 4.5, null);
+    g.hud.subtitle('三面镜里坐着你们两个。照影的时辰还没到。', 4.5, null);
     setTimeout(() => {
       g.hud.subtitle('絮絮往你手里塞了面小镜子，掌心全是汗——', 4.5);
       g.hud.subtitle('「拿着。镜子里的事，比外头早一拍。看镜子，别看人。」', 5.5);
@@ -834,25 +837,25 @@ export class Story {
       g.audio.bellSmall();
       g.hud.setLetterbox(false);
       g.player.frozen = false;
-      g.hud.subtitle('（获得伴娘手镜：镜中之物先于现实半拍）', 4);
+      g.hud.subtitle('（获得手镜：镜中之物先于现实半拍）', 4);
       g.hud.objective('下楼——去服务走廊，找那台亮着的电视');
-      if (g.agenda.stage < 2) g.agenda.advance(); // 上菜
+      if (g.agenda.stage < 2) g.agenda.advance(); // 归屋
       this.saveCheckpoint('suite807');
     }, 13500);
   }
 
-  // ---------- 节拍：敬酒 → 渗漏态 ----------
+  // ---------- 节拍：验户 → 渗漏态 ----------
   beginLeak() {
     const F = this.flags;
     if (F.leaked) return;
     F.leaked = true;
     const g = this.g;
     g.audio.setBloodTide(true);   // 深海轰鸣一记（无水的潮）
-    g.audio.setSongWarp(true);    // 喜歌换了唱法
+    g.audio.setSongWarp(true);    // 点名谣换了唱法
     g.ocean.setBloodTide(true, 1.2);
     g.sky.setBloodTide(true);
     g.stealth.envSightFactor = 0.85;
-    g.hud.subtitle('敬酒的杯子还举着——整栋楼往下沉了一寸。没有水。来的是深度。', 6, 'song');
+    g.hud.subtitle('验户念到一半——整栋楼往下沉了一寸。没有水。来的是深度。', 6, 'song');
     g.hud.subtitle('大堂的人不见了。席上的人还在——脚尖离了地。', 5.5, 'song');
     g.hud.subtitle('侍应把托盘收空了。想想员工须知里那句话。', 5);
     // 人群切换：满员正常态 → 浮客
@@ -934,11 +937,11 @@ export class Story {
     const g = this.g;
     g.hud.subtitle('母带很沉，像吸饱了水——可它是干的。', 4.5);
     g.hud.objective('回三楼 807，用房里的录像机放母带');
-    if (g.agenda.stage < 4) g.agenda.advance(); // 上头
+    if (g.agenda.stage < 4) g.agenda.advance(); // 熄灯
     this.saveCheckpoint('tape');
   }
 
-  // ---------- 节拍：播母带 + 全福婆 ----------
+  // ---------- 节拍：播母带 + 理册婆 ----------
   playTape() {
     const F = this.flags;
     F.tapeSeen = true;
@@ -959,7 +962,7 @@ export class Story {
         if (s.t > 0.5) {
           s.stage = 1;
           g.hud.subtitle('雪花。然后是宴会厅——彩排那天的宴会厅。', 4.5);
-          g.hud.subtitle('画外音是个老人。他在讲许潮的规矩。', 4);
+          g.hud.subtitle('画外音是个老人。他在讲还地的规矩。', 4);
         }
         break;
       case 1:
@@ -973,7 +976,7 @@ export class Story {
         if (this.g.state === 'PLAY') { // 文书已合上
           s.stage = 3; s.t = 0;
           g.player.frozen = true;
-          g.hud.subtitle('……收影。收的是影子。伴娘要挑外乡人。', 5.5, 'song');
+          g.hud.subtitle('……销账。销的是册末的空名。外证要挑外乡人。', 5.5, 'song');
           g.hud.subtitle('絮絮知道。她把镜子塞给你的时候，手在抖。', 5);
         }
         break;
@@ -1000,9 +1003,9 @@ export class Story {
       matron.enterAlert(g.player, g.audio, null);
     }
     g.audio.bellSmall();
-    g.hud.subtitle('走廊尽头的镜子里——全福婆已经站在你门口了。', 5, 'song');
+    g.hud.subtitle('走廊尽头的镜子里——理册婆已经站在你门口了。', 5, 'song');
     g.hud.subtitle('现实里她还没到。镜子早一拍。趁这一拍，走。', 5);
-    g.hud.objective('甩开全福婆，下楼去宴会厅——扯下囍匾，大破像');
+    g.hud.objective('甩开理册婆，下楼去宴会厅——扯下「還」字金匾，大破像');
     this.saveCheckpoint('tape807');
   }
 
@@ -1013,13 +1016,13 @@ export class Story {
     const g = this.g;
     g.audio.bellBig();
     g.crt.breakImage(9999);
-    g.agenda.advanceTo(5); // 送入洞房（广播在雪花里变形）
+    g.agenda.advanceTo(5); // 还地（广播在雪花里变形）
     // 匾落下：席位的名字没了着落
     const plate = g.world.dynamic.guestSeatPlate;
     if (plate) plate.visible = false;
-    g.hud.subtitle('金匾砸在舞台上。囍字断成两半。', 4.5);
+    g.hud.subtitle('金匾砸在舞台上。「還」字断成两半。', 4.5);
     g.hud.subtitle('全楼的屏幕一起转成雪花——没有下一个画面了。', 5, 'song');
-    g.hud.subtitle('司仪还举着杯。他的嘴被鱼籽封着，声音却没停：——送入洞房——', 6, 'song');
+    g.hud.subtitle('报数员还举着册。他的嘴被鱼籽封着，声音却没停：——还地——还地——', 6, 'song');
     // 全体警觉但失去目标：搜索状态
     for (const e of g.enemies) {
       if (!e.enabled || !e.lastSeenPos) continue;
@@ -1046,7 +1049,7 @@ export class Story {
     g.hud.prompt(null);
     this.endSeq = { t: 0, stage: 0 };
     g.hud.clearSubtitles();
-    g.hud.subtitle('潮声退了半拍。像一场宴席撤了席。', 5);
+    g.hud.subtitle('潮声退了半拍。像一本册子合上了页。', 5);
   }
 
   updateEnding(dt) {
@@ -1086,11 +1089,11 @@ export class Story {
           g.sightjack.restorePost();
           g.player.frozen = true;
           g.hud.showEnding(
-            ['潮退了半寸。', '絮絮还在楼里。你还欠她一场喜酒。', '', '—— Demo 结束 ——'],
+            ['潮退了半寸。', '絮絮还在楼里。她的名字还压在册底。', '', '—— Demo 结束 ——'],
             `返潮 FANCHAO · 蚀湾 2001<br/>
              文书拾获：${this.notesFound.size} / ${NOTES.length} · 被引座 ${this.deathCount} 次<br/><br/>
-             「电视先播，现实照做。喜事不许退席。」<br/><br/>
-             按 F5 重新赴宴`
+             「电视先播，现实照做。名册不许缺页。」<br/><br/>
+             按 F5 重新入镇`
           );
           g.onEnded?.();
         }
@@ -1102,27 +1105,27 @@ export class Story {
   applyStage(stage) {
     const g = this.g;
     switch (stage) {
-      case 0: // 迎宾：酒店灯箱更亮
+      case 0: // 起雾：酒店灯箱更亮
         break;
-      case 1: // 入席
+      case 1: // 收港
         break;
-      case 2: { // 上菜：侍应加速
+      case 2: { // 归屋：侍应加速
         for (const id of ['waiterBanquet', 'waiterLobby']) {
           const w = g.byId[id];
           if (w) w.walkSpeed = 1.1;
         }
         break;
       }
-      case 3: // 敬酒 = 返潮点火
+      case 3: // 验户 = 返潮点火
         this.beginLeak();
         break;
-      case 4: { // 上头：全福婆上三楼（等母带播完转为追）
+      case 4: { // 熄灯：理册婆上三楼（等母带播完转为追）
         const matron = g.byId.matron;
         if (matron) matron.setEnabled(true);
-        g.hud.subtitle('楼上传来梳齿过发的声音。一下，一下。', 5, 'song');
+        g.hud.subtitle('楼上传来翻册页的声音。一页，一页。', 5, 'song');
         break;
       }
-      case 5: // 送入洞房（终局压力）
+      case 5: // 还地（终局压力）
         for (const e of g.enemies) {
           if (e.enabled && e.permAlertBonus !== undefined) e.permAlertBonus = Math.min(9, e.permAlertBonus + 2);
         }
@@ -1159,9 +1162,9 @@ export class Story {
     this.g.sky._boltAz = -1.7; // 闪电裂纹立在牌坊背后的西天——剪影要有光源
     this.g.sky.boltMesh.visible = true;
     hud.subtitle('二〇〇一年，秋。蚀湾。雨没有停过。', 4);
-    hud.subtitle('……喜宴实况转播……南方大酒店……全镇同贺……', 5, 'radio');
+    hud.subtitle('……核册实况转播……南方大酒店……全镇同往……', 5, 'radio');
     hud.subtitle('末班长途车。司机没熄火——他等的不是你，是掉头。', 5.5);
-    hud.subtitle('絮絮的喜帖在行李箱里。她只求了你一件事：上头的时候，别出声。', 6);
+    hud.subtitle('絮絮的信在行李箱里。她只求了你一件事：念名的时候，别应。', 6);
     setTimeout(() => this.g.audio.doorCreak(), 1200); // 车门合拢
     setTimeout(() => {
       hud.objective('从站台长椅上取回行李');
@@ -1358,7 +1361,7 @@ export class Story {
     document.getElementById('death-text').textContent = reason ?? '席';
     const m = Math.floor(this.time / 60);
     const stats = `入镇 ${m} 分 · 文书 ${this.notesFound.size}/${NOTES.length} · 第 ${this.deathCount} 次被引座`;
-    g.hud.setDeath(true, sub ?? '喜事不许退席 —— 正在回到检查点', stats);
+    g.hud.setDeath(true, sub ?? '名册不许缺页 —— 正在回到检查点', stats);
   }
 
   updateDeath(dt) {
@@ -1390,7 +1393,7 @@ export class Story {
         this._drownWarned = true;
         this.g.hud.subtitle('水下有东西托了你一把——往深处托。', 3);
       }
-      if (this.drownTimer > 2.0) this.kill('沉', '海把你收去入席了。—— 回到检查点');
+      if (this.drownTimer > 2.0) this.kill('沉', '海把你收进册里了。—— 回到检查点');
     } else {
       this.drownTimer = Math.max(0, this.drownTimer - dt * 2);
       if (this.drownTimer === 0) this._drownWarned = false;
@@ -1613,11 +1616,11 @@ export class Story {
       if (!this.flags.leaked && !this._watcherSeen) {
         this._watcherSeen = true;
         this.g.hud.subtitle('滩尾的水里站着人。不上岸，也不回头。', 5);
-        this.g.hud.subtitle('他们在等宴席开始。', 4);
+        this.g.hud.subtitle('他们在等验户开始。', 4);
       } else if (this.flags.leaked && !this._watcherTurnSeen) {
         this._watcherTurnSeen = true;
         this.g.hud.subtitle('……望潮的人转过身来了。', 4.5, 'song');
-        this.g.hud.subtitle('敬酒之后，他们望着酒店。望着你。', 4.5, 'song');
+        this.g.hud.subtitle('验户之后，他们望着酒店。望着你。', 4.5, 'song');
       }
     }
   }
@@ -1705,7 +1708,7 @@ export class Story {
       d.radioDial.material.color.setHSL(0.08, 0.9, 0.4 + Math.sin(this.time * 7) * 0.12);
     }
 
-    // 新娘小动作
+    // 周絮小动作
     if (this.bride && this.bride.group.visible) {
       this.bride.animate('sit', dt, 0.6);
     }

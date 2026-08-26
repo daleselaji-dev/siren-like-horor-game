@@ -51,12 +51,12 @@ export async function run(page, h) {
   await look('l11-lobby-desk', -2, -47, -10, -52, 3.5);       // 红漆总台+登记簿
   await look('l12-lobby-stair', -4, -45.5, -4, -60, 3.5);     // 红毯大楼梯
   await look('l13-banquet-hall', -12.5, -46, -17, -64, 3.5);  // 圆桌宴席+舞台
-  await look('l14-banquet-stage', -13, -58, -16.5, -64.6, 3.5); // 舞台红幕+司仪
+  await look('l14-banquet-stage', -13, -58, -16.5, -64.6, 3.5); // 舞台红幕+报数员
   await look('l15-service-crt', 0.5, -62.5, 0.8, -65, 3.5);   // 服务走廊 CRT
   await look('l16-stairwell', 8.5, -53.5, 8, -57, 3.5);       // 楼梯间标识
   await look('l17-security-9crt', 7.5, -62, 10.5, -66, 6.9);  // 保卫科九宫格
   await look('l18-3f-corridor', -11, -55.5, 2, -55.5, 10.3);  // 3F 客房走廊
-  await look('l19-suite-807', -12, -60, -13.5, -64.6, 10.3);  // 807 三面镜+新娘
+  await look('l19-suite-807', -12, -60, -13.5, -64.6, 10.3);  // 807 三面镜+周絮
   await look('l20-annex-tank', 24, -50, 32, -52, 3.5);        // 海洋馆主展缸
 
   // —— 海洋馆主展厅：巨物残骸（深海巨物恐怖奇观） ——
@@ -65,7 +65,7 @@ export async function run(page, h) {
   await look('l20d-processing', 49.5, -55.5, 52.5, -57, 3.5); // 处理间铁柜
 
   // —— 宴席工位实体近景 ——
-  // 司仪（舞台上）：从上宾空席斜前方看，避开高背椅遮挡
+  // 报数员（舞台上）：从上宾空席斜前方看，避开高背椅遮挡
   await look('l21-emcee-close', -14.9, -63.0, -16.5, -64.6, 3.5);
   // 侍应（挪到宴会厅入口空地正拍，避开圆桌人群遮挡；拍完归位）
   const wp = await page.evaluate(() => {
@@ -83,7 +83,7 @@ export async function run(page, h) {
     w.pos.set(orig.x, w.pos.y, orig.z);
     w.yaw = orig.yaw; w.stateTimer = 0;
   }, wp);
-  // 全福婆（临时启用到 3F 走廊近景）
+  // 理册婆（临时启用到 3F 走廊近景）
   await page.evaluate(() => {
     const g = window.__game;
     const m = g.byId.matron;
@@ -120,7 +120,7 @@ export async function run(page, h) {
   // —— 渗漏态：浮客+上宾+深绿黑海色 ——
   await page.evaluate(() => {
     const g = window.__game;
-    g.agenda.advanceTo(3); // 敬酒=返潮点火
+    g.agenda.advanceTo(3); // 验户=返潮点火
     g.ocean.blood = 0.95;
     g.sky.blood = 0.95;
   });

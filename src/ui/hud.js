@@ -42,11 +42,11 @@ export class HUD {
   /** 电影黑边（演出用） */
   setLetterbox(on) { this.el.letterbox.classList.toggle('on', !!on); }
 
-  /** 喜事议程推进指示（司仪每报一次时辰，右上角亮一次） */
+  /** 核册议程推进指示（报数员每念一条，右上角亮一次） */
   agenda(stage, name) {
     const el = this.el.agenda;
     if (!el) return;
-    el.textContent = `喜事议程 · ${name}`;
+    el.textContent = `核册议程 · ${name}`;
     el.classList.add('show');
     el.classList.remove('flash');
     void el.offsetWidth; // 重触发动画
