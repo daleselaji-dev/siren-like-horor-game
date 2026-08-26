@@ -518,6 +518,36 @@ export function waterNormalTexture(seed = 99, size = 512) {
   return t;
 }
 
+/** 幻潮面（里世界悬空海）：从水底仰看的焦散光网——
+ *  两个尺度的细胞噪声边界线 + 云影调制，冷绿的活光。
+ *  加色混合贴在半透明大平面上，缓慢平移 = 「没有水的海面」在屋脊上流。 */
+export function phantomTideTexture(seed = 811, size = 256) {
+  const [c, ctx] = makeCanvas(size);
+  const img = ctx.createImageData(size, size);
+  const d = img.data;
+  const cell1 = makeCellular(seed, 10);
+  const cell2 = makeCellular(seed + 7, 23);
+  const fbm = makeFbm(seed + 3, 3);
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const c1 = cell1(u, v), c2 = cell2(u, v);
+      const w1 = Math.pow(clamp01(1 - (c1.f2 - c1.f1) * 2.6), 6);  // 大焦散网
+      const w2 = Math.pow(clamp01(1 - (c2.f2 - c2.f1) * 3.0), 7);  // 细碎光丝
+      const m = 0.55 + fbm(u * 2, v * 2) * 0.45;                   // 云影调制（网不许均匀）
+      const L = clamp01(w1 * 0.85 + w2 * 0.5) * m;
+      const i4 = (y * size + x) * 4;
+      d[i4] = L * 168; d[i4 + 1] = L * 232; d[i4 + 2] = L * 214; d[i4 + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 /** 渔网（带 alpha，绳股加粗留破洞） */
 export function netTexture(size = 256) {
   const [c, ctx] = makeCanvas(size);
@@ -1589,6 +1619,7 @@ export function buildTextureSet(lowspec = false) {
   set.hairCurtainIn = toTex(hairCurtainTexture(160, 256, 9911, { clumps: 4, dense: true }), { aniso, clamp: true });
   set.hairCurtainOut = toTex(hairCurtainTexture(160, 256, 5533, { clumps: 3, dense: false }), { aniso, clamp: true });
   set.waterNormal = waterNormalTexture(99, lowspec ? 256 : 512);
+  set.tide = phantomTideTexture(811, lowspec ? 128 : 256);
   set.net = netTexture();
   set.lantern = lanternTexture('潮');
   set.lanternJi = lanternTexture('祭');

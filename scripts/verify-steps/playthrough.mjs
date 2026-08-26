@@ -73,7 +73,7 @@ export async function run(page, h) {
       g.story.updateDeath(0.4);
     }
     const pp = g.player.pos;
-    for (const id of ['waiterBanquet', 'waiterLobby', 'waiterEast', 'security', 'osteo', 'wetcomer1', 'wetcomer2', 'wetcomer3']) {
+    for (const id of ['waiterBanquet', 'waiterLobby', 'waiterEast', 'security', 'osteo', 'wetcomer1', 'wetcomer2', 'wetcomer3', 'wetcomer4', 'wetcomer5']) {
       const w = g.byId[id];
       if (!w) continue;
       w.state = 'PATROL'; w.suspectMeter = 0;

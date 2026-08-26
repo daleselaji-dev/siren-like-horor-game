@@ -292,6 +292,7 @@ export class Story {
         { at: 320, cond: () => this.flags.townGateOpen && !this.flags.inHotel, act: () => this.g.hud.subtitle('家家门框上钉着户牌，名字用红漆新描过。街上一个人也没有。', 5.5) },
         { at: 520, cond: () => this.flags.inHotel && !this.flags.leaked, act: () => this.g.hud.subtitle('酒店里很暖。暖得像是楼在替什么东西焐着。', 5) },
         { at: 700, cond: () => this.flags.leaked, act: () => this.g.hud.subtitle('墙纸在鼓包。楼是干的，可它在承受水压。', 5, 'song') },
+        { at: 780, cond: () => this.flags.leaked, act: () => this.g.hud.subtitle('很大的影子从镇上游过去。不急。它认得路。', 5.5, 'song') },
       ],
     };
 
@@ -956,6 +957,13 @@ export class Story {
     });
     // —— 返潮之后的镇区（异化态叙事：地图变了，路也变了） ——
     add({
+      zone: Z.hotelFront, once: true, cond: () => this.flags.leaked,
+      act: () => {
+        g.hud.subtitle('抬头。潮面悬在屋脊上头——薄薄一层亮，像谁把海举回来了。', 6, 'song');
+        g.hud.subtitle('鱼的影子从街上游过去。没有水。鱼不需要了。', 5.5, 'song');
+      },
+    });
+    add({
       zone: Z.frontStreet, once: true, cond: () => this.flags.leaked,
       act: () => {
         g.hud.subtitle('街心摆满了椅子。一排一排，全脸朝海。', 5, 'song');
@@ -966,6 +974,7 @@ export class Story {
       zone: Z.villageCenter, once: true, cond: () => this.flags.leaked,
       act: () => {
         g.hud.subtitle('通酒店的主街隆起了一道脊。泥、壳，还有别人家的门。', 5.5);
+        g.hud.subtitle('拴船的缆绳从街面绷到半空，浮子顶着那层亮——水走了，绳还记得深度。', 6);
         g.hud.subtitle('路从今晚起不走这里。要过去，钻床单巷，或者绕盐田。', 5.5);
       },
     });
@@ -1085,7 +1094,8 @@ export class Story {
     }
     g.dog?.setEnabled(false);
     // 上街的换成湿客：不认贝灰的界、镁光打折——绕开或用闹钟钓走
-    for (const id of ['wetcomer1', 'wetcomer2', 'wetcomer3']) byId[id]?.setEnabled(true);
+    // 轮12 增生：家属楼院与盐田绕行道也各上一个——绕路不再是免费的
+    for (const id of ['wetcomer1', 'wetcomer2', 'wetcomer3', 'wetcomer4', 'wetcomer5']) byId[id]?.setEnabled(true);
     // 灯光：荧光变冷、闪烁加剧
     for (const hl of g.world.dynamic.hotelLights ?? []) {
       hl.flicker = Math.min(2.4, (hl.flicker ?? 0) + 0.8);
@@ -1841,7 +1851,7 @@ export class Story {
   updateWetcomers() {
     if (this._wetSeen || !this.flags.leaked) return;
     const p = this.g.player.pos;
-    for (const id of ['wetcomer1', 'wetcomer2', 'wetcomer3']) {
+    for (const id of ['wetcomer1', 'wetcomer2', 'wetcomer3', 'wetcomer4', 'wetcomer5']) {
       const w = this.g.byId[id];
       if (!w || !w.enabled) continue;
       if (Math.hypot(w.pos.x - p.x, w.pos.z - p.z) > 15) continue;

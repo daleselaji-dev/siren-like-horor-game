@@ -158,6 +158,19 @@ const enemyDefs = [
     fov: 100, sightRange: 15, hearRange: 18, walkSpeed: 0.6, chaseSpeed: 2.45,
     flashK: 0.55, ignoreLime: true,
   },
+  // —— 轮12 增生：异化态的镇不止三个湿客——家属楼院与盐田绕行道也被认领了 ——
+  {
+    id: 'wetcomer4', label: '湿客', kind: 'patrol', role: 'returnee', fxKind: 'wet', mute: true, enabled: false,
+    waypoints: P.wet4,
+    fov: 100, sightRange: 14, hearRange: 18, walkSpeed: 0.52, chaseSpeed: 2.35,
+    flashK: 0.55, ignoreLime: true,
+  },
+  {
+    id: 'wetcomer5', label: '湿客', kind: 'patrol', role: 'returnee', fxKind: 'wet', mute: true, enabled: false,
+    waypoints: P.wet5,
+    fov: 100, sightRange: 14, hearRange: 18, walkSpeed: 0.58, chaseSpeed: 2.4,
+    flashK: 0.55, ignoreLime: true,
+  },
 ];
 
 const enemies = enemyDefs.map((d) => new Enemy(engine.scene, world, M, d));

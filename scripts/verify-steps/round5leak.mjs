@@ -41,14 +41,21 @@ export async function run(page, h) {
       collidersOff: L ? L.colliders.every((c) => c.off) : false,
       screens: (g.world.dynamic.staticScreens ?? []).length,
       townFolk: ['runner1', 'runner2', 'streetRunner', 'dikePatrol', 'templeGuard'].map((id) => g.byId[id]?.enabled),
-      wet: ['wetcomer1', 'wetcomer2', 'wetcomer3'].map((id) => g.byId[id]?.enabled),
+      wet: ['wetcomer1', 'wetcomer2', 'wetcomer3', 'wetcomer4', 'wetcomer5'].map((id) => g.byId[id]?.enabled),
       dog: g.dog?.enabled,
+      // 双态材质：常态的沥青粗糙度必须还是干的（1.0）
+      asphaltRough: g.M.asphalt.roughness,
+      hasTide: !!L?.tide,
+      fishCount: L?.tide?.fish.count,
     };
   });
   console.log('[verify] pre-leak:', JSON.stringify(pre));
   assert(pre.hasLeakState, 'leakState missing');
   assert(pre.groupVisible === false, 'leak group visible too early');
   assert(pre.collidersOff, 'leak colliders active too early');
+  assert(pre.asphaltRough === 1, 'asphalt should be dry (rough=1) before leak, got ' + pre.asphaltRough);
+  assert(pre.hasTide, 'phantom tide not built');
+  assert(pre.fishCount >= 20, 'fish school too small: ' + pre.fishCount);
   assert(pre.townFolk.every(Boolean), 'townfolk should be on before leak');
   assert(pre.wet.every((v) => v === false), 'wetcomers should be off before leak');
   const preWalk = await walkSouth(-2, -20, 90); // 主街脊位(z=-26)向南穿行
@@ -70,8 +77,12 @@ export async function run(page, h) {
       light: L.light.intensity,
       townFolk: ['runner1', 'runner2', 'streetRunner', 'dikePatrol', 'templeGuard', 'booth'].map((id) => g.byId[id]?.enabled),
       keeper: g.byId.keeper?.enabled,
-      wet: ['wetcomer1', 'wetcomer2', 'wetcomer3'].map((id) => g.byId[id]?.enabled),
+      wet: ['wetcomer1', 'wetcomer2', 'wetcomer3', 'wetcomer4', 'wetcomer5'].map((id) => g.byId[id]?.enabled),
       dog: g.dog?.enabled,
+      // 双态材质：整镇泡透（沥青粗糙度减半、反射上调、色沉）
+      asphaltRough: g.M.asphalt.roughness,
+      asphaltEnv: g.M.asphalt.envMapIntensity,
+      wetMats: L.wetMats?.length ?? 0,
     };
   });
   console.log('[verify] post-leak:', JSON.stringify(post));
@@ -81,8 +92,30 @@ export async function run(page, h) {
   assert(post.screens > pre.screens, 'CRT cairn screens not registered');
   assert(post.townFolk.every((v) => v === false), 'townfolk not withdrawn: ' + JSON.stringify(post.townFolk));
   assert(post.keeper === true, 'keeper should stay (his rite is unfinished)');
-  assert(post.wet.every(Boolean), 'wetcomers not deployed');
+  assert(post.wet.every(Boolean), 'wetcomers not deployed (incl. round12 wet4/wet5)');
   assert(post.dog === false, 'dog should be gone after leak');
+  assert(post.asphaltRough < 0.7, 'asphalt not soaked after leak: ' + post.asphaltRough);
+  assert(post.asphaltEnv > 2, 'asphalt reflectivity not raised: ' + post.asphaltEnv);
+  assert(post.wetMats >= 8, 'dual-state material originals not recorded: ' + post.wetMats);
+
+  // ---------- 2b. 幻潮面活性：光网在流、鱼影在游（连续两拍矩阵必须变化） ----------
+  const tideAlive = await page.evaluate(() => {
+    const g = window.__game;
+    const td = g.world.dynamic.leakState.tide;
+    g.world.updateFx(500);
+    const a1 = td.fish.instanceMatrix.array.slice(0, 16).join(',');
+    const off1 = td.mats[0].map.offset.x;
+    g.world.updateFx(510);
+    const a2 = td.fish.instanceMatrix.array.slice(0, 16).join(',');
+    const off2 = td.mats[0].map.offset.x;
+    // 大鱼在潮面下 1.7m、体长 13m
+    const giantOk = td.giant.len > 10 && td.giant.y < td.y;
+    return { fishMoved: a1 !== a2, scrolled: off1 !== off2, giantOk };
+  });
+  console.log('[verify] phantom tide:', JSON.stringify(tideAlive));
+  assert(tideAlive.fishMoved, 'fish shadows frozen');
+  assert(tideAlive.scrolled, 'tide caustics not scrolling');
+  assert(tideAlive.giantOk, 'giant shadow misconfigured');
 
   // ---------- 3. 路线变化：主街封死，床单巷可绕 ----------
   const blockedWalk = await walkSouth(-2, -20, 90);
@@ -183,6 +216,18 @@ export async function run(page, h) {
   await look('r5-08-wetcomer-close', -4.3, -20.3, -5.8, -21.6, undefined, 0.02);
   await page.evaluate(() => { window.__game.game.state = 'PLAY'; });
   await look('r5-09-salt-crust', 0.5, -30.5, -4, -38, undefined, -0.3);    // 盐痂爬向酒店正门
+
+  // ---------- 7. 轮12 取证：幻潮面 / 鱼影 / 浮子缆绳 / 泡透的街 ----------
+  // 大鱼影停到镇心上空（r→0 = 原地悬停），仰拍悬空的海
+  await page.evaluate(() => {
+    const g = window.__game;
+    const td = g.world.dynamic.leakState.tide;
+    td.giant.cx = 2; td.giant.cz = -9; td.giant.r = 0.01;
+    g.world.updateFx(520);
+  });
+  await look('r5-10-phantom-tide', 2, -2, 2, -30, undefined, 1.08);   // 潮面光网+巨影仰拍
+  await look('r5-11-float-ropes', 2, -6, -4, -14, undefined, 0.55);   // 绷直的缆绳与悬空浮子
+  await look('r5-12-wet-street', 12, -4, -2, -20, undefined, -0.12);  // 泡透的街面+镜面水洼
 
   console.log('[verify] round5 leak-state all pass');
 }

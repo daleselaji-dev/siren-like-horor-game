@@ -2461,6 +2461,146 @@ export function buildTown(scene, M) {
       crust.count = n; crust.instanceMatrix.needsUpdate = true;
       leak.add(crust);
     }
+
+    // —— 幻潮面：悬在屋脊上头的海 ——
+    // 「没有水。来的是深度。」的字面化：牌坊以内的镇子上空 11.5m 悬一层
+    // 半透明的焦散光网，缓慢地流。屋脊从下面顶出来；人在潮底下走。
+    // 两层错速平移 = 水面的视差闪烁；加色混合 = 只发光不遮天。
+    const TIDE_Y = 11.5;
+    {
+      const t0 = M.textures.tide;
+      const t1 = M.textures.tide.clone();
+      t1.needsUpdate = true;
+      t0.repeat.set(9, 7);
+      t1.repeat.set(16, 12);
+      const mk = (tex, op, tint) => new THREE.MeshBasicMaterial({
+        map: tex, color: tint, transparent: true, opacity: op,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        side: THREE.DoubleSide, fog: true,
+      });
+      const mat0 = mk(t0, 0.34, 0xd8f0e6);
+      const mat1 = mk(t1, 0.2, 0xbfe4da);
+      const plane = new THREE.PlaneGeometry(108, 82);
+      const lay0 = new THREE.Mesh(plane, mat0);
+      const lay1 = new THREE.Mesh(plane, mat1);
+      lay0.rotation.x = -Math.PI / 2; lay1.rotation.x = -Math.PI / 2;
+      lay0.position.set(-8, TIDE_Y, -1);
+      lay1.position.set(-8, TIDE_Y + 0.2, -1);
+      lay0.renderOrder = 6; lay1.renderOrder = 7;
+      leak.add(lay0, lay1);
+
+      // —— 鱼影巡游：潮面底下的剪影 ——
+      // 车削鱼雷体 + 压扁尾鳍；三群绕圈的小鱼 + 一条极大的、不急的影子横越全镇。
+      const prof = [];
+      const NN = 8;
+      for (let i = 0; i <= NN; i++) {
+        const t = i / NN;
+        prof.push(new THREE.Vector2(Math.max(0.001, Math.sin(Math.PI * Math.pow(1 - t, 0.7)) * 0.085), t - 0.5));
+      }
+      const body = new THREE.LatheGeometry(prof, 8);
+      body.rotateZ(-Math.PI / 2);                    // 鼻尖朝 +X
+      const tail = new THREE.ConeGeometry(0.13, 0.26, 4);
+      tail.rotateZ(-Math.PI / 2);                    // 锥尖朝 +X（贴住尾根）
+      tail.scale(1, 0.18, 1);                        // 压扁成水平尾叶（自下仰看要读出尾形）
+      tail.translate(-0.6, 0, 0);
+      const fishGeo = BufferGeometryUtils.mergeGeometries([body, tail]);
+      const fishMat = new THREE.MeshBasicMaterial({ color: 0x060a0c, fog: true });
+      const fish = new THREE.InstancedMesh(fishGeo, fishMat, 24);
+      fish.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      fish.frustumCulled = false;                    // 实例满镇游动，包围球不可信
+      const fishParams = [];
+      const schools = [
+        { cx: 0, cz: -8, n: 9 },
+        { cx: 18, cz: 4, n: 8 },
+        { cx: -24, cz: 10, n: 6 },
+      ];
+      for (const sc of schools) {
+        for (let k = 0; k < sc.n; k++) {
+          fishParams.push({
+            cx: sc.cx + (rand() - 0.5) * 4, cz: sc.cz + (rand() - 0.5) * 4,
+            r: 5 + rand() * 12, speed: (0.1 + rand() * 0.16) * (rand() < 0.5 ? -1 : 1),
+            phase: rand() * 6.28, y: TIDE_Y - 0.6 - rand() * 0.9,
+            len: 1.0 + rand() * 1.2, wag: 2.5 + rand() * 2,
+          });
+        }
+      }
+      // 那条大的：绕全镇一圈要三分多钟。它知道路。
+      const giant = { cx: -6, cz: 0, r: 30, speed: 0.028, phase: 1.2, y: TIDE_Y - 1.7, len: 13, wag: 0.6 };
+      fishParams.push(giant);
+      leak.add(fish);
+
+      // —— 光柱：潮面漏下来的三根淡光（椅阵/CRT冢/街心） ——
+      const rayMat = new THREE.MeshBasicMaterial({
+        color: 0x9fd2c0, transparent: true, opacity: 0.032,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        side: THREE.DoubleSide, fog: true,
+      });
+      for (const [rx, rz, rr] of [[21, -4.5, 3.6], [-7.5, -22.8, 2.6], [2, 8, 3.0]]) {
+        const gy = g(rx, rz);
+        const h = TIDE_Y - gy;
+        const ray = new THREE.Mesh(new THREE.CylinderGeometry(rr * 0.34, rr, h, 10, 1, true), rayMat);
+        ray.position.set(rx, gy + h / 2, rz);
+        ray.renderOrder = 5;
+        leak.add(ray);
+      }
+
+      Object.assign(dynamic.leakState, {
+        tide: { mats: [mat0, mat1], op: [0.34, 0.2], fish, fishParams, giant, y: TIDE_Y },
+      });
+    }
+
+    // —— 系地缆绳：浮子顶在潮面底下 ——
+    // 缆绳锚在街面的木桩上，向上绷直；玻璃浮子悬在半空，
+    // 顶着那层亮——水走了，绳还记得深度。
+    {
+      const spots = [[8, -10], [-4, -14], [16, 2], [-14, -2], [-30, 14], [0, -33], [30, -10]];
+      for (const [sx, sz] of spots) {
+        const gy = g(sx, sz);
+        const topY = TIDE_Y - 0.85 - rand() * 0.5;
+        const dx = (rand() - 0.5) * 2.0, dz = (rand() - 0.5) * 2.0; // 顶端随「潮流」略偏
+        const H = topY - gy - 0.25;
+        add(GEO.box, M.woodDark, sx, gy + 0.22, sz, rand() * 6.28, 0.15, 0.44, 0.15); // 地桩
+        // 绳：小角度斜拉（近似欧拉倾角）
+        add(GEO.cyl, M.driftwood, sx + dx / 2, gy + 0.25 + H / 2, sz + dz / 2, 0,
+          0.07, H, 0.07, Math.atan2(dz, H), -Math.atan2(dx, H));
+        // 玻璃浮子（有的一只，有的一对）
+        add(GEO.sphere, M.glassGreen, sx + dx, topY + 0.16, sz + dz, 0, 0.62, 0.62, 0.62);
+        if (rand() < 0.45) add(GEO.sphere, M.glassGreen, sx + dx + 0.4, topY + 0.02, sz + dz + 0.2, 0, 0.44, 0.44, 0.44);
+      }
+    }
+
+    // —— 镜面水洼：返潮走过的街面留下的「亮」 ——
+    // 常态的沥青粗糙度是 1.0；异化后整镇材质变湿之外，
+    // 这些洼是纯镜面——倒着天上那层潮。
+    {
+      const puddleMat = new THREE.MeshStandardMaterial({
+        color: 0x11181c, roughness: 0.05, metalness: 0.55, envMapIntensity: 2.4,
+      });
+      const puddleGeo = new THREE.CylinderGeometry(1, 1, 0.02, 10);
+      const puddles = new THREE.InstancedMesh(puddleGeo, puddleMat, 26);
+      const m4 = new THREE.Matrix4(); const q = new THREE.Quaternion();
+      const e = new THREE.Euler(); const s3 = new THREE.Vector3();
+      const runs = [
+        { x0: 40, z0: 0, x1: 14, z1: -6 },
+        { x0: 12, z0: -8, x1: -2, z1: -20 },
+        { x0: -2, z0: -30, x1: -4, z1: -38 },
+        { x0: -8, z0: 4, x1: -26, z1: 12 },
+      ];
+      let n = 0;
+      for (const rn of runs) {
+        for (let i = 0; i < 7 && n < 26; i++) {
+          const t = i / 6;
+          const x = rn.x0 + (rn.x1 - rn.x0) * t + (rand() - 0.5) * 3;
+          const z = rn.z0 + (rn.z1 - rn.z0) * t + (rand() - 0.5) * 3;
+          e.set(0, rand() * 6.28, 0); q.setFromEuler(e);
+          s3.set(0.7 + rand() * 1.3, 1, 0.5 + rand() * 0.9);
+          m4.compose(new THREE.Vector3(x, g(x, z) + 0.015, z), q, s3);
+          puddles.setMatrixAt(n++, m4);
+        }
+      }
+      puddles.count = n; puddles.instanceMatrix.needsUpdate = true;
+      leak.add(puddles);
+    }
   }
 
   // ================= 巡逻路点 =================
@@ -2480,6 +2620,9 @@ export function buildTown(scene, M) {
   patrols.wet1 = [[17.5, -17], [18.3, -22.7], [19, -25], [18, -27.2], [17, -30.5], [17.9, -27.2], [19, -25], [18.2, -22.7]];
   patrols.wet2 = [[-22, -2], [-24, 8], [-22, 18], [-16, 8]];
   patrols.wet3 = [[46, -68], [56, -78], [48, -90], [40, -80]];
+  // 轮12 增生：家属楼院里一个（守着 201 那条对照线），盐田绕行道一个（绕盐田的代价）
+  patrols.wet4 = [[-36, 19], [-30, 14], [-28, 24], [-36, 28], [-42, 22]];
+  patrols.wet5 = [[-34, -2], [-40, 6], [-46, -2], [-38, -10]];
 
   // ================= 雨遮蔽（棚/檐/屋顶下不出现雨丝） =================
   dynamic.rainCovers = [
@@ -2529,11 +2672,16 @@ export function buildTown(scene, M) {
     return 'stone'; // 水磨石
   }
 
+  // updateFx 暂存（鱼影实例矩阵每帧重组，不许在帧内 new）
+  const _m4 = new THREE.Matrix4(); const _q = new THREE.Quaternion();
+  const _e = new THREE.Euler(); const _s = new THREE.Vector3(); const _v3 = new THREE.Vector3();
+
   return {
     colliders, bounds, heightAt, locations, patrols, dynamic, zones, lights, surfaceAt,
     waterLevelRef: { value: 0 },
     waterLevel() { return this.waterLevelRef.value; },
-    /** 返潮点火：异化镇区一次性显形——主街封脊、椅阵面海、CRT冢通电、床单巷挂帘 */
+    /** 返潮点火：异化镇区一次性显形——主街封脊、椅阵面海、CRT冢通电、床单巷挂帘、
+     *  幻潮面悬空、整镇材质返潮（双态材质：泡透的镇 vs 干着的镇） */
     applyLeakState() {
       const L = dynamic.leakState;
       if (!L || L.applied) return;
@@ -2544,6 +2692,17 @@ export function buildTown(scene, M) {
       dynamic.staticScreens.push(...L.screens);
       L.light._base = 9; // updateFx 以 _base 为准（建成时熄着）
       L.light.intensity = 9;
+      // —— 双态材质：外场共享材质整批「泡透」——变暗偏冷、粗糙度减半（湿面出反光）——
+      // 不动酒店前场内装（hotelWall/wallpaper/毯/水磨石走自己的灯光叙事）。
+      L.wetMats = [];
+      for (const key of ['asphalt', 'concrete', 'concreteDark', 'roadPaint', 'plaster', 'wood', 'woodDark', 'stone', 'slab', 'roof']) {
+        const m = M[key];
+        if (!m) continue;
+        L.wetMats.push({ key, color: m.color.clone(), rough: m.roughness, env: m.envMapIntensity });
+        m.color.multiply(new THREE.Color(0.66, 0.72, 0.75));
+        m.roughness = Math.max(0.32, m.roughness * 0.5);
+        m.envMapIntensity = Math.min(2.6, m.envMapIntensity * 1.8);
+      }
     },
     /** 每帧特效更新（烟柱 + 灯火呼吸 + 酒店荧光频闪 + 录像厅雪花屏） */
     updateFx(time) {
@@ -2574,6 +2733,30 @@ export function buildTown(scene, M) {
           k = Math.max(0.08, k) * (1 + Math.sin(time * 47 + i) * 0.04 * fl);
         }
         hl.pl.intensity = hl.base * k * (hl.powerK ?? 1); // powerK: 保险丝板拔掉该路=0
+      }
+      // 幻潮面：光网缓流 + 潮息涨落 + 鱼影巡游
+      const LS = dynamic.leakState;
+      if (LS?.applied && LS.tide) {
+        const td = LS.tide;
+        td.mats[0].map.offset.set(time * 0.0042, time * 0.0031);
+        td.mats[1].map.offset.set(-time * 0.0058, time * 0.0022);
+        const breathe = 0.82 + Math.sin(time * 0.22) * 0.18;   // 没有水的潮仍在涨落
+        td.mats[0].opacity = td.op[0] * breathe;
+        td.mats[1].opacity = td.op[1] * (1.64 - breathe * 0.64);
+        for (let i = 0; i < td.fishParams.length; i++) {
+          const f = td.fishParams[i];
+          const a = f.phase + time * f.speed;
+          const x = f.cx + Math.cos(a) * f.r;
+          const z = f.cz + Math.sin(a) * f.r;
+          const s = Math.sign(f.speed) || 1;
+          const ry = Math.atan2(-Math.cos(a) * s, -Math.sin(a) * s); // 鼻尖对切线
+          _e.set(0, ry, Math.sin(time * f.wag + f.phase) * 0.07);
+          _q.setFromEuler(_e);
+          _s.set(f.len, f.len * 0.9, f.len);
+          _m4.compose(_v3.set(x, f.y, z), _q, _s);
+          td.fish.setMatrixAt(i, _m4);
+        }
+        td.fish.instanceMatrix.needsUpdate = true;
       }
     },
   };
