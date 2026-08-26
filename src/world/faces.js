@@ -256,10 +256,12 @@ function compositeFace(M, job, img) {
 
   // 椭圆蒙版（照片空间）：把照片的灰背景/衣领挡在外面
   // eax 贴脸缘（脸半宽≈瞳距），配合背景色门控双保险——灰背景一点不许上脸颊
+  // 羽化圈外扩（1.1→1.18）：脸盖边界推出到太阳穴/颊侧转折之外，
+  // 断层线不再落在脸颊正侧面的受光带上
   const ioPx = (D.eyeRX - D.eyeLX) * S;
   const mePx = (D.mouthY - D.eyeY) * S;
   const ecx = cx, ecy = D.eyeY * S + mePx * 0.5;
-  const eax = ioPx * 1.1, eay = mePx * 2.05;
+  const eax = ioPx * 1.18, eay = mePx * 2.12;
   const chinPy = D.chinY * S;
   // 发际线 gate（照片空间）：正中 hairY、向两鬓按抛物线下垂——
   // 发际线及以上的照片头发一个像素都不许烘上头皮（双重发际涂鸦的根治）。
@@ -304,9 +306,10 @@ function compositeFace(M, job, img) {
   // 照片像素是 sRGB——setRGB 必须声明色彩空间，否则被当线性值放亮（颈白脸黄的元凶）
   M.faceLids[key].color.setRGB(skinAvg[0] / 255 * 0.92, skinAvg[1] / 255 * 0.9, skinAvg[2] / 255 * 0.9, THREE.SRGBColorSpace);
   M.faceLipMats[key].color.setRGB(lipAvg[0] / 255, lipAvg[1] / 255, lipAvg[2] / 255, THREE.SRGBColorSpace);
-  // 颈与脸皮同源：同一份颊部取色、RGB 同乘 0.82——只降明度不动色相
-  //（此前 0.78/0.74/0.73 的不等乘把颈推向灰红，正是「换头接缝」的色相元凶）
-  M.faceNecks[key].color.setRGB(skinAvg[0] / 255 * 0.82, skinAvg[1] / 255 * 0.82, skinAvg[2] / 255 * 0.82, THREE.SRGBColorSpace);
+  // 颈与脸皮同源：同一份颊部取色、RGB 同乘 0.88——只降明度不动色相
+  //（0.82 的明度差配窄接触影带在颌缘读成一道「硬暗线」；提到 0.88，
+  //  剩余的颌下变暗全部交给顶点色 smoothstep 接触影去做——影有坡，线就没了）
+  M.faceNecks[key].color.setRGB(skinAvg[0] / 255 * 0.88, skinAvg[1] / 255 * 0.88, skinAvg[2] / 255 * 0.88, THREE.SRGBColorSpace);
 
   // 底皮均值（色调匹配：底皮乘到照片肤色）
   const base = xd.getImageData(0, 0, S, S);
@@ -345,20 +348,32 @@ function compositeFace(M, job, img) {
           const rootDk = 1 - (1 - gate) * 0.13 * frontW;
           r *= rootDk; g *= rootDk; b *= rootDk;
           // 权重：朝前 × 椭圆 × 下巴截止 × 发际线 gate
+          // 羽化带展宽三倍（0.72-0.98 → 0.52-1.0）：底皮→照片是长坡不是窄圈陡坎
           let w = frontW;
           const rex = (spx - ecx) / eax, rey = (spy - ecy) / eay;
-          w *= 1 - sstep(0.72, 0.98, Math.sqrt(rex * rex + rey * rey));
+          const err = Math.sqrt(rex * rex + rey * rey);
+          w *= 1 - sstep(0.52, 1.0, err);
           w *= 1 - sstep(chinPy - 8, chinPy + 22, spy);
           w *= gate;
           if (w > 0.003) {
             // 双线性采样照片
             const xi = spx | 0, yi = spy | 0, xf = spx - xi, yf = spy - yi;
             const p00 = (yi * S + xi) * 4, p10 = p00 + 4, p01 = p00 + S * 4, p11 = p01 + 4;
-            const pr = (P[p00] * (1 - xf) + P[p10] * xf) * (1 - yf) + (P[p01] * (1 - xf) + P[p11] * xf) * yf;
-            const pg = (P[p00 + 1] * (1 - xf) + P[p10 + 1] * xf) * (1 - yf) + (P[p01 + 1] * (1 - xf) + P[p11 + 1] * xf) * yf;
-            const pb = (P[p00 + 2] * (1 - xf) + P[p10 + 2] * xf) * (1 - yf) + (P[p01 + 2] * (1 - xf) + P[p11 + 2] * xf) * yf;
+            let pr = (P[p00] * (1 - xf) + P[p10] * xf) * (1 - yf) + (P[p01] * (1 - xf) + P[p11] * xf) * yf;
+            let pg = (P[p00 + 1] * (1 - xf) + P[p10 + 1] * xf) * (1 - yf) + (P[p01 + 1] * (1 - xf) + P[p11 + 1] * xf) * yf;
+            let pb = (P[p00 + 2] * (1 - xf) + P[p10 + 2] * xf) * (1 - yf) + (P[p01 + 2] * (1 - xf) + P[p11 + 2] * xf) * yf;
             w *= bgGate(pr, pg, pb); // 背景色（灰墙/衣领）拒绝上皮
             w *= strandGate(spy, pr, pg, pb); // 额区散落发丝拒绝上皮
+            // 照片肤色→底皮色彩迁移（脸盖消融的另一半）：羽化带内保留照片的明暗细节、
+            // 色度渐次收敛到调色底皮——即使照片局部影调与底皮 tint 不一致，
+            // 边界两侧的「色」也已在坡上合流，太阳穴/颊侧不再有面具切线
+            const mig = sstep(0.40, 0.88, err);
+            if (mig > 0.01) {
+              const pl = Math.min(1.7, Math.max(0.3, (pr * 0.35 + pg * 0.5 + pb * 0.15) / Math.max(1, skinLum)));
+              pr += (r * pl - pr) * mig;
+              pg += (g * pl - pg) * mig;
+              pb += (b * pl - pb) * mig;
+            }
             r += (pr - r) * w; g += (pg - g) * w; b += (pb - b) * w;
           }
         }
@@ -367,6 +382,40 @@ function compositeFace(M, job, img) {
     }
   }
   xd.putImageData(base, 0, 0);
+
+  // ---- 眼周 AO 烘焙：眼窝-眼睑接触阴影层次（multiply 压进漫反射）----
+  // 眼球/眼睑是独立网格，实时光照给不出接触阴影——把五层软影直接烘进头皮：
+  // 眶缘软影 → 上睑褶皱带 → 内眦深影 → 下睑接触影 → 眉弓下投影，由大到小、由浅到深。
+  // 眼睛因此「嵌」进眼眶：眶内是一个有层次的暗腔，不是平皮上摆两颗球
+  {
+    const eyeLen2 = Math.hypot(EYE_X, EYE_Y, EYE_Z);
+    const phiE2 = Math.atan2(EYE_X, EYE_Z);
+    const evy = (Math.acos(EYE_Y / eyeLen2) / Math.PI) * S;
+    const aoK = key === 'chalk' ? 0.7 : key === 'pale' ? 0.85 : 1;
+    xd.globalCompositeOperation = 'multiply';
+    const soft = (px3, py3, rx3, ry3, a) => {
+      xd.save();
+      xd.translate(px3, py3);
+      xd.scale(1, ry3 / rx3);
+      const gr2 = xd.createRadialGradient(0, 0, 0, 0, 0, rx3);
+      gr2.addColorStop(0, `rgba(118,86,72,${(a * aoK).toFixed(3)})`);
+      gr2.addColorStop(0.6, `rgba(126,94,80,${(a * aoK * 0.5).toFixed(3)})`);
+      gr2.addColorStop(1, 'rgba(126,94,80,0)');
+      xd.fillStyle = gr2;
+      xd.fillRect(-rx3, -rx3, rx3 * 2, rx3 * 2);
+      xd.restore();
+    };
+    for (const sgn of [-1, 1]) {
+      const ex2 = (0.5 + sgn * phiE2 / TWO_PI) * S; // 左右眼画布列
+      const sideIn = -sgn;                          // 内眦朝画布中线
+      soft(ex2, evy - 4, 56, 42, 0.24);             // 眶缘软影（整窝一层浅）
+      soft(ex2, evy - 13, 42, 12, 0.34);            // 上睑褶皱带（最深的一道）
+      soft(ex2 + sideIn * 24, evy + 2, 14, 11, 0.36); // 内眦深影
+      soft(ex2, evy + 13, 36, 9, 0.18);             // 下睑接触影
+      soft(ex2, evy - 24, 46, 12, 0.14);            // 眉弓下投影
+    }
+    xd.globalCompositeOperation = 'source-over';
+  }
   mapTex.needsUpdate = true;
 
   // ---- 程序化补法线：照片亮度高频 → 前脸凹凸（皱纹/毛孔/唇纹跟着照片走）----
@@ -398,7 +447,7 @@ function compositeFace(M, job, img) {
       if (spx < 8 || spx > S - 9 || spy < 8 || spy > S - 9) continue;
       let w = sstep(0.18, 0.5, dz);
       const rex = (spx - ecx) / eax, rey = (spy - ecy) / eay;
-      w *= 1 - sstep(0.7, 0.95, Math.sqrt(rex * rex + rey * rey));
+      w *= 1 - sstep(0.52, 0.95, Math.sqrt(rex * rex + rey * rey)); // 与漫反射同宽的羽化坡
       w *= 1 - sstep(chinPy - 10, chinPy + 16, spy);
       w *= hairGate(spx, spy); // 发际以上的照片头发假法线一并拒绝
       if (w < 0.01) continue;

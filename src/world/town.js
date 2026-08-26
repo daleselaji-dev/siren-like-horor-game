@@ -674,7 +674,12 @@ export function buildTown(scene, M) {
         const body = new THREE.Mesh(bodyG, M.plaster);
         bus.add(body);
       }
-      mkBox(M.ironDark, 0, 0.55, 0, 8.4, 0.55, 2.34);                // 裙边
+      // 裙边压暗 + 轮拱真开口：裙边不再横贯全长——轮位挖出洞、洞里是内凹黑腔，
+      // 车轮从「洞」里长出来；裙面换更暗的哑光铁皮（湿夜里裙边吃住地面，不反光抢戏）
+      const skirtM = new THREE.MeshStandardMaterial({ color: 0x0d1013, roughness: 0.88, metalness: 0.15 });
+      mkBox(skirtM, -3.87, 0.55, 0, 0.66, 0.55, 2.34);               // 尾段
+      mkBox(skirtM, 0, 0.55, 0, 4.5, 0.55, 2.34);                    // 中段（两轴之间）
+      mkBox(skirtM, 3.87, 0.55, 0, 0.66, 0.55, 2.34);                // 头段
       mkBox(M.clothRed, 0, 1.05, 0, 8.42, 0.22, 2.36);               // 红腰线
       // 窗带：车厢内微光 + 座椅背板剪影烘进贴图（一格一窗、窗柱分隔）——
       // 夜里路过的大巴车窗永远是「暖光里一排空椅背」，不是一条黑玻璃
@@ -769,8 +774,9 @@ export function buildTown(scene, M) {
         hub.rotation.x = Math.PI / 2;
         hub.position.set(wx, 0.44, wz);
         bus.add(hub);
-        // 轮窝暗腔：轮子是从「洞」里长出来的，不是贴在裙边上的
-        mkBox(wellM, wx, 0.62, wz, 1.06, 0.5, 0.3);
+        // 轮窝内凹暗腔：内壁从裙面（z≈1.17）后退 13cm——侧视裙边开口里是一个
+        // 有深度的黑腔，轮胎穿腔而出；旧的贴面黑盒只是一块「涂黑」没有进深
+        mkBox(wellM, wx, 0.6, Math.sign(wz) * 0.82, 1.3, 0.64, 0.44);
         // 轮拱罩：半环钢壳压在轮上（θ π/2..3π/2 → 旋转后为上半拱）
         const arch = new THREE.Mesh(
           new THREE.CylinderGeometry(0.54, 0.54, 0.34, 12, 1, true, Math.PI / 2, Math.PI), M.ironDark);
@@ -799,10 +805,30 @@ export function buildTown(scene, M) {
       const tl = new THREE.MeshBasicMaterial({ color: 0xff2a20 });
       mkBox(tl, -4.22, 1.0, -0.85, 0.06, 0.16, 0.3);
       mkBox(tl, -4.22, 1.0, 0.85, 0.06, 0.16, 0.3);
-      // 车灯：雨夜里两支体积光锥扎进雨丝（末班车留给你的最后一段光）
+      // 车头灯组小几何：内凹灯碗 + 钢圈 bezel + 玻璃凸透镜 + 角上琥珀转向灯——
+      // 灯是「装」在车脸上的组件，不再是两粒贴面发光方块
       const hlM = new THREE.MeshBasicMaterial({ color: 0xfff2c8 });
-      mkBox(hlM, 4.19, 0.92, -0.82, 0.05, 0.16, 0.28);
-      mkBox(hlM, 4.19, 0.92, 0.82, 0.05, 0.16, 0.28);
+      {
+        const bezelM = new THREE.MeshStandardMaterial({ color: 0x8a9094, roughness: 0.3, metalness: 0.85 });
+        const ambM = new THREE.MeshBasicMaterial({ color: 0xd8862a });
+        for (const s of [-1, 1]) {
+          const lz = s * 0.82;
+          const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.118, 0.085, 0.09, 14), wellM);
+          bowl.rotation.z = -Math.PI / 2;    // 轴向车头：碗口朝前的暗腔
+          bowl.position.set(4.15, 0.92, lz);
+          bus.add(bowl);
+          const bez = new THREE.Mesh(new THREE.TorusGeometry(0.112, 0.016, 8, 18), bezelM);
+          bez.rotation.y = Math.PI / 2;
+          bez.position.set(4.205, 0.92, lz);
+          bus.add(bez);
+          const lens = new THREE.Mesh(new THREE.SphereGeometry(0.098, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), hlM);
+          lens.scale.set(1, 0.42, 1);        // 压扁成凸透镜
+          lens.rotation.z = -Math.PI / 2;    // 球顶朝前
+          lens.position.set(4.2, 0.92, lz);
+          bus.add(lens);
+          mkBox(ambM, 4.19, 0.92, s * 1.07, 0.045, 0.08, 0.1); // 角上小转向灯
+        }
+      }
       for (const hz2 of [-0.82, 0.82]) {
         const hcone = makeLightCone(0xffeec0, 0.07, 0.13, 1.8, 8);
         hcone.position.set(4.2, 0.92, hz2);

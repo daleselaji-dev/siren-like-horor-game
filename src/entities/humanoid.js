@@ -271,6 +271,36 @@ function noseDyFor(P, photoKey) {
   return Math.max(-0.012, Math.min(0.004, a.noseY - def));
 }
 
+/** 耳廓（近距 LOD 带软骨起伏）：耳轮缘脊 / 耳舟沟 / 对耳轮 / 耳甲腔 / 耳屏 / 耳垂。
+ *  皮肤背光透红 rim 要「走」在软骨的棱谷上才可信——光滑鸡蛋面上的 rim 读成描边。
+ *  远景仍是缩放球（省顶点）；xform 会把 x 压到 ~0.3 倍，径向位移的 x 分量预放大补偿。
+ *  side: -1 左耳 / +1 右耳（浮雕镜像）。 */
+function earGeo(hd, side) {
+  return G(`ear_${hd ? 'hd' : 'lo'}_${side}`, () => {
+    const g = new THREE.SphereGeometry(0.021, hd ? 24 : 10, hd ? 18 : 8);
+    if (!hd) return g;
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const rl = Math.hypot(x, y, z) || 1;
+      const nx = (x / rl) * side, ny = y / rl, nz = z / rl; // nx>0 = 外侧面
+      const a = Math.atan2(ny, nz);                // 0 前 / ±π 后 / +π/2 上
+      const mask = 0.5 + 0.5 * Math.cos(a - 1.9);  // 缘脊沿上后弧，前下（耳垂/耳屏区）淡出
+      const ax = Math.abs(nx);
+      let d = 0;
+      d += Math.exp(-((ax / 0.16) ** 2)) * 0.0036 * mask;            // 耳轮：外缘卷边脊
+      d -= Math.exp(-(((ax - 0.30) / 0.09) ** 2)) * 0.0024 * mask;   // 耳舟：缘脊内一道沟
+      d += Math.exp(-(((ax - 0.52) / 0.09) ** 2)) * 0.0018 * mask;   // 对耳轮：再起一道缓脊
+      d -= _ss01(0.55, 0.85, nx) * (0.5 + 0.5 * Math.cos(a + 0.2)) * 0.005; // 耳甲腔（外面中前凹）
+      d += Math.exp(-((nx - 0.5) ** 2) * 30 - ((a + 0.35) ** 2) * 9) * 0.0022; // 耳屏小凸
+      d += _ss01(-0.55, -0.95, ny) * 0.001;                          // 耳垂微鼓
+      pos.setXYZ(i, x + (x / rl) * d * 2.8, y + (y / rl) * d, z + (z / rl) * d);
+    }
+    g.computeVertexNormals();
+    return g;
+  });
+}
+
 /** 头部集合（头骨+鼻+耳，唇已独立成 lipsGeo）：皮肤材质一体网格，鼻耳全部由 P 参数化 */
 function headGeo(variant, P, hd = false, photoKey = null) {
   return G(`head_${variant}_${P.key}_${photoKey ?? 'x'}${hd ? '_hd' : ''}`, () => {
@@ -288,10 +318,11 @@ function headGeo(variant, P, hd = false, photoKey = null) {
     parts.push(xform(new THREE.SphereGeometry(0.005, 6 * sd, 5 * sd), -0.0035, -0.023 + dy * 0.5, 0.0885, 0, 0, 0, 0.55, 1.9, 0.4));
     parts.push(xform(new THREE.SphereGeometry(0.005, 6 * sd, 5 * sd), 0.0035, -0.023 + dy * 0.5, 0.0885, 0, 0, 0, 0.55, 1.9, 0.4));
     // 耳（带不对称：左右高低差半毫米——近景才读得出的活人证据）
+    // 近距 LOD 换带软骨起伏的耳廓：rim 透红沿耳轮/对耳轮的棱走，不再是光球描边
     const earS = 0.28 + P.earS * 0.12;
     const earDy = (P.asym - 0.5) * 0.006;
-    parts.push(xform(new THREE.SphereGeometry(0.021, 10 * sd, 8 * sd), -0.082, earDy, -0.008, 0, 0, 0.15, earS, 1 + P.earS * 0.15, 0.68));
-    parts.push(xform(new THREE.SphereGeometry(0.021, 10 * sd, 8 * sd), 0.082, -earDy, -0.008, 0, 0, -0.15, earS, 1 + P.earS * 0.15, 0.68));
+    parts.push(xform(earGeo(hd, -1), -0.082, earDy, -0.008, 0, 0, 0.15, earS, 1 + P.earS * 0.15, 0.68));
+    parts.push(xform(earGeo(hd, 1), 0.082, -earDy, -0.008, 0, 0, -0.15, earS, 1 + P.earS * 0.15, 0.68));
     // 下巴球（把尖锥兜圆）
     parts.push(xform(new THREE.SphereGeometry(0.02, 10 * sd, 8 * sd), 0, -0.068, 0.062, 0, 0, 0, 1.35, 0.95, 0.85));
     // 球面投影 UV：整头（含鼻/耳/下巴）统一投到一张头皮上——照片脸横跨鼻梁不断缝
@@ -528,8 +559,13 @@ function hairCurtainGeo(w = 0.052, h = 0.22) {
       const x = pos.getX(i), y = pos.getY(i);
       const tx = x / (w * 0.5);          // -1(后缘)..1(前缘)
       const ty = 0.5 - y / h;            // 0 顶 → 1 梢
-      // 绕颊圆弧（半径≈4cm）+ 前缘随颊面向内扣拢
-      let z = -tx * tx * 0.014 - Math.max(0, tx) * Math.sin(Math.min(1, ty * 1.6) * Math.PI) * 0.007;
+      // 内缘贴颊剖面（随脸颊曲率，帘顶挂在耳上）：
+      // 颧下起坡(ty~0.1) → 颊窝内扣最深(ty~0.20) → 颌缘再拢一道(ty~0.34) → 颏下释放垂坠
+      // 旧单峰正弦峰值压在颌位、颊窝处离颊 3-4mm 悬空——帘与脸之间漏一条缝
+      const hug = _ss01(0.0, 0.1, ty) * 0.0034
+        + Math.exp(-((ty - 0.20) ** 2) * 90) * 0.0058
+        + Math.exp(-((ty - 0.34) ** 2) * 120) * 0.0046;
+      let z = -tx * tx * 0.014 - Math.max(0, tx) * hug * (1 - _ss01(0.5, 0.78, ty));
       // 垂坠：中段贴颊、梢部微离（下摆有自己的弧线，不是直板）
       z += ty * ty * 0.006 - Math.sin(ty * Math.PI) * 0.003;
       pos.setZ(i, z);
@@ -1048,11 +1084,12 @@ export class Humanoid {
         const col = new Float32Array(pos2.count * 3);
         for (let i = 0; i < pos2.count; i++) {
           // 下颌接触阴影只降明度不动色相——RGB 同乘，颈色与脸皮同源。
-          // smoothstep 缓入缓出（旧线性斜坡在中段留一道可见「明度台阶」），
-          // 带宽收窄到 0.048（旧 0.1 把整段颈都压进阴影里）——影只贴颌底，颈亮起来
-          const t = Math.min(1, Math.max(0, (pos2.getY(i) - 0.052) / 0.048));
+          // 硬暗线软化：带宽 0.048→0.077（坡再放缓一倍）、暗量 0.34→0.21，
+          // 且起点下移到 0.028——影从锁骨上方就开始缓缓聚拢，
+          // 顶缘钻进下颌腔时已是渐近的暗，不再在颌缘留一道可见的「切口线」
+          const t = Math.min(1, Math.max(0, (pos2.getY(i) - 0.028) / 0.077));
           const s2 = t * t * (3 - 2 * t);
-          const sh = 1 - s2 * 0.34;
+          const sh = 1 - s2 * 0.21;
           col[i * 3] = sh; col[i * 3 + 1] = sh; col[i * 3 + 2] = sh;
         }
         g2.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -1346,9 +1383,32 @@ export class Humanoid {
         // 颈窝碎发（两片错位）
         addCard(hairCardGeo(0.06, 0.055, 4), strandM, 0, -0.052, -0.078, 0.35, Math.PI, 0);
         addCard(hairCardGeo(0.05, 0.05, 5), strandM, -0.024, -0.048, -0.072, 0.3, Math.PI - 0.5, 0.1);
-        // 顶部逆光碎发（十字两片、根朝下立起）——轮廓上的几根「不听话」
-        addCard(hairCardGeo(0.085, 0.05, 2), wispM, 0, 0.128, -0.012, 0, 0, Math.PI);
-        addCard(hairCardGeo(0.085, 0.05, 2), wispM, 0, 0.128, -0.012, 0, Math.PI / 2, Math.PI);
+        // 头顶散丝重做：高密度短绒卡×12 绕颅顶两圈立根——
+        // 旧方案是两片大卡打十字（0.05 高），逆光下读成「贴片玻璃」；
+        // 改为短绒卡（长度减半 ~0.02，数量翻六倍），根部沉进壳面 1/4 卡高、
+        // 沿壳球面逐卡外倾——轮廓上是一圈各自立根的碎绒毛
+        {
+          const hwK = (faceVariant === 'f' ? 0.87 : 0.85) + P.headW * 0.05; // 颅骨横向收窄补偿
+          const flK = 0.96 + P.faceLen * 0.06;
+          for (let ci = 0; ci < 12; ci++) {
+            const az2 = (ci / 12) * Math.PI * 2 + (ci % 2) * 0.26 + P.asymPh * 0.8;
+            const el2 = 0.28 + (ci % 3) * 0.15;          // 距顶极角两圈
+            const dx2 = Math.sin(el2) * Math.sin(az2), dy2 = Math.cos(el2), dz2 = Math.sin(el2) * Math.cos(az2);
+            const ch2 = 0.018 + (ci % 3) * 0.004;        // 卡高（旧 0.05 的一半以下）
+            const rr2 = 0.1055;                          // 壳面近似半径（壳心 y+0.03 / z-0.018）
+            const wsp = mkMesh(hairCardGeo(0.026 + (ci % 2) * 0.008, ch2, 3), fringeM,
+              dx2 * (rr2 * hwK + ch2 * 0.25),
+              0.115 + 0.03 + dy2 * (rr2 * flK * 0.97 + ch2 * 0.25),
+              -0.018 + dz2 * (rr2 + ch2 * 0.25));
+            wsp.rotation.order = 'YXZ';                  // 先方位后外倾再翻根
+            wsp.rotation.set(el2 * 0.85 + ((ci * 7) % 5) * 0.04, az2, Math.PI);
+            wsp.castShadow = false;
+            this.head.add(wsp);
+          }
+        }
+        // 轮廓上两根「不听话」的长丝（同样减半高）：顶心错拍
+        addCard(hairCardGeo(0.06, 0.026, 2), wispM, 0, 0.128, -0.012, 0, 0.5, Math.PI);
+        addCard(hairCardGeo(0.06, 0.026, 2), wispM, 0.01, 0.126, -0.008, 0, 2.1, Math.PI);
         if (hairStyle === 'long') {
           // 前帘双层：内帘实（绺芯缎带+密股，贴颊，是帘的「体」）
           //           外帘散（稀股大摆，浮在内帘外 4mm，是帘的「散」）
@@ -1362,13 +1422,14 @@ export class Humanoid {
           const curtOut = curtM('hairCurtainOut', 0.05);
           this.hairCurtains = [];
           for (const s of [-1, 1]) {
-            const inner = mkMesh(hairCurtainGeo(0.05, 0.21), curtIn, s * 0.088, 0.115 + 0.018, 0.012);
+            // 挂点外让 1.5mm：贴颊剖面加深后帘内缘更靠脸，根位外移保住不穿颊的安全距
+            const inner = mkMesh(hairCurtainGeo(0.05, 0.21), curtIn, s * 0.0895, 0.115 + 0.018, 0.012);
             inner.rotation.set(0.05, s * 1.32, s * -0.04);
             inner.renderOrder = 1;
             inner.userData.baseRZ = s * -0.04;
             inner.userData.swayPh = s < 0 ? 0 : 1.9; // 两侧错拍
             inner.userData.swayAmp = 0.6;            // 内帘贴颊，摆幅小
-            const outer = mkMesh(hairCurtainGeo(0.057, 0.228), curtOut, s * 0.094, 0.115 + 0.02, 0.017);
+            const outer = mkMesh(hairCurtainGeo(0.057, 0.228), curtOut, s * 0.0955, 0.115 + 0.02, 0.017);
             outer.rotation.set(0.08, s * 1.3, s * -0.07);
             outer.renderOrder = 2;
             outer.userData.baseRZ = s * -0.07;
