@@ -221,7 +221,7 @@ const sightjack = new SightjackSystem(engine, player, audio);
 const stealth = new StealthSystem(world, player);
 const crt = new CRTSystem(engine, world);
 crt.gainLight = sky.hemi; // 监控头自动增益用
-const tools = new ToolsSystem({ scene: engine.scene, engine, player, world, stealth, hud, audio, enemies });
+const tools = new ToolsSystem({ scene: engine.scene, engine, player, world, stealth, hud, audio, enemies, guest });
 
 const game = {
   scene: engine.scene, engine, world, player, hud, audio,

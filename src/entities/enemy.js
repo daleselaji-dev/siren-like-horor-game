@@ -824,27 +824,121 @@ export class HonoredGuest {
 
     this.group = new THREE.Group();
     const mats = [M.veneerRed, M.woodDark, M.driftwood, M.veneer];
-    // 臂：8 节板，沿肩→手贝塞尔摆放
+    this.stunT = 0;      // 镁光「定影」剩余秒
+    this.alignK = 0;     // 0=活的错拍 → 1=钉回照片（板材对齐）
+    this.lure = null;    // 闹钟诱引 {x,z,t}
+    this.t = 0;
+
+    // 臂：8 节板，沿肩→手贝塞尔摆放。板上带钉头与劈裂条——都是拆来的旧料
     this.armPanels = [];
+    const nailMat = new THREE.MeshStandardMaterial({ color: 0x2e2a26, roughness: 0.5, metalness: 0.7 });
     for (let i = 0; i < 8; i++) {
       const w = 1.7 - i * 0.12, h = 0.09, d = 0.8 - i * 0.05;
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats[i % mats.length]);
       m.castShadow = true;
+      // 钉头两枚（没起干净的钉子）
+      for (const sx of [-1, 1]) {
+        const nail = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.03, 6), nailMat);
+        nail.position.set(sx * w * 0.36, h / 2 + 0.012, (sx > 0 ? -1 : 1) * d * 0.22);
+        m.add(nail);
+      }
+      // 劈裂条：沿板长的一根窄木刺，略翘
+      const splinter = new THREE.Mesh(new THREE.BoxGeometry(w * 0.55, 0.022, 0.05), mats[(i + 2) % mats.length]);
+      splinter.position.set(w * 0.12, -h / 2 - 0.008, d * 0.38);
+      splinter.rotation.z = 0.05;
+      m.add(splinter);
+      // 板端铜箍：包浆黄铜扁箍带，勒着近关节的板头——板间的缝里没有任何东西
+      if (i > 0) {
+        const hoop = new THREE.Mesh(new THREE.TorusGeometry(d * 0.5, 0.022, 8, 16), M.brass);
+        hoop.rotation.y = Math.PI / 2;    // 环轴沿板长方向
+        hoop.scale.set(1, 0.32, 1);       // 压扁贴合板材扁截面
+        hoop.position.set(-w / 2 + 0.12, 0, 0);
+        m.add(hoop);
+      }
       this.group.add(m);
       this.armPanels.push(m);
     }
-    // 手：4 指，每指 2 板
+    // 丈杆：一根量地的红白节杆，捆在中段板下——它是来清点的
+    {
+      const cv = document.createElement('canvas');
+      cv.width = 64; cv.height = 8;
+      const cc = cv.getContext('2d');
+      for (let i = 0; i < 8; i++) {
+        cc.fillStyle = i % 2 ? '#b8352a' : '#e8e2d2';
+        cc.fillRect(i * 8, 0, 8, 8);
+      }
+      const tex = new THREE.CanvasTexture(cv);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 3.4, 8),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
+      rod.rotation.z = Math.PI / 2 - 0.06;
+      rod.position.set(0.1, -0.11, -0.12);
+      this.armPanels[3].add(rod);
+    }
+    // 垂绳三股：湿麻绳，绳端挂红漆界桩牌（「界」）——挂在上臂板下，走动时晃
+    this.ropes = [];
+    {
+      const cv = document.createElement('canvas');
+      cv.width = 32; cv.height = 64;
+      const cc = cv.getContext('2d');
+      cc.fillStyle = '#8e2318'; cc.fillRect(0, 0, 32, 64);
+      cc.strokeStyle = '#5e150e'; cc.lineWidth = 3; cc.strokeRect(1.5, 1.5, 29, 61);
+      cc.fillStyle = '#e5ded0'; cc.font = 'bold 24px serif';
+      cc.textAlign = 'center'; cc.textBaseline = 'middle';
+      cc.fillText('界', 16, 34);
+      const tagTex = new THREE.CanvasTexture(cv);
+      const tagMat = new THREE.MeshStandardMaterial({ map: tagTex, roughness: 0.8 });
+      tagMat.userData.fullUV = true;
+      const ropeMat = new THREE.MeshStandardMaterial({ color: 0x4a4238, roughness: 0.98 });
+      for (let r = 0; r < 3; r++) {
+        const len = 1.15 + r * 0.35;
+        const grp = new THREE.Group();
+        const line = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, len, 5), ropeMat);
+        line.position.y = -len / 2;
+        grp.add(line);
+        const tag = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.03), tagMat);
+        tag.position.y = -len - 0.14;
+        tag.rotation.y = r * 1.1;
+        grp.add(tag);
+        this.group.add(grp);
+        this.ropes.push({ grp, panel: 1 + r * 2, len, phase: r * 2.3 });
+      }
+    }
+    // 掌：半张圆桌面（宴会厅的料）垫在腕下
+    this.palm = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.72, 0.72, 0.055, 14, 1, false, 0, Math.PI), M.veneer);
+    this.palm.castShadow = true;
+    this.group.add(this.palm);
+    // 手：4 指，每指 2 板 + 旋木指端（桌腿脚旋出来的葫芦头）
     this.fingers = [];
     for (let f = 0; f < 4; f++) {
       const seg1 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.42), mats[(f + 1) % mats.length]);
       const seg2 = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.42, 0.34), mats[(f + 2) % mats.length]);
       seg1.castShadow = seg2.castShadow = true;
-      this.group.add(seg1, seg2);
-      this.fingers.push({ seg1, seg2, ang: (f / 3 - 0.5) * 1.5 });
+      const tip = new THREE.Group();
+      const t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.075, 0.16, 8), mats[(f + 1) % mats.length]);
+      const t2 = new THREE.Mesh(new THREE.SphereGeometry(0.062, 8, 6), mats[(f + 3) % mats.length]);
+      t2.position.y = -0.13;
+      tip.add(t1, t2);
+      this.group.add(seg1, seg2, tip);
+      this.fingers.push({ seg1, seg2, tip, ang: (f / 3 - 0.5) * 1.5, phase: f * 1.7 });
     }
     this.group.visible = false;
     scene.add(this.group);
     this.pos = this.hand; // 供距离判断
+  }
+
+  /** 镁光定影：被拍下的东西必须跟照片对齐——板材「咔」地排齐，僵在上一个稳定形态 */
+  flashStun(sec) {
+    if (!this.enabled) return;
+    this.stunT = Math.max(this.stunT, sec);
+    this.handTarget.copy(this.hand);
+    this.nameT = 0;
+  }
+
+  /** 闹钟诱引：出声的东西要先登记——放着不管的响铃比你的脚步更该清点 */
+  lureTo(x, z) {
+    if (!this.enabled) return;
+    this.lure = { x, z, t: 9 };
   }
 
   setEnabled(on) {
@@ -856,31 +950,64 @@ export class HonoredGuest {
     this.hand.copy(this.anchors[0]);
     this.handTarget.copy(this.anchors[0]);
     this.nameT = 0;
+    this.stunT = 0;
+    this.lure = null;
   }
 
   update(ctx) {
     if (!this.enabled) return;
     const { dt, player, audio } = ctx;
     const vib = ctx.vibration ?? 0;
+    this.t += dt;
 
-    // 目标：振动大 → 循声压向玩家；否则沿锚点缓慢巡摸
+    // 镁光定影：僵直中只做对齐，不追不点名
+    if (this.stunT > 0) this.stunT -= dt;
+    const stunned = this.stunT > 0;
+    this.alignK += ((stunned ? 1 : 0) - this.alignK) * Math.min(1, dt * (stunned ? 10 : 1.6));
+    if (this.lure) {
+      this.lure.t -= dt;
+      if (this.lure.t <= 0) this.lure = null;
+    }
+
+    // 目标优先级：镁光僵直 > 振动压向玩家 > 闹钟诱引 > 沿锚点巡摸
     const inArea = player.pos.x >= this.area.minX && player.pos.x <= this.area.maxX
       && player.pos.z >= this.area.minZ && player.pos.z <= this.area.maxZ
       && Math.abs(player.pos.y - this.hand.y) < 2.5;
-    if (vib > 0.5 && inArea && !player.dead) {
+    if (stunned) {
+      // 与照片对齐的东西不许动
+    } else if (vib > 0.5 && inArea && !player.dead) {
       this.handTarget.set(
         Math.max(this.area.minX, Math.min(this.area.maxX, player.pos.x)),
         player.pos.y,
         Math.max(this.area.minZ, Math.min(this.area.maxZ, player.pos.z)));
+    } else if (this.lure) {
+      this.handTarget.set(
+        Math.max(this.area.minX, Math.min(this.area.maxX, this.lure.x)),
+        this.hand.y,
+        Math.max(this.area.minZ, Math.min(this.area.maxZ, this.lure.z)));
     } else {
       const a = this.anchors[this.anchorIdx];
       if (this.hand.distanceTo(a) < 0.5) this.anchorIdx = (this.anchorIdx + 1) % this.anchors.length;
       this.handTarget.copy(this.anchors[this.anchorIdx]);
     }
-    const speed = vib > 0.5 ? 1.9 : 0.75;
+    // 贝灰界：干的坎，湿料不跨——去路一步内有界就停在界前清点
+    let limeHold = false;
+    if (!stunned) {
+      const lines = this.world.dynamic.limeLines;
+      if (lines && lines.length) {
+        const dxT = this.handTarget.x - this.hand.x, dzT = this.handTarget.z - this.hand.z;
+        const dT = Math.hypot(dxT, dzT) || 1;
+        const nx = this.hand.x + (dxT / dT) * 0.7, nz = this.hand.z + (dzT / dT) * 0.7;
+        for (const l of lines) {
+          if (distToSeg(nx, nz, l) < 0.6) { limeHold = true; break; }
+        }
+      }
+    }
+    const speed = stunned || limeHold ? 0 : vib > 0.5 ? 1.9 : 0.75;
     const d = this.handTarget.clone().sub(this.hand);
     const dist = d.length();
-    if (dist > 0.05) {
+    const moving = speed > 0 && dist > 0.05;
+    if (moving) {
       d.multiplyScalar(Math.min(1, (speed * dt) / dist));
       this.hand.add(d);
       this.creakT -= dt;
@@ -890,9 +1017,9 @@ export class HonoredGuest {
       }
     }
 
-    // 点名：手贴近玩家 → 数拍子；或振动满格直接点名
+    // 点名：手贴近玩家 → 数拍子；或振动满格直接点名（僵直中不点）
     const dp = Math.hypot(player.pos.x - this.hand.x, player.pos.z - this.hand.z);
-    if (!player.dead && inArea && (dp < 1.35 || vib >= 0.98)) {
+    if (!player.dead && !stunned && inArea && (dp < 1.35 || vib >= 0.98)) {
       this.nameT += dt;
       if (this.nameT > 0.4) ctx.onCaught?.(this);
     } else {
@@ -900,6 +1027,8 @@ export class HonoredGuest {
     }
 
     // ---- 摆件：肩→手 贝塞尔，板间留缝 ----
+    // alignK→1 时错拍归零：板材排得整整齐齐——照片里它就是这么摆的
+    const jig = 1 - this.alignK;
     const s = this.shoulder, hnd = this.hand;
     const ctrl = _v1.set((s.x + hnd.x) / 2, Math.max(s.y, hnd.y + 2.6), (s.z + hnd.z) / 2);
     for (let i = 0; i < this.armPanels.length; i++) {
@@ -915,21 +1044,41 @@ export class HonoredGuest {
       const tx = 2 * it * (ctrl.x - s.x) + 2 * t * (hnd.x - ctrl.x);
       const ty = 2 * it * (ctrl.y - s.y) + 2 * t * (hnd.y - ctrl.y);
       const tz = 2 * it * (ctrl.z - s.z) + 2 * t * (hnd.z - ctrl.z);
+      const wob = Math.sin(this.t * 1.1 + i) * 0.03 * jig; // 活着的微错拍
       p.rotation.set(
-        Math.atan2(-ty, Math.hypot(tx, tz)) + Math.sin(i * 2.7) * 0.1,
-        Math.atan2(tx, tz) + Math.sin(i * 1.3) * 0.14,
-        Math.sin(i * 3.9 + t * 4) * 0.12
+        Math.atan2(-ty, Math.hypot(tx, tz)) + (Math.sin(i * 2.7) * 0.1 + wob) * jig,
+        Math.atan2(tx, tz) + Math.sin(i * 1.3) * 0.14 * jig,
+        Math.sin(i * 3.9 + t * 4) * 0.12 * jig
       );
     }
-    // 手指扒地
+    // 垂绳：挂在对应板下，随移动与自摆晃——僵直时垂死不动
+    for (const r of this.ropes) {
+      const p = this.armPanels[r.panel];
+      r.grp.position.set(p.position.x, p.position.y - 0.06, p.position.z);
+      const sway = (moving ? 0.16 : 0.06) * jig;
+      r.grp.rotation.x = Math.sin(this.t * 1.35 + r.phase) * sway;
+      r.grp.rotation.z = Math.cos(this.t * 1.05 + r.phase * 1.7) * sway;
+    }
+    // 掌与手指扒地
     const gy = this.world.heightAt(hnd.x, hnd.z, hnd.y + 0.5);
+    const heading = moving ? Math.atan2(d.x, d.z) : this.t * 0.05;
+    this.palm.position.set(hnd.x, gy + 0.78, hnd.z);
+    this.palm.rotation.set(0.12 * jig, heading + Math.PI, 0);
     for (const f of this.fingers) {
+      // 僵直=指尖悬停离地（照片里它还没落下）；平时空指慢敲，追时扒进地里
+      const drum = stunned ? 0 : Math.max(0, Math.sin(this.t * (moving ? 5.5 : 2.2) + f.phase)) * (moving ? 0.05 : 0.09) * jig;
+      const lift = this.alignK * 0.22;
       const fx = hnd.x + Math.sin(f.ang) * 0.72;
       const fz = hnd.z + Math.cos(f.ang) * 0.72;
-      f.seg1.position.set(hnd.x + Math.sin(f.ang) * 0.35, gy + 0.62, hnd.z + Math.cos(f.ang) * 0.35);
+      f.seg1.position.set(hnd.x + Math.sin(f.ang) * 0.35, gy + 0.62 + drum * 0.4 + lift, hnd.z + Math.cos(f.ang) * 0.35);
       f.seg1.rotation.set(0.5, f.ang, 0);
-      f.seg2.position.set(fx, gy + 0.2, fz);
+      f.seg2.position.set(fx, gy + 0.2 + drum + lift, fz);
       f.seg2.rotation.set(1.15, f.ang, 0);
+      f.tip.position.set(
+        hnd.x + Math.sin(f.ang) * 0.95,
+        gy + 0.1 + drum * 1.4 + lift,
+        hnd.z + Math.cos(f.ang) * 0.95);
+      f.tip.rotation.set(1.35, f.ang, 0);
     }
   }
 }

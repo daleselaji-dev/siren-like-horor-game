@@ -9,7 +9,7 @@ const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 
 export class ToolsSystem {
-  constructor({ scene, engine, player, world, stealth, hud, audio, enemies }) {
+  constructor({ scene, engine, player, world, stealth, hud, audio, enemies, guest }) {
     this.scene = scene;
     this.engine = engine;
     this.player = player;
@@ -18,6 +18,7 @@ export class ToolsSystem {
     this.hud = hud;
     this.audio = audio;
     this.enemies = enemies;
+    this.guest = guest; // 上宾（主压迫）——三件工具对它有专门的规矩
 
     this.hasCamera = false;
     this.bulbs = 0;
@@ -81,6 +82,18 @@ export class ToolsSystem {
       hit++;
     }
     if (hit > 0) this.hud.subtitle(hit > 1 ? '几张脸同时白了一下，定在原地。' : '那张脸白了一下，定在原地。', 3.5);
+    // 上宾：被拍下来的东西必须先跟照片对齐——板材排齐、收指僵直
+    const gu = this.guest;
+    if (gu?.enabled) {
+      const gd = Math.hypot(gu.hand.x - p.pos.x, gu.hand.z - p.pos.z);
+      if (gd < 14 && Math.abs(gu.hand.y - p.pos.y) < 4.5) {
+        _v2.set(gu.hand.x, gu.hand.y + 0.6, gu.hand.z);
+        if (hasLineOfSight(_v1, _v2, this.world.colliders, (x, z) => this.world.heightAt(x, z, p.pos.y))) {
+          gu.flashStun(6);
+          this.hud.subtitle('板材「咔」地排齐了——像被钉回上一张照片。', 4, 'song');
+        }
+      }
+    }
     this.syncHud();
     return true;
   }
@@ -161,6 +174,13 @@ export class ToolsSystem {
           const dy = Math.abs(e.pos.y - c.y);
           if (d > e.hearRange * 1.6 + 8 || dy > 3.2) continue;
           e.lureTo?.(c.x, c.z);
+        }
+        // 上宾：铃震着地板——出声的东西要先清点
+        const gu = this.guest;
+        if (gu?.enabled && Math.hypot(gu.hand.x - c.x, gu.hand.z - c.z) < 24
+          && c.x >= gu.area.minX - 4 && c.x <= gu.area.maxX + 4
+          && c.z >= gu.area.minZ - 4 && c.z <= gu.area.maxZ + 4) {
+          gu.lureTo(c.x, c.z);
         }
       } else if (c.phase === 'ring') {
         if (c.t > 9) {
