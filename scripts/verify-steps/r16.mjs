@@ -63,6 +63,10 @@ export async function run(page, h) {
   // 屋顶设备层剪影（机房/水箱/天线杆越过女儿墙）
   await look('34_hotel_roofline', HO.x - 2, HO.z + 36, HO.x - 3, HO.z + 8, undefined, 0.24);
 
+  // ---------- 门3镇街：denser 远景构图（电线/招牌/横幅/积水/行人剪影层次） ----------
+  await look('37_street_vista_west', 43.5, -0.6, 12, -7.4, undefined, 0.02);
+  await look('38_street_vista_mid', 36, -1.0, 13, -7.0, undefined, 0.03);
+
   // ---------- 门3车内：重播开场零拍定帧（内衬壳/顶棚/A柱/座椅/仪表可读） ----------
   await page.evaluate(() => {
     const g = window.__game;

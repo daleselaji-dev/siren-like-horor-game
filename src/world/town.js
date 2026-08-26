@@ -771,6 +771,78 @@ export function buildTown(scene, M) {
         circle(px2, pz2, 0.2, pb + 5.0, { noSightBlock: true });
         B.add(GEO.box, M.ironDark, px2, pb + 4.35, pz2, 1.1, 1.2, 0.09, 0.09);
       }
+      // —— 轮16：镇前街 denser 远景层（门3）——通信线一路/断头垂线/横幅两道/
+      // 立杆招牌三面/行人剪影三具/路面积水链——远看这条街要有「天上乱、地上亮、
+      // 街边有字、雨里有人」四层 ——
+      {
+        // 低压通信线：同一排杆再压一条更松的线（天际线要「乱」）
+        for (let i = 0; i < poleTops.length - 1; i++) {
+          const [x1, z1] = poleTops[i], [x2, z2] = poleTops[i + 1];
+          wire(x1, g(x1, z1) + 3.7, z1, x2, g(x2, z2) + 3.7, z2, 0.85);
+        }
+        // 电话亭下户线 + 杆头垂着的一截断头线
+        wire(30.5, g(30.5, 2.2) + 4.3, 2.2, 31.6, g(31.6, -5.2) + 2.5, -5.0, 0.6);
+        wire(21, g(21, -4.6) + 4.4, -4.6, 21.7, g(21, -4.6) + 2.2, -4.0, 0.12);
+        // 横幅①（红底白字·防汛）：北灯杆→南竹竿，横跨街面
+        B.add(GEO.cyl, M.woodDark, 30.0, g(30.0, -5.6) + 2.1, -5.6, 0, 0.06, 4.2, 0.06);
+        const ban1 = plateMat('防 台 防 汛 · 人 人 有 责', { w: 640, h: 56, bg: '#8c1616', fg: '#f0e6d0', font: 0.5 });
+        B.add(GEO.box, ban1, 30.25, g(30.3, -1.7) + 3.62, -1.7, Math.PI / 2 - 0.06, 7.4, 0.6, 0.04, 0, 0.05);
+        wire(30.5, g(30.5, 2.2) + 4.0, 2.2, 30.3, g(30.3, -1.7) + 3.95, 1.95, 0.1);
+        wire(30.0, g(30.0, -5.6) + 4.1, -5.6, 30.2, g(30.3, -1.7) + 3.9, -5.3, 0.1);
+        // 横幅②（暗红·核册夜，一角脱扣斜着）：更远一层进深
+        B.add(GEO.cyl, M.woodDark, 19.0, g(19.0, -7.2) + 1.9, -7.2, 0, 0.055, 3.8, 0.055);
+        const ban2 = plateMat('今 夜 核 册 · 关 灯 闭 户', { w: 640, h: 56, bg: '#5a1414', fg: '#c8a860', font: 0.5 });
+        B.add(GEO.box, ban2, 19.6, g(19.6, -3.2) + 3.28, -3.2, Math.PI / 2 + 0.1, 6.9, 0.56, 0.04, 0, -0.12);
+        // 立杆招牌三面（两只灯箱微光+一面木牌）：沿北侧人行道排开——远景里一层「字」
+        const signPost = (x, z, txt, opts, hSign, ry2) => {
+          const b2 = g(x, z);
+          B.add(GEO.cyl, M.woodDark, x, b2 + 1.45, z, 0, 0.05, 2.9, 0.05);
+          B.add(GEO.box, plateMat(txt, opts), x, b2 + hSign, z, ry2, 1.15, 0.5, 0.07);
+          B.add(GEO.box, M.ironDark, x, b2 + hSign + 0.29, z, ry2, 1.2, 0.05, 0.09);
+        };
+        signPost(33.8, 2.5, '五金 · 日杂', { w: 288, h: 96, bg: '#274a26', fg: '#e8e0c8', font: 0.42, emissive: 0.35 }, 2.42, Math.PI / 2 + 0.08);
+        signPost(27.5, 1.5, '白鹤旅社', { w: 288, h: 96, bg: '#173a4a', fg: '#f0d28c', font: 0.46, emissive: 0.45 }, 2.3, Math.PI / 2 - 0.05);
+        signPost(15.5, -2.4, '收废品 换煤气', { w: 320, h: 96, bg: '#6a5636', fg: '#2c2418', font: 0.4 }, 2.2, Math.PI / 2 + 0.14);
+        // 行人剪影三具：打伞站着不动的人——雨里的一层「人形」，走近了也不抬头
+        const pedM = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.96 });
+        const umbM = new THREE.MeshStandardMaterial({ color: 0x0d0f12, roughness: 0.85 });
+        const ped = (x, z, face) => {
+          const b2 = g(x, z);
+          B.add(GEO.box, pedM, x - 0.07, b2 + 0.36, z, face, 0.11, 0.72, 0.13);
+          B.add(GEO.box, pedM, x + 0.07, b2 + 0.35, z + 0.02, face, 0.11, 0.7, 0.13);
+          B.add(GEO.box, pedM, x, b2 + 1.06, z, face, 0.42, 0.72, 0.3);     // 大衣身
+          B.add(GEO.box, pedM, x, b2 + 1.5, z, face, 0.3, 0.18, 0.24);      // 肩围
+          B.add(GEO.sphere, pedM, x, b2 + 1.58, z, face, 0.17, 0.2, 0.19);  // 头（藏在伞影里）
+          const um = new THREE.Mesh(new THREE.ConeGeometry(0.56, 0.2, 9), umbM);
+          um.position.set(x + Math.sin(face) * 0.06, b2 + 1.88, z + Math.cos(face) * 0.06);
+          scene.add(um);
+          const st = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.5, 5), umbM);
+          st.position.set(x + Math.sin(face) * 0.06, b2 + 1.62, z + Math.cos(face) * 0.06);
+          scene.add(st);
+          circle(x, z, 0.28, b2 + 1.7, { noSightBlock: true });
+        };
+        ped(24.5, -4.3, 2.2);
+        ped(17.2, -5.9, -1.4);
+        ped(14.3, -3.6, 2.9);
+        // 路面积水链（同镜洼配方：写模板供幻潮镜像层）——街心一路亮到雾里
+        const pm2 = new THREE.MeshStandardMaterial({
+          color: 0x11171a, roughness: 0.04, metalness: 0.92, envMapIntensity: 1.8,
+        });
+        pm2.stencilWrite = true;
+        pm2.stencilRef = 1;
+        pm2.stencilZPass = THREE.ReplaceStencilOp;
+        const pg2 = new THREE.CircleGeometry(1, 16);
+        for (const [px3, pz3, s3, sq3] of [
+          [34, -1.6, 1.7, 0.42], [28.5, -2.6, 1.3, 0.5], [22.5, -4.2, 1.9, 0.4],
+          [15.2, -6.3, 1.3, 0.5], [12.6, -7.3, 1.0, 0.55],
+        ]) {
+          const p3 = new THREE.Mesh(pg2, pm2);
+          p3.rotation.x = -Math.PI / 2;
+          p3.scale.set(s3, s3 * sq3, 1);
+          p3.position.set(px3, g(px3, pz3) + 0.058, pz3);
+          scene.add(p3);
+        }
+      }
       if (wireGeos.length) {
         const wm = new THREE.Mesh(
           BufferGeometryUtils.mergeGeometries(wireGeos, false),
