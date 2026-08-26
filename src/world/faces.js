@@ -401,6 +401,24 @@ function compositeFace(M, job, img) {
   xp.drawImage(img, 0, 0, PS, PS);
   const P = xp.getImageData(0, 0, PS, PS).data;
 
+  // —— 轮16·去光照缓冲：照片低频亮度（128 网格 + 双线性）——
+  // 照片从此只当「肤色/毛孔/五官色彩参考」：影棚光形体明暗（鼻影/眶影/颊侧渐变）
+  // 属于低频，除掉；毛孔红斑属于高频，保住。形体明暗交还给真几何+实时光。
+  const BLW = 128;
+  const cbl = document.createElement('canvas');
+  cbl.width = cbl.height = BLW;
+  const xbl = cbl.getContext('2d', { willReadFrequently: true });
+  xbl.drawImage(cp, 0, 0, BLW, BLW);
+  const BLD = xbl.getImageData(0, 0, BLW, BLW).data;
+  const blurLum = (px, py) => {
+    const fx = Math.min(BLW - 1.001, Math.max(0, (px / PS) * BLW - 0.5));
+    const fy = Math.min(BLW - 1.001, Math.max(0, (py / PS) * BLW - 0.5));
+    const xi = fx | 0, yi = fy | 0, xf = fx - xi, yf = fy - yi;
+    const q = (xx, yy) => { const i = (yy * BLW + xx) * 4; return BLD[i] * 0.35 + BLD[i + 1] * 0.5 + BLD[i + 2] * 0.15; };
+    return (q(xi, yi) * (1 - xf) + q(xi + 1, yi) * xf) * (1 - yf)
+      + (q(xi, yi + 1) * (1 - xf) + q(xi + 1, yi + 1) * xf) * yf;
+  };
+
   // ---- 标定：世界(头局部) → 照片像素 仿射 ----
   const eyeLen = Math.hypot(EYE_X, EYE_Y, EYE_Z);
   const thetaE = Math.acos(EYE_Y / eyeLen);
@@ -541,6 +559,20 @@ function compositeFace(M, job, img) {
             let pb = (P[p00 + 2] * (1 - xf) + P[p10 + 2] * xf) * (1 - yf) + (P[p01 + 2] * (1 - xf) + P[p11 + 2] * xf) * yf;
             w *= bgGate(pr, pg, pb); // 背景色（灰墙/衣领）拒绝上皮
             w *= strandGate(spy, pr, pg, pb); // 额区散落发丝拒绝上皮
+            // —— 轮16·去光照：像素亮度除以低频亮度、乘回肤色基准——
+            // 照片自带的鼻侧影/眶影/影棚渐变被清空（真几何鼻自己会投影子），
+            // 鼻区最强去光（双鼻影根治）；眉块/唇块是「五官色彩」，保住不抹平
+            const bl = blurLum(spx, spy);
+            if (bl > 12) {
+              const nzx = (spx - cx) / (ioPx * 0.4), nzy = (spy - D.noseY * PS) / (mePx * 0.62);
+              let kf = 0.55 + 0.38 * Math.exp(-(nzx * nzx + nzy * nzy * 0.8));
+              const dBrow = (spy - D.browY * PS) / (mePx * 0.22);
+              kf *= 1 - 0.62 * Math.exp(-dBrow * dBrow);
+              const mlx = (spx - cx) / (ioPx * 0.42), mly = (spy - D.mouthY * PS) / (mePx * 0.3);
+              kf *= 1 - 0.55 * Math.exp(-(mlx * mlx + mly * mly));
+              const fDel = Math.min(1.75, Math.max(0.55, 1 + (skinLum / bl - 1) * kf));
+              pr *= fDel; pg *= fDel; pb *= fDel;
+            }
             // 照片肤色→底皮色彩迁移（脸盖消融的另一半）：羽化带内色度收敛到调色底皮，
             // 明度差也随迁移收敛 75%（照片脸缘的摄影亮斑正是「面具」最亮的一圈）——
             // 边界两侧的色与光已在坡上合流，太阳穴/颊侧不再有面具切线
@@ -615,6 +647,40 @@ function compositeFace(M, job, img) {
       soft(ex2, evy + 13 * SC, 36 * SC, 9 * SC, 0.18);               // 下睑接触影
       soft(ex2, evy - 24 * SC, 46 * SC, 12 * SC, 0.14);              // 眉弓下投影
     }
+    xd.globalCompositeOperation = 'source-over';
+  }
+  // ---- 轮16·鼻几何注册烘焙：去光照清掉了照片自带鼻影——孔腔/翼沟的「暗」是
+  // 洞穴光学，必须补回在真几何鼻孔的 UV 准确位上（几何鼻底已对齐照片鼻影线，
+  // noseDyFor 保证两者逐点重合；这里的暗斑与鼻孔凹腔是同一坐标系）----
+  {
+    const noseY3 = (cy - D.noseY * PS) / sy; // 照片鼻底线（头局部米）
+    const pxmX = S / (TWO_PI * R0), pxmY = S / (Math.PI * R0);
+    const uvPt = (x3m, y3m) => {
+      const ct2 = Math.max(-0.999, Math.min(0.999, y3m / R0));
+      const th2 = Math.acos(ct2), st2 = Math.sin(th2);
+      const sp2 = Math.max(-0.999, Math.min(0.999, x3m / (R0 * st2)));
+      return [(0.5 + Math.asin(sp2) / TWO_PI) * S, (th2 / Math.PI) * S];
+    };
+    xd.globalCompositeOperation = 'multiply';
+    const dark = (x3m, y3m, rxm, rym, a, rgb = '58,34,26') => {
+      const [X, Y] = uvPt(x3m, y3m);
+      const rx3 = rxm * pxmX, ry3 = rym * pxmY;
+      xd.save();
+      xd.translate(X, Y);
+      xd.scale(1, ry3 / rx3);
+      const gr2 = xd.createRadialGradient(0, 0, 0, 0, 0, rx3);
+      gr2.addColorStop(0, `rgba(${rgb},${a.toFixed(3)})`);
+      gr2.addColorStop(0.55, `rgba(${rgb},${(a * 0.45).toFixed(3)})`);
+      gr2.addColorStop(1, `rgba(${rgb},0)`);
+      xd.fillStyle = gr2;
+      xd.fillRect(-rx3, -rx3, rx3 * 2, rx3 * 2);
+      xd.restore();
+    };
+    for (const s2 of [-1, 1]) {
+      dark(s2 * 0.0074, noseY3 + 0.0016, 0.0044, 0.0032, 0.5);  // 鼻孔腔暗
+      dark(s2 * 0.0128, noseY3 + 0.003, 0.0034, 0.0048, 0.24);  // 鼻翼沟
+    }
+    dark(0, noseY3 - 0.003, 0.011, 0.0042, 0.15);               // 鼻底投影（软）
     xd.globalCompositeOperation = 'source-over';
   }
   // ---- 统频微粒：overlay 一层毛孔尺度的亮度噪声铺满整头皮 ----

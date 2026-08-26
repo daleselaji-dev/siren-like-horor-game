@@ -52,6 +52,7 @@ const roles = [
   ['townsman', { role: 'townsman', seed: 66 }, 'walk'],
   ['fisher', { role: 'fisher', seed: 77, hat: true, tool: 'rake' }, 'work_rake'],
   ['gaze', { role: 'guest_m2', seed: 88, ghost: true }, 'watch'],
+  ['returnee', { role: 'returnee', seed: 4104 }, 'walk'],
   ['bride', { role: 'bride', seed: 99 }, 'sing'],
   // 同角色不同种子：证明「逐种子独特面孔」不是一张脸复制粘贴
   ['face_a', { role: 'townsman', seed: 1017 }, 'idle'],
@@ -102,10 +103,18 @@ window.__lookAt = (i, dist = 2.6, height = 1.4) => {
 window.__face = (i) => {
   const f = figures[i];
   moveLights(f.group.position.x);
-  // 用头部世界坐标取景——姿态低头/歪头时也能框住脸
+  // 用头部世界坐标取景——姿态低头/歪头时也能框住脸（0.6m 级近景：父审要求 0.5-0.8m）
   const p = f.h ? f.h.headWorldPos(new THREE.Vector3()) : new THREE.Vector3(f.group.position.x, 1.62, 0);
-  cam.position.set(p.x + 0.28, p.y + 0.1, p.z + 0.82);
-  cam.lookAt(p.x, p.y + 0.02, p.z);
+  cam.position.set(p.x + 0.2, p.y + 0.08, p.z + 0.6);
+  cam.lookAt(p.x, p.y + 0.01, p.z);
+};
+window.__profile = (i) => {
+  const f = figures[i];
+  moveLights(f.group.position.x);
+  // 侧脸机位：鼻突/眉弓-鼻根-鼻梁三段线/颌缘的证据位
+  const p = f.h ? f.h.headWorldPos(new THREE.Vector3()) : new THREE.Vector3(f.group.position.x, 1.62, 0);
+  cam.position.set(p.x + 0.68, p.y + 0.04, p.z + 0.1);
+  cam.lookAt(p.x, p.y, p.z);
 };
 window.__lookAt(0);
 window.__ready = true;
