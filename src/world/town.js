@@ -943,7 +943,10 @@ export function buildTown(scene, M) {
       mkBox(skirtM, -3.87, 0.55, 0, 0.66, 0.55, 2.34);               // 尾段
       mkBox(skirtM, 0, 0.55, 0, 4.5, 0.55, 2.34);                    // 中段（两轴之间）
       mkBox(skirtM, 3.87, 0.55, 0, 0.66, 0.55, 2.34);                // 头段
-      mkBox(M.clothRed, 0, 1.05, 0, 8.42, 0.22, 2.36);               // 红腰线
+      // 红腰线：两侧条带+前后帽（轮16：原实心整箱的顶面从车内看是一片红汪——挖空）
+      for (const s of [-1, 1]) mkBox(M.clothRed, 0, 1.05, s * 1.165, 8.42, 0.22, 0.03);
+      mkBox(M.clothRed, 4.19, 1.05, 0, 0.04, 0.22, 2.36);
+      mkBox(M.clothRed, -4.19, 1.05, 0, 0.04, 0.22, 2.36);
       // 窗带：车厢内微光 + 座椅背板剪影烘进贴图（一格一窗、窗柱分隔）——
       // 夜里路过的大巴车窗永远是「暖光里一排空椅背」，不是一条黑玻璃
       {
@@ -995,7 +998,8 @@ export function buildTown(scene, M) {
           map: winTex, emissive: 0xffffff, emissiveMap: winTex, emissiveIntensity: 0.55,
           roughness: 0.22, metalness: 0.15, envMapIntensity: 1.5,
         });
-        mkBox(winMat, 0, 1.95, 0, 7.2, 0.62, 2.36);
+        // 轮16：整箱改两侧薄板——车内视角不再从窗带盒子「里面」看穿一切
+        for (const s of [-1, 1]) mkBox(winMat, 0, 1.95, s * 1.15, 7.2, 0.62, 0.06);
       }
       // 前挡：透明玻璃（轮15——开场首拍前两秒的车内视角要从这里看出去；
       // 从外看也露出驾驶舱剪影，车头不再是一块涂黑铁皮）
@@ -1046,8 +1050,11 @@ export function buildTown(scene, M) {
           0.2, 0.775, 0, 7.6, 0.012, 0.6);                           // 过道胶条（磨旧的暗红）
         mkBox(darkM, 3.62, 1.36, 0, 0.55, 0.3, 2.05);                // 仪表台上沿
         mkBox(darkM, 3.8, 0.95, 0, 0.42, 0.55, 2.1);                 // 仪表台立面
-        mkBox(new THREE.MeshBasicMaterial({ color: 0x6f9e66 }), 3.4, 1.44, 0.5, 0.02, 0.055, 0.1);  // 仪表微光·车速
-        mkBox(new THREE.MeshBasicMaterial({ color: 0xc09a4c }), 3.4, 1.44, 0.26, 0.02, 0.045, 0.07); // 仪表微光·油量
+        // 仪表盘罩（中巴的中置仪表台——过道视角能读到）+ 仪表微光两块
+        // （轮16：原先埋在上沿盒体内不可见——挪到罩面上、移向中线）
+        mkBox(darkM, 3.3, 1.47, 0.1, 0.18, 0.14, 0.46);
+        mkBox(new THREE.MeshBasicMaterial({ color: 0x6f9e66 }), 3.2, 1.48, 0.2, 0.02, 0.055, 0.1);   // 仪表微光·车速
+        mkBox(new THREE.MeshBasicMaterial({ color: 0xc09a4c }), 3.2, 1.47, -0.02, 0.02, 0.045, 0.07); // 仪表微光·油量
         const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.02, 8, 20), darkM);
         wheel.position.set(3.26, 1.34, 0.55);
         wheel.rotation.y = Math.PI / 2;
@@ -1061,15 +1068,80 @@ export function buildTown(scene, M) {
         mkBox(drvM, 3.1, 1.46, 0.55, 0.3, 0.6, 0.42);                // 司机背影躯干
         const dhead = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), drvM);
         dhead.position.set(3.12, 1.95, 0.55);
+        dhead.scale.set(0.92, 1.08, 0.98);
         bus.add(dhead);
-        for (const [sx2, sz2] of [[1.35, 0.55], [1.35, -0.55], [2.2, -0.55]]) { // 乘客椅背
-          mkBox(seatM, sx2, 1.26, sz2, 0.12, 0.7, 0.5);
+        // 司机的旧解放帽（帽檐压着后颈线——不能是一颗光球）
+        const dcap = new THREE.Mesh(new THREE.CylinderGeometry(0.118, 0.125, 0.07, 10), darkM);
+        dcap.position.set(3.12, 2.02, 0.55);
+        bus.add(dcap);
+        mkBox(darkM, 3.12, 1.7, 0.55, 0.1, 0.1, 0.1);                // 颈（领口立起）
+        for (const [sx2, sz2] of [[0.5, 0.55], [0.5, -0.55], [1.35, 0.55], [1.35, -0.55], [2.2, -0.55]]) {
+          mkBox(seatM, sx2, 1.26, sz2, 0.12, 0.7, 0.5);              // 乘客椅背
           mkBox(seatM, sx2, 1.68, sz2, 0.1, 0.15, 0.28);             // 头枕
+          mkBox(seatM, sx2 + 0.24, 0.97, sz2, 0.44, 0.09, 0.48);     // 座垫
+          mkBox(darkM, sx2 + 0.22, 0.85, sz2, 0.34, 0.16, 0.4);      // 座箱基座
         }
         const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 5.4, 6), M.steel);
         rail.rotation.z = Math.PI / 2;
-        rail.position.set(0.5, 2.14, 0);
+        rail.position.set(0.5, 1.98, 0);
         bus.add(rail);
+        // 吊环三只（垂在扶手杆下，怠速里跟着车身微晃的剪影）
+        for (const hx3 of [0.9, 1.7, 2.5]) {
+          mkBox(M.ironDark, hx3, 1.92, 0, 0.015, 0.12, 0.015);
+          const ring = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.011, 6, 12), darkM);
+          ring.position.set(hx3, 1.82, 0);
+          ring.rotation.y = Math.PI / 2;
+          bus.add(ring);
+        }
+        // —— 车厢内衬（轮16）：内壁板/顶棚/窗柱/内窗玻璃/A柱——
+        // 车内视角的每个方向都得是「车」，不能从壳的背面剔除里看穿到世界；
+        // 顶棚板必须压在弧顶圆柱下皮(y2.09)之下，否则弧顶下半面（法线朝下）从车内读成一只大灰球
+        const innM = new THREE.MeshStandardMaterial({ color: 0x393e40, roughness: 0.92 });
+        const ceilM = new THREE.MeshStandardMaterial({ color: 0x87826f, roughness: 0.9 });
+        const glsM = new THREE.MeshStandardMaterial({
+          color: 0x121a1e, roughness: 0.07, metalness: 0.25, envMapIntensity: 1.5,
+        });
+        for (const s of [-1, 1]) {
+          mkBox(innM, 0.3, 1.2, s * 1.12, 7.6, 0.92, 0.05);          // 窗下内壁板
+          mkBox(glsM, 0.3, 1.85, s * 1.12, 7.6, 0.44, 0.03);         // 车窗内玻璃（湿夜两条暗玻璃）
+          for (let wx3 = -3.3; wx3 <= 4.05; wx3 += 0.92) {
+            mkBox(innM, wx3, 1.84, s * 1.13, 0.09, 0.44, 0.08);      // 窗柱分格
+          }
+          mkBox(innM, 0.3, 1.97, s * 1.02, 7.6, 0.05, 0.24);         // 行李架沿线
+        }
+        mkBox(ceilM, -0.4, 2.05, 0, 6.8, 0.05, 2.22);                // 顶棚板（车内抬头是顶，不是弧顶的背面）
+        // 前段顶棚抬高一级 + 线路牌箱立面——挡风玻璃的「框」向上放大，不再读成一条缝
+        mkBox(ceilM, 3.6, 2.27, 0, 1.06, 0.05, 2.22);
+        mkBox(innM, 3.12, 2.16, 0, 0.1, 0.28, 2.2);                  // 线路牌箱立面
+        const routePlate = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.9, 0.2),
+          plateMat('县城 ⇌ 蚀湾', { w: 256, h: 64, bg: '#262a1a', fg: '#e0cf8e', font: 0.52, emissive: 0.9 }),
+        );
+        routePlate.rotation.y = -Math.PI / 2;
+        routePlate.position.set(3.06, 2.16, 0);
+        bus.add(routePlate);
+        for (const lx3 of [1.2, 3.2]) {                              // 顶棚管灯两支（昏黄）
+          mkBox(new THREE.MeshBasicMaterial({ color: 0x8f7a4c }), lx3, 2.015, 0, 0.68, 0.02, 0.1);
+        }
+        // 车厢顶灯（真实光：夜车里那种昏黄——内饰能被读出来的底光）
+        const cab = new THREE.PointLight(0xffd9a2, 2.4, 4.6, 2);
+        cab.position.set(1.8, 1.95, 0);
+        bus.add(cab);
+        for (const s of [-1, 1]) mkBox(innM, 4.1, 1.86, s * 1.02, 0.14, 0.95, 0.18); // A柱
+        mkBox(innM, 4.1, 2.26, 0, 0.16, 0.16, 2.2);                  // 前挡上横梁
+        mkBox(innM, 4.12, 1.44, 0, 0.12, 0.14, 2.2);                 // 前挡下沿（接仪表台）
+        // 车内后视镜 + 镜下红璎珞平安符（怠速里轻轻悠着）
+        mkBox(M.ironDark, 3.96, 2.15, 0.1, 0.03, 0.14, 0.03);
+        mkBox(new THREE.MeshStandardMaterial({ color: 0x1c2422, roughness: 0.12, metalness: 0.5 }),
+          3.94, 2.03, 0.1, 0.04, 0.11, 0.32);
+        mkBox(M.ironDark, 3.9, 1.91, 0.1, 0.012, 0.16, 0.012);
+        mkBox(M.clothRed, 3.9, 1.79, 0.1, 0.05, 0.12, 0.05);         // 红穗坠
+        // 司机顶遮阳板（斜垂）+ 前门井竖扶杆（右前门位）
+        mkBox(darkM, 3.98, 2.08, 0.62, 0.2, 0.02, 0.46);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 8), M.steel);
+        pole.position.set(3.45, 1.42, -0.85);
+        bus.add(pole);
+        mkBox(new THREE.MeshBasicMaterial({ color: 0x060708 }), 3.7, 0.78, -0.85, 0.7, 0.02, 0.55); // 前门井暗腔
       }
       // 后视镜（外探的「耳朵」——低角度剪影的辨识件）
       for (const s of [-1, 1]) {

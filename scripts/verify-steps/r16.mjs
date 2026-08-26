@@ -63,5 +63,33 @@ export async function run(page, h) {
   // 屋顶设备层剪影（机房/水箱/天线杆越过女儿墙）
   await look('34_hotel_roofline', HO.x - 2, HO.z + 36, HO.x - 3, HO.z + 8, undefined, 0.24);
 
+  // ---------- 门3车内：重播开场零拍定帧（内衬壳/顶棚/A柱/座椅/仪表可读） ----------
+  await page.evaluate(() => {
+    const g = window.__game;
+    const bus = g.world.dynamic.bus;
+    bus.visible = true;
+    bus.position.set(64.5, g.world.heightAt(64.5, -1.3) + 0.06, -1.3);
+    g.story.busGo = false;
+    g.story._busV = 1.2;
+    g.story.flags.intro = false;
+    g.story.beginIntro();
+  });
+  const freezeIntroAt = (ms) => page.evaluate((t) => new Promise((res) => {
+    const g = window.__game;
+    g.game.state = 'PAUSE';
+    g.story.introSeq.t0 = performance.now() - t;
+    g.story.updateIntro(0);
+    requestAnimationFrame(() => requestAnimationFrame(res));
+  }), ms);
+  await freezeIntroAt(620);   // 雨刮扫到中幅
+  await h.shot('r16/35_bus_interior_wiper_mid');
+  await freezeIntroAt(1090);  // 雨刮近停摆——内饰全景
+  await h.shot('r16/36_bus_interior_cabin');
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.game.state = 'PLAY';
+    g.story.endIntro();
+  });
+
   console.log('[verify] r16 hotel facade evidence done');
 }

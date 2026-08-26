@@ -1479,8 +1479,8 @@ export class Story {
       const bx = bus ? bus.position.x : 64.5;
       const by = bus ? bus.position.y : gnd(64.5, -1.3) + 0.06;
       const bz = bus ? bus.position.z : -1.3;
-      px = bx + 1.35; py = by + 1.66; pz = bz + 0.32; // 头排座后的坐姿视高
-      tx = bx + 6.5; ty = by + 1.52; tz = bz + 0.02;
+      px = bx + 1.35; py = by + 1.74; pz = bz + 0.16; // 头排座后过道轴上的坐姿视高
+      tx = bx + 6.5; ty = by + 1.5; tz = bz - 0.06;
       roll = Math.sin(s.t * 1.7) * 0.01;         // 怠速的车身在轻轻哆嗦
       py += Math.sin(s.t * 27) * 0.004;
       // 雨刮：周期 1.15s 一趟——0 停摆位、1 扫到顶；扫过去镜面的水被抹开，
