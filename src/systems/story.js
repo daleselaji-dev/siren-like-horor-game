@@ -1378,6 +1378,9 @@ export class Story {
     this.introSeq = { t: 0, dur: 12.0, thunder2: false };
     hud.setLetterbox(true);
     this.g.player.frozen = true;
+    // 镜头淋在雨里：水珠贴着镜片滑（endIntro 后由 update 缓慢淡出——
+    // 落回眼睛之后那几步，眼睫上还挂着站台的雨）
+    this.g.engine.finalPass.uniforms.uWetLens.value = 1.0;
     // 光雷谱一拍：开场首闪（远雷慢半拍跟上）；二拍双闪由 updateIntro 按真实时钟触发
     this.g.sky.flashSeq = { t: 0, strikes: [0.6, 0.85] };
     this.g.sky.thunderQueued = 1;
@@ -1431,6 +1434,10 @@ export class Story {
       ty = gnd(64.5, -1.3) + 1.55 + u * 0.5;
       tz = -1.3;
       roll = Math.sin(s.t * 0.7) * 0.028;
+      // 起步碾动：车轮咬上湿沥青那两秒，地面把抖传给蹲着的镜头
+      const rumble = Math.max(0, 1 - s.t / 2.2) * 0.016;
+      py += Math.sin(s.t * 31) * rumble;
+      roll += Math.sin(s.t * 23.7) * rumble * 0.9;
     } else if (s.t < 8.4) {
       // 【二拍 · 牌坊剪影】低机位仰角咬住「蚀湾」牌坊——双闪把瓦顶石柱烧成剪影，雷声同拍
       const u = ss(5.0, 8.4, s.t);
@@ -1461,6 +1468,10 @@ export class Story {
 
   endIntro() {
     if (!this.introSeq) return;
+    // 跳过开场（未走完运镜）＝观众要立刻上手——镜片上的雨直接收干大半
+    if (this.introSeq.t < this.introSeq.dur - 0.1) {
+      this.g.engine.finalPass.uniforms.uWetLens.value = 0.18;
+    }
     this.introSeq = null;
     this.busGo = true;
     this.g.hud.setLetterbox(false);
@@ -1894,6 +1905,11 @@ export class Story {
     const g = this.g;
 
     this.updateIntro(dt);
+    // 开场湿镜头淡出：落回眼睛后眼睫上的雨慢慢干（约 5 秒）
+    {
+      const wl = g.engine.finalPass.uniforms.uWetLens;
+      if (!this.introSeq && wl.value > 0) wl.value = Math.max(0, wl.value - dt * 0.2);
+    }
     this.updateBus(dt);
     this.updateCaught(dt);
     this.updateDeath(dt);

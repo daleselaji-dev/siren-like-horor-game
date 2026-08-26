@@ -903,17 +903,70 @@ export class HonoredGuest {
         this.ropes.push({ grp, panel: 1 + r * 2, len, phase: r * 2.3 });
       }
     }
+    // 红绸三条：宴会厅披挂的旧料——比麻绳轻，走动时飘成拖尾（半褪的礼红）
+    this.silks = [];
+    {
+      const silkMat = new THREE.MeshStandardMaterial({ color: 0x7e2018, roughness: 0.85, side: THREE.DoubleSide });
+      for (let k = 0; k < 3; k++) {
+        const len = 0.9 + k * 0.28;
+        const grp = new THREE.Group();
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.11, len, 0.008), silkMat);
+        strip.position.y = -len / 2;
+        grp.add(strip);
+        // 绸尾撕成岔
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 0.008), silkMat);
+        tail.position.set(0.035, -len - 0.13, 0);
+        tail.rotation.z = 0.14;
+        grp.add(tail);
+        this.group.add(grp);
+        this.silks.push({ grp, panel: k * 3, phase: k * 2.1 });
+      }
+    }
+    // 木屑尘：板缝里簌簌往下掉的旧料末——走动时成幕，停下只剩偶发一两粒
+    {
+      const N = 42;
+      this.dustN = N;
+      this.dustPos = new Float32Array(N * 3);
+      this.dustVel = new Float32Array(N * 3);
+      this.dustLife = new Float32Array(N);
+      for (let i = 0; i < N; i++) { this.dustLife[i] = Math.random() * 1.4; this.dustPos[i * 3 + 1] = -99; }
+      const gdust = new THREE.BufferGeometry();
+      gdust.setAttribute('position', new THREE.BufferAttribute(this.dustPos, 3));
+      this.dust = new THREE.Points(gdust, new THREE.PointsMaterial({
+        color: 0xa8937a, size: 0.035, transparent: true, opacity: 0.55,
+        depthWrite: false, sizeAttenuation: true,
+      }));
+      this.dust.frustumCulled = false;
+      this.group.add(this.dust);
+    }
     // 掌：半张圆桌面（宴会厅的料）垫在腕下
     this.palm = new THREE.Mesh(
       new THREE.CylinderGeometry(0.72, 0.72, 0.055, 14, 1, false, 0, Math.PI), M.veneer);
     this.palm.castShadow = true;
+    // 台面铜镶边：宴会圆桌的包边条还留在断口上
+    {
+      const edge = new THREE.Mesh(new THREE.TorusGeometry(0.71, 0.018, 6, 20, Math.PI), M.brass);
+      edge.rotation.x = -Math.PI / 2;
+      edge.position.y = 0.012;
+      this.palm.add(edge);
+    }
     this.group.add(this.palm);
     // 手：4 指，每指 2 板 + 旋木指端（桌腿脚旋出来的葫芦头）
     this.fingers = [];
+    const wrapMat = new THREE.MeshStandardMaterial({ color: 0x6e1c15, roughness: 0.92 });
     for (let f = 0; f < 4; f++) {
       const seg1 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.42), mats[(f + 1) % mats.length]);
       const seg2 = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.42, 0.34), mats[(f + 2) % mats.length]);
       seg1.castShadow = seg2.castShadow = true;
+      // 指节缠布：褪色红布带勒着近节板头（缠了又松、松了又缠的旧结）
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.185, 0.075, 0.445), wrapMat);
+      band.position.y = 0.12;
+      seg1.add(band);
+      // 远节板上一枚黄铜平钉
+      const tack = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.02, 6), M.brass);
+      tack.position.set(0, 0.1, 0.18);
+      tack.rotation.x = Math.PI / 2;
+      seg2.add(tack);
       const tip = new THREE.Group();
       const t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.075, 0.16, 8), mats[(f + 1) % mats.length]);
       const t2 = new THREE.Mesh(new THREE.SphereGeometry(0.062, 8, 6), mats[(f + 3) % mats.length]);
@@ -1059,14 +1112,57 @@ export class HonoredGuest {
       r.grp.rotation.x = Math.sin(this.t * 1.35 + r.phase) * sway;
       r.grp.rotation.z = Math.cos(this.t * 1.05 + r.phase * 1.7) * sway;
     }
+    // 红绸：比麻绳轻——走动时飘出大摆
+    for (const sk of this.silks) {
+      const p = this.armPanels[sk.panel];
+      sk.grp.position.set(p.position.x, p.position.y - 0.05, p.position.z);
+      const sway = (moving ? 0.34 : 0.12) * jig;
+      sk.grp.rotation.x = Math.sin(this.t * 2.1 + sk.phase) * sway;
+      sk.grp.rotation.z = Math.cos(this.t * 1.7 + sk.phase * 1.3) * sway;
+    }
+    // 木屑尘：从板缝落下的旧料末（移动时簌簌成幕）
+    {
+      const rate = moving ? 1.6 : 0.3;
+      for (let i = 0; i < this.dustN; i++) {
+        this.dustLife[i] -= dt * rate;
+        if (this.dustLife[i] <= 0) {
+          const p = this.armPanels[(Math.random() * this.armPanels.length) | 0];
+          this.dustPos[i * 3] = p.position.x + (Math.random() - 0.5) * 1.2;
+          this.dustPos[i * 3 + 1] = p.position.y - 0.06;
+          this.dustPos[i * 3 + 2] = p.position.z + (Math.random() - 0.5) * 0.5;
+          this.dustVel[i * 3] = (Math.random() - 0.5) * 0.12;
+          this.dustVel[i * 3 + 1] = -(0.5 + Math.random() * 0.7);
+          this.dustVel[i * 3 + 2] = (Math.random() - 0.5) * 0.12;
+          this.dustLife[i] = 0.7 + Math.random() * 0.8;
+        }
+        this.dustPos[i * 3] += this.dustVel[i * 3] * dt;
+        this.dustPos[i * 3 + 1] += this.dustVel[i * 3 + 1] * dt;
+        this.dustPos[i * 3 + 2] += this.dustVel[i * 3 + 2] * dt;
+      }
+      this.dust.geometry.attributes.position.needsUpdate = true;
+    }
+    // 界牌转脸：手在七步之内时，绳端的「界」牌缓缓拧过来朝向你——先点到名的是牌
+    if (dp < 7 && !player.dead && !stunned) {
+      for (const r of this.ropes) {
+        const tag = r.grp.children[1];
+        const want = Math.atan2(player.pos.x - r.grp.position.x, player.pos.z - r.grp.position.z);
+        let dyaw = want - tag.rotation.y;
+        dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+        tag.rotation.y += dyaw * Math.min(1, dt * 1.6);
+      }
+    }
     // 掌与手指扒地
     const gy = this.world.heightAt(hnd.x, hnd.z, hnd.y + 0.5);
     const heading = moving ? Math.atan2(d.x, d.z) : this.t * 0.05;
     this.palm.position.set(hnd.x, gy + 0.78, hnd.z);
     this.palm.rotation.set(0.12 * jig, heading + Math.PI, 0);
+    const counting = this.nameT > 0.02; // 正在数你
     for (const f of this.fingers) {
-      // 僵直=指尖悬停离地（照片里它还没落下）；平时空指慢敲，追时扒进地里
-      const drum = stunned ? 0 : Math.max(0, Math.sin(this.t * (moving ? 5.5 : 2.2) + f.phase)) * (moving ? 0.05 : 0.09) * jig;
+      // 僵直=指尖悬停离地（照片里它还没落下）；平时空指慢敲，追时扒进地里；
+      // 点名时四指丢掉各自的相位、同拍敲地——一下，一下，数的就是你
+      const drum = stunned ? 0
+        : counting ? Math.max(0, Math.sin(this.t * 6.2)) * 0.13 * jig
+        : Math.max(0, Math.sin(this.t * (moving ? 5.5 : 2.2) + f.phase)) * (moving ? 0.05 : 0.09) * jig;
       const lift = this.alignK * 0.22;
       const fx = hnd.x + Math.sin(f.ang) * 0.72;
       const fz = hnd.z + Math.cos(f.ang) * 0.72;
