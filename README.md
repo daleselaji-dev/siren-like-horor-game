@@ -183,6 +183,7 @@ node scripts/verify.mjs round6guest  # 主怪：部件计数/镁光定格/闹钟
 node scripts/verify.mjs looks        # 外观：镇口车站/牌坊/告示墙/巨骸/工位近景/渗漏态
 node scripts/verify.mjs playthrough  # 主线全流程通关：10 条文书 + 三条规则怪谈的
                                      # 违反与遵守双路径逐 flag 断言
+FULLSPEC=1 node scripts/verify.mjs keepshots   # 精选交付图生成（全画质渲染，落盘 verify/keep/）
 ```
 
 截图输出到 `verify/`（精选交付图在 `verify/keep/`，人物近景在 `verify/chars/`）。
