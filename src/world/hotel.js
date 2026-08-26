@@ -240,7 +240,7 @@ export function buildHotel(ctx) {
   // 轮15：换 interior-mapping 假房间——16 樘客房窗后各自长出带视差的进深，
   // 两成亮着暖灯（住着人的楼），临街立面不再是一条黑玻璃带
   for (const y0 of [F2, F3]) {
-    box(M.winRoom, 0, y0 + 1.7, 11.02, 33.4, 1.35, 0.04);
+    box(M.winRoom, 0, y0 + 1.7, 10.96, 33.4, 1.35, 0.04); // 轮16：玻璃退进墙厚——窗洞有了真进深
   }
   // 南立面 z=-11：厨房后门 + 窗
   wallX(TILE, -17, 17, -11, 0, F2, [
@@ -251,7 +251,7 @@ export function buildHotel(ctx) {
     { from: -14, to: -12, top: 5.8, sill: 4.4 }, { from: -8, to: -6, top: 5.8, sill: 4.4 },
     { from: -2, to: 0, top: 5.8, sill: 4.4 }, { from: 4, to: 6, top: 5.8, sill: 4.4 }, { from: 10, to: 12, top: 5.8, sill: 4.4 },
   ]);
-  box(M.winRoom, -1, F3 + 1.7, -11.02, 27, 1.35, 0.04); // 3F 南窗假房间带（藏墙缝）
+  box(M.winRoom, -1, F3 + 1.7, -10.96, 27, 1.35, 0.04); // 3F 南窗假房间带（退进墙厚）
   // 西立面 x=-17
   wallZ(TILE, -11, 11, -17, 0, ROOF, [
     { from: -6, to: -4, top: 2.4, sill: 1.0 }, { from: 1, to: 3, top: 2.4, sill: 1.0 }, { from: 6, to: 8, top: 2.4, sill: 1.0 },
@@ -264,7 +264,7 @@ export function buildHotel(ctx) {
   wallZ(TILE, -11, 11, 17, F2, ROOF, [
     { from: -6, to: -4, top: 5.8, sill: 4.4 }, { from: 0, to: 2, top: 5.8, sill: 4.4 }, { from: 5, to: 7, top: 5.8, sill: 4.4 },
   ]);
-  box(M.winRoom, 17.02, F3 + 1.7, 0.5, 0.04, 1.35, 13.5); // 3F 东窗假房间带（藏墙缝）
+  box(M.winRoom, 16.96, F3 + 1.7, 0.5, 0.04, 1.35, 13.5); // 3F 东窗假房间带（退进墙厚）
   // 屋顶
   slabRect(-17, -11, 17, 11, ROOF, null, { walk: false });
   // 女儿墙
@@ -306,18 +306,127 @@ export function buildHotel(ctx) {
     }
   }
 
-  // ================= 正门：雨棚 + 灯箱 + 玻璃门 =================
+  // ================= 立面轮16：真窗框/窗洞进深/勒脚/伸缩缝/落水管/屋顶设备层 =================
+  // 门3审计的「灰盒大楼+扁窗带」根治：每一樘窗有绿漆钢框+中梃+上悬亮子，
+  // 玻璃退进墙厚 19cm（洞口四壁是真的），墙面有分缝与污迹分层，屋顶轮廓不再是一条直线
   {
-    // 雨棚
-    box(M.terrazzo, 0, 3.35, 12.6, 10.5, 0.28, 3.6);
-    box(M.brass, 0, 3.22, 14.3, 10.6, 0.1, 0.14);
-    // 雨棚立柱（镜面不锈钢包柱）
-    for (const px of [-4.6, 4.6]) {
-      cyl(M.mirror, px, 1.6, 13.9, 0.5, 3.2, 0.5);
-      colliders.push({ x: hx + px, z: hz + 13.9, r: 0.3, maxY: hb + 3.2 });
+    const winsN = [[-15.5, -13.5], [-11.5, -9.5], [-7, -5], [-2.5, -0.5], [1.5, 3.5], [6, 8], [10.5, 12.5], [14, 16]];
+    const frameM = new THREE.MeshStandardMaterial({
+      color: 0x37544a, roughness: 0.5, metalness: 0.25, envMapIntensity: 0.9,
+    }); // 老绿漆钢窗（1998 落成县镇酒店的标配）
+    // 一樘窗的框系（朝 +z）：外框四边 + 竖中梃 + 上亮子横梃 + 洞口顶/侧反光板（进深读感）
+    const winFrameN = (a, b, y0, lz) => {
+      const cx2 = (a + b) / 2, w2 = b - a, sillY = y0 + 1.0, topY = y0 + 2.4, ch = topY - sillY;
+      const fz = lz - 0.09; // 框面缩进墙面 9cm
+      box(frameM, cx2, sillY + ch / 2, fz, w2, 0.055, 0.06);            // 下框（贴槛）
+      box(frameM, cx2, topY - 0.03, fz, w2, 0.055, 0.06);               // 上框
+      box(frameM, a + 0.03, sillY + ch / 2, fz, 0.055, ch, 0.06);       // 左框
+      box(frameM, b - 0.03, sillY + ch / 2, fz, 0.055, ch, 0.06);       // 右框
+      box(frameM, cx2, sillY + ch / 2, fz, 0.05, ch, 0.055);            // 竖中梃
+      box(frameM, cx2, topY - 0.42, fz, w2, 0.05, 0.055);               // 上悬亮子横梃
+      box(frameM, cx2, sillY + 0.035, fz, w2 - 0.1, 0.05, 0.05);        // 底框压条
+      // 洞口四壁（墙厚里的反光面）：顶暗/侧亮——远看窗洞是「腔」，不是贴纸
+      box(M.concreteDark, cx2, topY - 0.02, lz - 0.075, w2, 0.04, 0.15);
+      box(M.plaster, a + 0.02, sillY + ch / 2, lz - 0.075, 0.04, ch, 0.15);
+      box(M.plaster, b - 0.02, sillY + ch / 2, lz - 0.075, 0.04, ch, 0.15);
+    };
+    for (const y0 of [F2, F3]) for (const [a, b] of winsN) winFrameN(a, b, y0, 11.15);
+    // 南立面 3F 五樘 + 东立面 3F 三樘 + 西立面三樘（同框系，朝向翻转）
+    const winFrameS = (a, b, y0) => {
+      const cx2 = (a + b) / 2, sillY = y0 + 1.0, topY = y0 + 2.4, ch = topY - sillY, w2 = b - a;
+      box(frameM, cx2, sillY + ch / 2, -11.06, w2, 0.055, 0.06);
+      box(frameM, cx2, topY - 0.03, -11.06, w2, 0.055, 0.06);
+      box(frameM, a + 0.03, sillY + ch / 2, -11.06, 0.055, ch, 0.06);
+      box(frameM, b - 0.03, sillY + ch / 2, -11.06, 0.055, ch, 0.06);
+      box(frameM, cx2, sillY + ch / 2, -11.06, 0.05, ch, 0.055);
+    };
+    for (const [a, b] of [[-14, -12], [-8, -6], [-2, 0], [4, 6], [10, 12]]) winFrameS(a, b, F3); // 南3F窗带 sill=F2+4.4=F3+1.0
+    const winFrameZ = (a, b, sillY, topY, lx) => {
+      const cz2 = (a + b) / 2, ch = topY - sillY, w2 = b - a;
+      box(frameM, lx, sillY + ch / 2, cz2, 0.06, ch, 0.05); // 竖中梃
+      box(frameM, lx, sillY + 0.03, cz2, 0.06, 0.055, w2);
+      box(frameM, lx, topY - 0.03, cz2, 0.06, 0.055, w2);
+      box(frameM, lx, sillY + ch / 2, a + 0.03, 0.06, ch, 0.055);
+      box(frameM, lx, sillY + ch / 2, b - 0.03, 0.06, ch, 0.055);
+    };
+    for (const [a, b] of [[-6, -4], [0, 2], [5, 7]]) winFrameZ(a, b, F2 + 4.4, F2 + 5.8, 17.15);
+    for (const [a, b] of [[-6, -4], [1, 3], [6, 8]]) winFrameZ(a, b, 1.0, 2.4, -17.15);
+    // —— 勒脚（水泥基座带）：楼是从地里长出来的，不是摆上去的 ——
+    box(M.concreteDark, -11.7, 0.3, 11.18, 11.0, 0.6, 0.1);
+    box(M.concreteDark, 11.7, 0.3, 11.18, 11.0, 0.6, 0.1);
+    box(M.concreteDark, 0, 0.3, -11.18, 34.4, 0.6, 0.1);
+    box(M.concreteDark, -17.18, 0.3, 0, 0.1, 0.6, 22.4);
+    box(M.concreteDark, 17.18, 0.3, 0, 0.1, 0.6, 22.4);
+    // —— 转角壁柱（水泥抹面）：盒子四棱断开瓷砖面 ——
+    for (const [px, pz] of [[-17.1, 11.05], [17.1, 11.05], [-17.1, -11.05], [17.1, -11.05]]) {
+      box(M.concrete, px, (ROOF + 0.9) / 2, pz, 0.5, ROOF + 0.9, 0.5);
     }
-    // 门楣灯箱
-    box(M.signSouth, 0, 2.95, 11.3, 7.2, 0.9, 0.18);
+    // —— 伸缩缝（贯通竖缝两道）+ 逐段瓷砖色差补丁（旧楼修补过的面）——
+    for (const jx of [-8.25, 9.25]) box(M.ironDark, jx, (ROOF + 0.6) / 2, 11.16, 0.07, ROOF + 0.6, 0.04);
+    box(M.concreteDark, -3.7, F2 + 1.1, 11.155, 1.3, 1.6, 0.02);  // 修补砂浆片
+    box(M.concreteDark, 12.9, F3 + 0.5, 11.155, 0.9, 1.1, 0.02);
+    // —— 落水管两根（带弯头出水）+ 女儿墙泄水口锈痕 ——
+    for (const px of [-16.5, 16.5]) {
+      cyl(M.concrete, px, (ROOF + 0.7) / 2, 11.26, 0.13, ROOF + 0.7, 0.13);
+      cyl(M.concrete, px, 0.18, 11.42, 0.12, 0.5, 0.12, 0, 1.2, 0);   // 弯头
+      box(M.concreteDark, px, 0.02, 11.5, 0.7, 0.03, 0.5);            // 排水溅蚀斑
+    }
+    for (const px of [-13.2, -1.9, 6.4, 15.1]) {
+      box(M.concreteDark, px, ROOF + 0.15, 11.17, 0.24, 1.3, 0.03);   // 泄水口下的黑水锈舌
+    }
+    // —— 屋顶设备层：电梯机房/水箱/天线/排气管——盒楼的天际线终于有了「上面」 ——
+    // （压着楼顶北半布置：从镇街仰看，剪影要越过女儿墙）
+    box(M.plaster, -12.5, ROOF + 1.2, 7.0, 4.6, 2.4, 4.6);            // 电梯机房
+    box(M.concreteDark, -12.5, ROOF + 2.46, 7.0, 4.9, 0.14, 4.9);     // 机房压顶
+    box(M.ironDark, -10.22, ROOF + 0.85, 7.0, 0.06, 1.7, 0.9);        // 机房铁门
+    box(M.concreteDark, -12.5, ROOF + 1.7, 9.33, 3.2, 1.0, 0.04);     // 机房北墙雨渍
+    cyl(M.steel, 11.5, ROOF + 2.35, 8.0, 2.6, 1.7, 2.6);              // 不锈钢水箱
+    cyl(M.steel, 11.5, ROOF + 3.24, 8.0, 1.0, 0.3, 1.0);              // 水箱顶盖帽
+    for (const [lx2, lz2] of [[10.6, 7.1], [12.4, 7.1], [10.6, 8.9], [12.4, 8.9]]) {
+      cyl(M.ironDark, lx2, ROOF + 0.75, lz2, 0.09, 1.5, 0.09);        // 水箱腿
+    }
+    cyl(M.ironDark, 7.5, ROOF + 2.9, 9.0, 0.07, 5.8, 0.07);           // 电视天线杆
+    for (const ay of [4.6, 5.15]) box(M.ironDark, 7.5, ROOF + ay, 9.0, 1.7, 0.035, 0.035, 0.5);
+    cyl(M.ironDark, 7.5, ROOF + 5.75, 9.0, 0.16, 0.05, 0.16);         // 杆顶避雷帽
+    for (const [vx, vz] of [[-4, 8.2], [1.5, 6.4]]) cyl(M.concrete, vx, ROOF + 0.55, vz, 0.3, 1.1, 0.3); // 排气烟囱
+  }
+
+  // ================= 正门：进深门斗 + 体积雨棚 + 灯箱 + 玻璃门 =================
+  // 轮16门3：门脸从墙皮里长出 1.5m——玻璃门退在门斗腔里，雨棚是一只有檐口板带的
+  // 「盒子」压在两墩一排柱上，不再是一片悬空薄板
+  {
+    // —— 门斗侧翼墩（瓷砖包面 + 石基座）：正门是一个腔，不是一张贴纸 ——
+    for (const s of [-1, 1]) {
+      const px = s * 6.0;
+      wall(TILE, px, 1.62, 11.75, 0.7, 3.24, 1.5);             // 侧翼墩（承雨棚）
+      box(M.stone, px, 0.34, 11.78, 0.86, 0.68, 1.62);         // 墩基座石
+      box(M.concreteDark, px, 3.3, 11.75, 0.78, 0.12, 1.58);   // 墩顶收边
+      box(M.concreteDark, px, 0.02, 12.7, 0.8, 0.03, 0.6);     // 墩前泛碱渍
+    }
+    // 门斗腔顶（侧翼墩之间、玻璃门之上的深门楣板——站在门口抬头是「顶」，不是天）
+    box(M.veneerRed, 0, 3.02, 11.7, 11.3, 0.5, 1.4);
+    box(M.brass, 0, 2.79, 12.38, 11.34, 0.05, 0.08);           // 门楣板收口金线
+    // —— 体积雨棚：底板 + 三面檐口板带 + 出挑顶盖 + 檐底筒灯 ——
+    box(M.terrazzo, 0, 3.38, 12.9, 12.4, 0.2, 4.0);            // 底板（soffit）
+    box(M.terrazzo, 0, 3.86, 14.83, 12.4, 0.76, 0.14);         // 前檐口板带
+    box(M.terrazzo, -6.13, 3.86, 12.9, 0.14, 0.76, 4.0);       // 左檐口
+    box(M.terrazzo, 6.13, 3.86, 12.9, 0.14, 0.76, 4.0);        // 右檐口
+    box(M.concrete, 0, 4.31, 12.9, 12.68, 0.14, 4.3);          // 顶盖压边（出挑一皮）
+    box(M.brass, 0, 3.51, 14.88, 12.44, 0.07, 0.1);            // 檐底金压条
+    box(M.concreteDark, 3.1, 3.86, 14.91, 1.1, 0.76, 0.02);    // 檐口板旧水渍片
+    // 前檐口正中：店名灯箱（挂在檐口板带上，雨夜远处第一眼）
+    box(M.signSouth, 0, 3.86, 14.94, 7.2, 0.66, 0.1);
+    // 檐底嵌筒灯三只 + 暖光
+    for (const lxq of [-3.4, 0, 3.4]) cyl(M.tungsten, lxq, 3.26, 13.2, 0.14, 0.05, 0.14);
+    addLight(0xffd9a0, 7, 7.5, 0, 2.9, 13.1, 0.5);
+    // 雨棚立柱（镜面不锈钢包柱 + 石柱础）
+    for (const px of [-4.6, 4.6]) {
+      cyl(M.mirror, px, 1.66, 13.9, 0.5, 3.44, 0.5);
+      cyl(M.stone, px, 0.2, 13.9, 0.64, 0.42, 0.64);
+      colliders.push({ x: hx + px, z: hz + 13.9, r: 0.3, maxY: hb + 3.4 });
+    }
+    // 门楣灯箱（门斗腔内低位一窄条：夜里两级亮面）
+    box(M.signSouth, 0, 2.55, 11.32, 7.2, 0.42, 0.18);
     // 玻璃门框（中缝常开 1.4m）
     for (const px of [-2.4, 2.4]) {
       box(M.brass, px, 1.25, 11, 0.12, 2.5, 0.12);
@@ -333,17 +442,21 @@ export function buildHotel(ctx) {
     box(M.crtGlass, 4.2, 1.35, 11, 3.5, 2.7, 0.05);
     colliders.push({ minX: hx + 2.45, maxX: hx + 5.95, minZ: hz + 10.9, maxZ: hz + 11.1, maxY: hb + 2.7, noSightBlock: true });
     for (const px of [-2.45, 2.45, -5.95, 5.95]) box(M.brass, px, 1.35, 11, 0.1, 2.7, 0.1);
-    // 「名」字红灯笼一对（真实光）
+    // 「名」字红灯笼一对（真实光，吊杆挂在雨棚底板下）
     for (const px of [-3.4, 3.4]) {
       const lan = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.55, 12), M.lanternPaperXi);
       lan.position.copy(world(px, 2.55, 12.6));
       scene.add(lan);
+      cyl(M.ironDark, px, 3.05, 12.6, 0.02, 0.46, 0.02);
       addLight(0xff5040, 8, 8, px, 2.4, 12.6, 0.4);
     }
-    // 台阶两侧石狮座(简化)
-    for (const px of [-5.2, 5.2]) {
-      box(M.stone, px, 0.45, 12.5, 0.9, 0.9, 0.9);
-      colliders.push({ x: hx + px, z: hz + 12.5, r: 0.55, maxY: hb + 1.4 });
+    // 台阶两侧石狮（座+蹲身+头，移出门斗墩外侧）
+    for (const s of [-1, 1]) {
+      const px = s * 7.4;
+      box(M.stone, px, 0.4, 12.4, 1.0, 0.8, 1.1);              // 须弥座
+      box(M.stone, px, 1.06, 12.35, 0.62, 0.56, 0.88, 0, 0.12, 0); // 蹲身（后高前低）
+      box(M.stone, px, 1.5, 12.72, 0.5, 0.46, 0.44, 0, 0, s * 0.06); // 头
+      colliders.push({ x: hx + px, z: hz + 12.4, r: 0.62, maxY: hb + 1.75 });
     }
     locations.hotelEntrance = world(0, 0.5, 12);
   }
