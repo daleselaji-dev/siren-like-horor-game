@@ -962,18 +962,26 @@ function mirroredHandGeo(curl = 'relax') {
   return G('handMir_' + curl, () => {
     const g = handGeo(curl).clone();
     g.scale(-1, 1, 1);
-    // 负缩放翻面：逐三角交换 1/2 号顶点恢复绕向
-    for (const name of ['position', 'normal', 'uv']) {
-      const at = g.attributes[name];
-      if (!at) continue;
-      const it = at.itemSize;
-      for (let t = 0; t + 2 < at.count; t += 3) {
-        for (let k = 0; k < it; k++) {
-          const a = (t + 1) * it + k, b = (t + 2) * it + k;
-          const tmp = at.array[a]; at.array[a] = at.array[b]; at.array[b] = tmp;
-        }
+    // 负缩放翻面：翻转三角形绕向恢复正面（合并几何带索引——翻的是索引序）
+    if (g.index) {
+      const idx = g.index.array;
+      for (let t = 0; t + 2 < idx.length; t += 3) {
+        const tmp = idx[t + 1]; idx[t + 1] = idx[t + 2]; idx[t + 2] = tmp;
       }
-      at.needsUpdate = true;
+      g.index.needsUpdate = true;
+    } else {
+      for (const name of ['position', 'normal', 'uv']) {
+        const at = g.attributes[name];
+        if (!at) continue;
+        const it = at.itemSize;
+        for (let t = 0; t + 2 < at.count; t += 3) {
+          for (let k = 0; k < it; k++) {
+            const a = (t + 1) * it + k, b = (t + 2) * it + k;
+            const tmp = at.array[a]; at.array[a] = at.array[b]; at.array[b] = tmp;
+          }
+        }
+        at.needsUpdate = true;
+      }
     }
     g.computeVertexNormals();
     return g;
@@ -1451,7 +1459,8 @@ export class Humanoid {
     }
     if (D.torso === 'work' && !D.epaulet) mkCollar(torsoMat, 'fold'); // 工装夹克翻领（镇民/渔民/湿客/理骨员）
     if (D.tie) this.torso.add(mkMesh(tieGeo(), pick(Mtl('tieRed', () => new THREE.MeshStandardMaterial({ color: 0x6e1414, roughness: 0.55 }))), 0, 0.556, 0.104));
-    if (D.bowtie) this.torso.add(mkMesh(bowtieGeo(), pick(Mtl('bowtieBlk', () => new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.6 }))), 0, 0.612, 0.068));
+    // 轮19：领结随扩径领面前移（0.068→0.094）——不许埋进领筒只剩两只黑角
+    if (D.bowtie) this.torso.add(mkMesh(bowtieGeo(), pick(Mtl('bowtieBlk', () => new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.6 }))), 0, 0.607, 0.094));
     if (D.knots) {
       this.torso.add(mkMesh(knotButtonsGeo(), pick(Mtl('knotGold', () => new THREE.MeshStandardMaterial({ color: 0xb8923e, roughness: 0.45, metalness: 0.4 }))), 0, 0, 0));
       mkCollar(torsoMat, 'band');       // 缎袄立领（盘扣领）
