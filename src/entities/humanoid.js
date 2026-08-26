@@ -1814,12 +1814,15 @@ export class Humanoid {
             ? limbGeo(0.041, 0.029, 0.22, 'foreArmSkin', 0.13, { peak: 0.3 })
             : limbGeo(0.041, 0.035, 0.226, 'foreArmCuff', 0.1, { peak: 0.3, cuff: 0.007, wrinkle: 0.0016 }),
           foreMat, 0, 0.008, 0, limbScl, 1, limbScl));
-        // 袖口露腕（手套角色腕部也是胶皮）——腕径回到真人 (r 24mm)
-        elbow.add(mkMesh(G('wrist', () => new THREE.CapsuleGeometry(0.0245, 0.05, 4, 10)), D.gloves ? rubber : skin, 0, -0.24, 0));
+        // 袖口露腕（手套角色腕部也是胶皮）——腕径回到真人 (r 24mm)。
+        // 轮17：旧胶囊长 10cm,抬臂时从袖口垂出一整段裸皮柱+球头(审计的「肘冒皮肤球」)——
+        // 缩到 6cm 且上端藏进袖管：袖口与掌根之间只露 2-3cm 真腕
+        elbow.add(mkMesh(G('wrist', () => new THREE.CapsuleGeometry(0.0245, 0.012, 4, 10)), D.gloves ? rubber : skin, 0, -0.245, 0));
       }
       const handMat = D.drift ? drift : D.gloves ? rubber : skin;
       const flat = D.tray && side < 0;
-      const hand = mkMesh(handGeo(flat ? 'flat' : 'relax'), handMat, 0, -0.252, 0.004);
+      // 手整体收 8%：近景里旧手掌大过半张脸（人偶手元凶之一）
+      const hand = mkMesh(handGeo(flat ? 'flat' : 'relax'), handMat, 0, -0.252, 0.004, 0.92, 0.92, 0.92);
       // 静息掌心朝腿（解剖静息位是半旋前），托盘手保持掌心向上的旧取向
       hand.rotation.y = flat ? Math.PI : (side < 0 ? Math.PI - 1.2 : -1.2);
       elbow.add(hand);
