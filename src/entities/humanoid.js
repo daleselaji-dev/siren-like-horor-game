@@ -1093,13 +1093,12 @@ export class Humanoid {
         const pos2 = g2.attributes.position;
         const col = new Float32Array(pos2.count * 3);
         for (let i = 0; i < pos2.count; i++) {
-          // 下颌接触阴影只降明度不动色相——RGB 同乘，颈色与脸皮同源。
-          // 硬暗线软化：带宽 0.048→0.077（坡再放缓一倍）、暗量 0.34→0.21，
-          // 且起点下移到 0.028——影从锁骨上方就开始缓缓聚拢，
-          // 顶缘钻进下颌腔时已是渐近的暗，不再在颌缘留一道可见的「切口线」
-          const t = Math.min(1, Math.max(0, (pos2.getY(i) - 0.028) / 0.077));
+          // 轮15：接触阴影主责移交颌裙环（随头转的那圈才是真「下颌影」）——
+          // 静止颈裙只留极浅的收头（0.10），且整段上移到 0.072 起——
+          // 可见段（环圈以下）几乎均亮，旧的「暗脊」不再落在颌缘可见带上
+          const t = Math.min(1, Math.max(0, (pos2.getY(i) - 0.072) / 0.05));
           const s2 = t * t * (3 - 2 * t);
-          const sh = 1 - s2 * 0.21;
+          const sh = 1 - s2 * 0.10;
           col[i * 3] = sh; col[i * 3 + 1] = sh; col[i * 3 + 2] = sh;
         }
         g2.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -1107,6 +1106,37 @@ export class Humanoid {
         return g2;
       });
       this.torso.add(mkMesh(nkG, neckMat, 0, 0.6, 0.005));
+      // 颌裙环（轮15·下颌-颈接缝根治）：挂在 head 组上、随头转的一圈「皮领」——
+      // 上缘藏进下颌腔、下摆罩过颈裙顶段（颈顶的暗带整个盖在环里面）。
+      // 头模底缘的剪影线从此压在同材质的环面上：同色（faceNecks 同一份材质）、
+      // 同频（同一张颈皮调频贴图）——颌缘不再是「头壳切口 vs 颈筒」的明暗断面
+      {
+        const jrG = G('jawRing', () => {
+          // 头组局部（head.scale=1.08 已含）：r=躯干值/1.08，y=(躯干y-0.66)/1.08
+          const prof = [
+            [0.0433, 0.0389], [0.0444, 0.0241], [0.0447, 0.0046],
+            [0.0443, -0.0093], [0.0431, -0.0176],
+          ].map(([r, y2]) => new THREE.Vector2(r, y2));
+          const g2 = new THREE.LatheGeometry(prof, 18);
+          g2.scale(1, 1, 0.86);
+          const pos2 = g2.attributes.position;
+          const col = new Float32Array(pos2.count * 3);
+          for (let i = 0; i < pos2.count; i++) {
+            // 下颌接触阴影烘在环自己身上：越往上钻进颌腔越暗（0.14），
+            // 露出的下摆归一亮——与其下方的颈裙同色衔接
+            const t = Math.min(1, Math.max(0, (pos2.getY(i) - 0.002) / 0.034));
+            const s2 = t * t * (3 - 2 * t);
+            const sh = 1 - s2 * 0.14;
+            col[i * 3] = sh; col[i * 3 + 1] = sh; col[i * 3 + 2] = sh;
+          }
+          g2.setAttribute('color', new THREE.BufferAttribute(col, 3));
+          g2.computeVertexNormals();
+          return g2;
+        });
+        const jr = mkMesh(jrG, neckMat, 0, 0, 0.0046);
+        jr.name = 'jawRing';
+        this.head.add(jr);
+      }
       // 喉结（男性；2 米内的活人证据）——补白顶点色，否则顶点色材质把它染黑
       if (D.face === 'm' || D.face === 'gaunt' || D.face === 'old') {
         this.torso.add(mkMesh(G('adam', () => {

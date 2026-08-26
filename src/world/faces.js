@@ -281,6 +281,70 @@ export function buildFaceMaterials(M, T, lowspec = false) {
   }
 }
 
+// 轮15：照片权重缓冲（逐脸复用）——主合成循环把每个像素最终的照片权重 w 记下来，
+// 色斑合成按 (1-w) 铺进羽化带外的程序底皮区（照片区自己带斑，不再叠双份）
+let _wBuf = null, _wBufS = 0;
+function weightBuf(S) {
+  if (_wBufS !== S) { _wBuf = new Float32Array(S * S); _wBufS = S; }
+  else _wBuf.fill(0);
+  return _wBuf;
+}
+
+// 轮15：照片高频色斑瓦片——从照片的干净皮区（双颊/额心/下巴）取若干小补丁，
+// 减去补丁均值得到零均值的彩色残差，余弦窗拼贴进 256 瓦片（环绕连续）。
+// 铺满整头皮后，羽化带外的底皮区也带上「这张脸自己的」红斑/色沉频率——
+// 照片区与程序区的色度统计终于是同一张皮
+function buildMottleTile(P, PS, D, cx, ioPx, mePx) {
+  const MT = 256;
+  const acc = new Float32Array(MT * MT * 3);
+  const wsum = new Float32Array(MT * MT);
+  let s = 1237;
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  // 干净皮区（照片空间中心点）：双颊 / 额下段（眉上一指）/ 下巴
+  const zones = [
+    [cx - ioPx * 0.58, D.eyeY * PS + mePx * 0.52],
+    [cx + ioPx * 0.58, D.eyeY * PS + mePx * 0.52],
+    [cx, (D.browY - 0.045) * PS],
+    [cx, D.mouthY * PS + mePx * 0.34],
+  ];
+  const PR = 30; // 补丁半径（照片 px）
+  for (let k = 0; k < 44; k++) {
+    const z = zones[k % zones.length];
+    const px0 = Math.round(z[0] + (rnd() - 0.5) * ioPx * 0.22);
+    const py0 = Math.round(z[1] + (rnd() - 0.5) * mePx * 0.2);
+    if (px0 < PR + 1 || px0 > PS - PR - 2 || py0 < PR + 1 || py0 > PS - PR - 2) continue;
+    // 补丁均值
+    let mr = 0, mg = 0, mb = 0, mn = 0;
+    for (let dy = -PR; dy <= PR; dy += 2) {
+      for (let dx = -PR; dx <= PR; dx += 2) {
+        const i = ((py0 + dy) * PS + (px0 + dx)) * 4;
+        mr += P[i]; mg += P[i + 1]; mb += P[i + 2]; mn++;
+      }
+    }
+    mr /= mn; mg /= mn; mb /= mn;
+    // 目标落点（瓦片内随机，环绕写入）
+    const tx0 = (rnd() * MT) | 0, ty0 = (rnd() * MT) | 0;
+    for (let dy = -PR; dy <= PR; dy++) {
+      for (let dx = -PR; dx <= PR; dx++) {
+        const rr = Math.hypot(dx, dy) / PR;
+        if (rr >= 1) continue;
+        const w = 0.5 + 0.5 * Math.cos(rr * Math.PI); // 余弦窗
+        const i = ((py0 + dy) * PS + (px0 + dx)) * 4;
+        const ti = (((ty0 + dy + MT) % MT) * MT + ((tx0 + dx + MT) % MT)) * 3;
+        acc[ti] += (P[i] - mr) * w;
+        acc[ti + 1] += (P[i + 1] - mg) * w;
+        acc[ti + 2] += (P[i + 2] - mb) * w;
+        wsum[ti / 3] += w;
+      }
+    }
+  }
+  for (let i = 0; i < MT * MT; i++) {
+    const w = Math.max(0.35, wsum[i]);
+    acc[i * 3] /= w; acc[i * 3 + 1] /= w; acc[i * 3 + 2] /= w;
+  }
+  return acc; // 零均值 RGB 残差，256×256
+}
+
 // 统频微粒瓦片：128 细粒亮度噪声（均值 128）——以 overlay 混合铺满整头皮，
 // 照片区与程序底皮区的微粒频率在同一层噪声里合流（「面具边界」的频率差根治）
 let _grainPat = null;
@@ -432,10 +496,15 @@ function compositeFace(M, job, img) {
 
   // ---- 逐像素合成：整张底皮调色 + 前脸照片球面投影 ----
   const TWO_PI = Math.PI * 2;
+  const WB = weightBuf(S); // 轮15：记录逐像素照片权重，色斑合成按 (1-w) 铺
   for (let py2 = 0; py2 < S; py2++) {
     const v = (py2 + 0.5) / S;
     const theta = v * Math.PI;
     const st = Math.sin(theta), ct = Math.cos(theta);
+    // 轮15·同色烘焙：下颌以下的头皮带（v>0.80）向颈皮有效色收敛——
+    // 颈材质= skinAvg×0.96 色 × 调频贴图均值 ~0.80 ≈ 头皮的 0.775 倍亮度；
+    // 头模底缘剪影两侧（头皮带 vs 颌裙环）从此是同一档明度，暗脊无处可立
+    const neckQ = 1 - sstep(0.80, 0.94, v) * 0.225;
     for (let px2 = 0; px2 < S; px2++) {
       const i4 = (py2 * S + px2) * 4;
       // 底皮调色到照片肤色
@@ -484,10 +553,33 @@ function compositeFace(M, job, img) {
               pb += (b * pl - pb) * mig;
             }
             r += (pr - r) * w; g += (pg - g) * w; b += (pb - b) * w;
+            WB[py2 * S + px2] = w;
           }
         }
       }
-      B[i4] = r; B[i4 + 1] = g; B[i4 + 2] = b;
+      B[i4] = r * neckQ; B[i4 + 1] = g * neckQ; B[i4 + 2] = b * neckQ;
+    }
+  }
+  // ---- 轮15·照片高频色斑合成铺满整头皮 ----
+  // 瓦片来自这张照片自己的皮（零均值彩色残差）；羽化带外全强度、
+  // 照片区按权重递减到 15%——底皮区不再是「调过色的均匀皮」，
+  // 而是带着同一张脸的红斑/色沉频率（面具边界最后一味统计差的根治）
+  {
+    const MTILE = buildMottleTile(P, PS, D, cx, ioPx, mePx);
+    const MT = 256;
+    const mk = 0.5; // 残差强度
+    for (let py2 = 0; py2 < S; py2++) {
+      const ty = ((py2 * 0.5) | 0) % MT;
+      for (let px2 = 0; px2 < S; px2++) {
+        const tx = ((px2 * 0.5) | 0) % MT;
+        const ti = (ty * MT + tx) * 3;
+        const g2 = mk * (1 - WB[py2 * S + px2] * 0.85);
+        if (g2 < 0.02) continue;
+        const i4 = (py2 * S + px2) * 4;
+        B[i4] = Math.max(0, Math.min(255, B[i4] + MTILE[ti] * g2));
+        B[i4 + 1] = Math.max(0, Math.min(255, B[i4 + 1] + MTILE[ti + 1] * g2));
+        B[i4 + 2] = Math.max(0, Math.min(255, B[i4 + 2] + MTILE[ti + 2] * g2));
+      }
     }
   }
   xd.putImageData(base, 0, 0);
