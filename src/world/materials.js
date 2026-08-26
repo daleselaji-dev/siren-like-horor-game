@@ -209,7 +209,7 @@ export function buildMaterials(lowspec = false) {
 
   M.textures = T;
   // 生图烘焙脸皮：同步建材质（底皮），照片由 bakeFaces(M) 异步合成进 Canvas
-  buildFaceMaterials(M, T);
+  buildFaceMaterials(M, T, lowspec);
   return M;
 }
 
