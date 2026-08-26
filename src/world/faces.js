@@ -364,12 +364,13 @@ function compositeFace(M, job, img) {
             let pb = (P[p00 + 2] * (1 - xf) + P[p10 + 2] * xf) * (1 - yf) + (P[p01 + 2] * (1 - xf) + P[p11 + 2] * xf) * yf;
             w *= bgGate(pr, pg, pb); // 背景色（灰墙/衣领）拒绝上皮
             w *= strandGate(spy, pr, pg, pb); // 额区散落发丝拒绝上皮
-            // 照片肤色→底皮色彩迁移（脸盖消融的另一半）：羽化带内保留照片的明暗细节、
-            // 色度渐次收敛到调色底皮——即使照片局部影调与底皮 tint 不一致，
-            // 边界两侧的「色」也已在坡上合流，太阳穴/颊侧不再有面具切线
-            const mig = sstep(0.40, 0.88, err);
+            // 照片肤色→底皮色彩迁移（脸盖消融的另一半）：羽化带内色度收敛到调色底皮，
+            // 明度差也随迁移收敛 75%（照片脸缘的摄影亮斑正是「面具」最亮的一圈）——
+            // 边界两侧的色与光已在坡上合流，太阳穴/颊侧不再有面具切线
+            const mig = sstep(0.34, 0.82, err);
             if (mig > 0.01) {
-              const pl = Math.min(1.7, Math.max(0.3, (pr * 0.35 + pg * 0.5 + pb * 0.15) / Math.max(1, skinLum)));
+              const pl0 = Math.min(1.7, Math.max(0.3, (pr * 0.35 + pg * 0.5 + pb * 0.15) / Math.max(1, skinLum)));
+              const pl = 1 + (pl0 - 1) * (1 - mig * 0.75);
               pr += (r * pl - pr) * mig;
               pg += (g * pl - pg) * mig;
               pb += (b * pl - pb) * mig;

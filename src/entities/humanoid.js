@@ -1385,21 +1385,23 @@ export class Humanoid {
         addCard(hairCardGeo(0.05, 0.05, 5), strandM, -0.024, -0.048, -0.072, 0.3, Math.PI - 0.5, 0.1);
         // 头顶散丝重做：高密度短绒卡×12 绕颅顶两圈立根——
         // 旧方案是两片大卡打十字（0.05 高），逆光下读成「贴片玻璃」；
-        // 改为短绒卡（长度减半 ~0.02，数量翻六倍），根部沉进壳面 1/4 卡高、
-        // 沿壳球面逐卡外倾——轮廓上是一圈各自立根的碎绒毛
+        // 改为短绒卡（长度减半 ~0.02，数量翻六倍）。根位走颅骨变形域精确求壳面：
+        // 壳 = field(dir) × (r_orig/R)×1.02（conformSkull 同式），根部沉进壳面 1/4 卡高
         {
-          const hwK = (faceVariant === 'f' ? 0.87 : 0.85) + P.headW * 0.05; // 颅骨横向收窄补偿
-          const flK = 0.96 + P.faceLen * 0.06;
+          const fld2 = makeSkullField(faceVariant, P);
+          const sp2 = { x: 0, y: 0, z: 0 };
           for (let ci = 0; ci < 12; ci++) {
             const az2 = (ci / 12) * Math.PI * 2 + (ci % 2) * 0.26 + P.asymPh * 0.8;
-            const el2 = 0.28 + (ci % 3) * 0.15;          // 距顶极角两圈
+            const el2 = 0.24 + (ci % 3) * 0.15;          // 距顶极角两圈（0.24/0.39/0.54 rad）
             const dx2 = Math.sin(el2) * Math.sin(az2), dy2 = Math.cos(el2), dz2 = Math.sin(el2) * Math.cos(az2);
             const ch2 = 0.018 + (ci % 3) * 0.004;        // 卡高（旧 0.05 的一半以下）
-            const rr2 = 0.1055;                          // 壳面近似半径（壳心 y+0.03 / z-0.018）
+            fld2(dx2, dy2, dz2, sp2);                    // 该方向的颅面点
+            // 壳共形倍率：cap 球心 (0,+0.03,-0.018) 抬高了原始顶点半径——按方向重建
+            const k2 = ((0.103 + 0.03 * dy2 - 0.018 * dz2) / SKULL_R) * 1.02;
             const wsp = mkMesh(hairCardGeo(0.026 + (ci % 2) * 0.008, ch2, 3), fringeM,
-              dx2 * (rr2 * hwK + ch2 * 0.25),
-              0.115 + 0.03 + dy2 * (rr2 * flK * 0.97 + ch2 * 0.25),
-              -0.018 + dz2 * (rr2 + ch2 * 0.25));
+              sp2.x * k2 + dx2 * ch2 * 0.25,
+              0.115 + sp2.y * k2 + dy2 * ch2 * 0.25,
+              sp2.z * k2 + dz2 * ch2 * 0.25);
             wsp.rotation.order = 'YXZ';                  // 先方位后外倾再翻根
             wsp.rotation.set(el2 * 0.85 + ((ci * 7) % 5) * 0.04, az2, Math.PI);
             wsp.castShadow = false;
@@ -1407,8 +1409,8 @@ export class Humanoid {
           }
         }
         // 轮廓上两根「不听话」的长丝（同样减半高）：顶心错拍
-        addCard(hairCardGeo(0.06, 0.026, 2), wispM, 0, 0.128, -0.012, 0, 0.5, Math.PI);
-        addCard(hairCardGeo(0.06, 0.026, 2), wispM, 0.01, 0.126, -0.008, 0, 2.1, Math.PI);
+        addCard(hairCardGeo(0.06, 0.026, 2), wispM, 0, 0.136, -0.012, 0, 0.5, Math.PI);
+        addCard(hairCardGeo(0.06, 0.026, 2), wispM, 0.01, 0.133, -0.008, 0, 2.1, Math.PI);
         if (hairStyle === 'long') {
           // 前帘双层：内帘实（绺芯缎带+密股，贴颊，是帘的「体」）
           //           外帘散（稀股大摆，浮在内帘外 4mm，是帘的「散」）
