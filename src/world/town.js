@@ -997,7 +997,13 @@ export function buildTown(scene, M) {
         });
         mkBox(winMat, 0, 1.95, 0, 7.2, 0.62, 2.36);
       }
-      mkBox(M.crtGlass, 4.16, 1.9, 0, 0.1, 0.8, 1.9);                // 前挡
+      // 前挡：透明玻璃（轮15——开场首拍前两秒的车内视角要从这里看出去；
+      // 从外看也露出驾驶舱剪影，车头不再是一块涂黑铁皮）
+      const shieldM = new THREE.MeshStandardMaterial({
+        color: 0x1a2226, roughness: 0.06, metalness: 0.3, envMapIntensity: 1.6,
+        transparent: true, opacity: 0.22, depthWrite: false,
+      });
+      mkBox(shieldM, 4.16, 1.9, 0, 0.1, 0.8, 1.9);                   // 前挡
       // 弧顶：客车顶是拱不是平板（低机位仰拍时的关键轮廓线）
       {
         const dome = new THREE.Mesh(new THREE.CylinderGeometry(1.14, 1.14, 8.15, 18, 1), M.plaster);
@@ -1011,11 +1017,59 @@ export function buildTown(scene, M) {
       mkBox(M.steel, -4.28, 0.58, 0, 0.16, 0.26, 2.42);
       mkBox(plateMat('浙C·20114', { w: 192, h: 48, bg: '#1e3a8a', fg: '#f0f0e8', font: 0.6 }),
         4.37, 0.58, 0, 0.04, 0.14, 0.5);                             // 前牌照
-      // 雨刮 ×2：停在前挡下缘、微斜（雨夜里它刚停摆）
+      // 雨刮 ×2（轮15：铰接可动）：枢轴挂在前挡下缘，臂+胶条两段——
+      // 开场车内拍里 story.updateIntro 驱动它一躬一躬扫挡风玻璃
+      dynamic.busWipers = [];
       for (const wz2 of [-0.55, 0.25]) {
-        const arm = mkBox(M.ironDark, 4.23, 1.62, wz2, 0.025, 0.42, 0.035);
-        arm.rotation.x = wz2 < 0 ? 0.45 : 0.38;
-        arm.rotation.z = -0.12;
+        const piv = new THREE.Group();
+        piv.position.set(4.24, 1.52, wz2);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.4, 0.03), M.ironDark);
+        arm.position.y = 0.2;
+        piv.add(arm);
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.05, 0.34), M.ironDark);
+        blade.position.set(0.008, 0.38, 0.05);
+        piv.add(blade);
+        piv.rotation.x = wz2 < 0 ? 1.02 : 0.94; // 停摆位：斜卧前挡下缘
+        piv.rotation.z = -0.1;
+        bus.add(piv);
+        dynamic.busWipers.push(piv);
+      }
+      // 驾驶舱内饰（轮15）：车内视角一帧里的所有剪影——仪表台/方向盘/
+      // 司机背影（他没熄火，等的不是你）/乘客椅背两排/顶棚扶手杆
+      {
+        const darkM = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.85 });
+        const seatM = new THREE.MeshStandardMaterial({ color: 0x2e323a, roughness: 0.95 });
+        const drvM = new THREE.MeshStandardMaterial({ color: 0x1f2227, roughness: 0.98 });
+        mkBox(new THREE.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.97 }),
+          0, 0.74, 0, 8.2, 0.06, 2.2);                               // 车内地板（低视线不能穿到车底）
+        mkBox(new THREE.MeshStandardMaterial({ color: 0x4a2622, roughness: 0.95 }),
+          0.2, 0.775, 0, 7.6, 0.012, 0.6);                           // 过道胶条（磨旧的暗红）
+        mkBox(darkM, 3.62, 1.36, 0, 0.55, 0.3, 2.05);                // 仪表台上沿
+        mkBox(darkM, 3.8, 0.95, 0, 0.42, 0.55, 2.1);                 // 仪表台立面
+        mkBox(new THREE.MeshBasicMaterial({ color: 0x6f9e66 }), 3.4, 1.44, 0.5, 0.02, 0.055, 0.1);  // 仪表微光·车速
+        mkBox(new THREE.MeshBasicMaterial({ color: 0xc09a4c }), 3.4, 1.44, 0.26, 0.02, 0.045, 0.07); // 仪表微光·油量
+        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.02, 8, 20), darkM);
+        wheel.position.set(3.26, 1.34, 0.55);
+        wheel.rotation.y = Math.PI / 2;
+        wheel.rotateX(0.45);                                          // 盘面向司机后仰
+        bus.add(wheel);
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.42, 6), darkM);
+        col.position.set(3.42, 1.18, 0.55);
+        col.rotation.z = 1.05;
+        bus.add(col);
+        mkBox(seatM, 2.98, 1.32, 0.55, 0.13, 0.85, 0.5);             // 司机座高背
+        mkBox(drvM, 3.1, 1.46, 0.55, 0.3, 0.6, 0.42);                // 司机背影躯干
+        const dhead = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), drvM);
+        dhead.position.set(3.12, 1.95, 0.55);
+        bus.add(dhead);
+        for (const [sx2, sz2] of [[1.35, 0.55], [1.35, -0.55], [2.2, -0.55]]) { // 乘客椅背
+          mkBox(seatM, sx2, 1.26, sz2, 0.12, 0.7, 0.5);
+          mkBox(seatM, sx2, 1.68, sz2, 0.1, 0.15, 0.28);             // 头枕
+        }
+        const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 5.4, 6), M.steel);
+        rail.rotation.z = Math.PI / 2;
+        rail.position.set(0.5, 2.14, 0);
+        bus.add(rail);
       }
       // 后视镜（外探的「耳朵」——低角度剪影的辨识件）
       for (const s of [-1, 1]) {

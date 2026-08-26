@@ -3,8 +3,8 @@ export async function run(page, h) {
   await page.click('#title-start');
   // 开场不跳：拍两拍运镜（intro 走真实时钟；截图本身有秒级延迟，时点提前留量）
   await h.sleep(1200);
-  await h.shot('r14d/01_intro_bus_wetlens');
-  await h.sleep(2400); // ≈5.5s+延迟：牌坊剪影 + 双闪
+  await h.shot('r14d/01_intro_bus_wetlens'); // 轮15 起此时点为零拍车内（湿镜头满帧）
+  await h.sleep(5000); // ≈7.5s+延迟：牌坊剪影 + 双闪（轮15 全谱后移 2s）
   await h.shot('r14d/02_intro_arch_flash');
   await h.tapKey('Space');
   await h.sleep(400);

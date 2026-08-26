@@ -256,6 +256,7 @@ export class Story {
     this.introSeq = null;
     this.caughtSeq = null;
     this.tapeSeq = null;
+    this.guestSeq = null; // 上宾首见演出（轮15）
     this.deathCount = 0;
     this.drownTimer = 0;
     this.time = 0;
@@ -1144,12 +1145,59 @@ export class Story {
     }, 5000);
     g.hud.subtitle('总闸落下。整栋楼黑了一拍——屏幕里的画面撕成雪花。', 5.5);
     g.hud.subtitle('录像作废了。这一次点名不算。', 4.5, 'song');
-    g.hud.subtitle('但大堂里进来了别的东西。走红毯。硬地会把你的脚步传给它。', 6);
     g.hud.objective('从玻璃连廊进海洋馆——母带在主展厅深处的处理间');
-    // 上宾入场
+    // 上宾入场：首见演出——大堂挑空的天花上，旧料一块跟着一块聚合成臂
     g.guest.setEnabled(true);
     g.stealth.vibrationActive = true;
+    this.beginGuestIntro();
     this.saveCheckpoint('broken');
+  }
+
+  // ---------- 上宾首见演出（轮15）：板材从天花逐块聚合成臂 ----------
+  beginGuestIntro() {
+    if (this.guestSeq) return;
+    const g = this.g;
+    g.guest.beginAssembly?.(5.6);
+    this.guestSeq = { t: 0, sub1: false, sub2: false };
+    g.player.frozen = true;
+    g.hud.setLetterbox(true);
+    g.hud.prompt(null);
+    g.audio.woodStrain?.(3); // 第一声：钉子退出旧料
+  }
+
+  updateGuestIntro(dt) {
+    if (!this.guestSeq) return;
+    const s = this.guestSeq;
+    s.t += dt;
+    const g = this.g;
+    const HI = g.world.dynamic.hotelInfo;
+    const hx = HI.origin.x, hb = HI.origin.y, hz = HI.origin.z;
+    const cam = g.engine.camera;
+    const ss = (a, b, t) => {
+      t = Math.min(1, Math.max(0, (t - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    };
+    // 机位：大堂西南角半蹲——先仰望挑空顶棚（板在剥离），
+    // 跟着落位的件一路摇下来，最后停在成形的臂与扒地的指上
+    const u = ss(0.7, 5.0, s.t);
+    cam.position.set(hx - 4.4 + u * 0.9, hb + 1.66 - u * 0.34, hz + 2.4 + u * 1.1);
+    cam.lookAt(hx + 2.6 - u * 7.4, hb + 6.55 - u * 5.6, hz + 8.4 - u * 0.5);
+    cam.rotation.z += Math.sin(s.t * 0.8) * 0.012; // 手持微晃
+    if (!s.sub1 && s.t > 0.4) {
+      s.sub1 = true;
+      g.hud.subtitle('大堂的天花响了一声——钉子退出旧木料的那种响。', 4.5);
+    }
+    if (!s.sub2 && s.t > 3.0) {
+      s.sub2 = true;
+      g.hud.subtitle('拆下来的板一块跟着一块，凌空拼进一条臂。宴会厅记得自己的家具。', 5.5, 'song');
+    }
+    if (s.t >= 6.4) {
+      this.guestSeq = null;
+      g.hud.setLetterbox(false);
+      g.hud.subtitle('但大堂里进来了别的东西。走红毯。硬地会把你的脚步传给它。', 6);
+      if (g.state === 'PLAY' && !g.player.dead) g.player.frozen = false;
+      g.player.syncCamera(0);
+    }
   }
 
   // ---------- 节拍：取母带 ----------
@@ -1375,25 +1423,27 @@ export class Story {
     if (F.intro) return;
     F.intro = true;
     const hud = this.g.hud;
-    this.introSeq = { t: 0, dur: 12.0, thunder2: false };
+    this.introSeq = { t: 0, dur: 14.0, thunder2: false, wipes: 0, cut1: false };
     hud.setLetterbox(true);
     this.g.player.frozen = true;
     // 镜头淋在雨里：水珠贴着镜片滑（endIntro 后由 update 缓慢淡出——
-    // 落回眼睛之后那几步，眼睫上还挂着站台的雨）
+    // 落回眼睛之后那几步，眼睫上还挂着站台的雨）。
+    // 零拍（车内）里这层水珠读作挡风玻璃上的雨——雨刮扫过会被抹开一瞬
     this.g.engine.finalPass.uniforms.uWetLens.value = 1.0;
     // 光雷谱一拍：开场首闪（远雷慢半拍跟上）；二拍双闪由 updateIntro 按真实时钟触发
     this.g.sky.flashSeq = { t: 0, strikes: [0.6, 0.85] };
     this.g.sky.thunderQueued = 1;
     this.g.sky._boltAz = -1.7; // 闪电裂纹立在牌坊背后的西天——剪影要有光源
     this.g.sky.boltMesh.visible = true;
+    hud.subtitle('雨刮扫了两下。到站的人只有你一个。', 3.5);
     hud.subtitle('二〇〇一年，秋。蚀湾。雨没有停过。', 4);
     hud.subtitle('……核册实况转播……南方大酒店……全镇同往……', 5, 'radio');
     hud.subtitle('末班长途车。司机没熄火——他等的不是你，是掉头。', 5.5);
     hud.subtitle('絮絮的信在行李箱里。她只求了你一件事：念名的时候，别应。', 6);
-    setTimeout(() => this.g.audio.doorCreak(), 1200); // 车门合拢
+    setTimeout(() => this.g.audio.doorCreak(), 2300); // 车门在你身后合拢（零拍切外拍）
     setTimeout(() => {
       hud.objective('从站台长椅上取回行李');
-    }, 13000);
+    }, 15000);
   }
 
   updateIntro(dt) {
@@ -1411,9 +1461,9 @@ export class Story {
       return t * t * (3 - 2 * t);
     };
     const lv = (a, b, t) => a + (b - a) * t;
-    if (s.t > 1.6) this.busGo = true; // 末班车掉头回县城
+    if (s.t > 3.6) this.busGo = true; // 末班车掉头回县城
     // 门 3 冲击拍：镜头咬住牌坊剪影的同一瞬，双闪+近雷同拍压下
-    if (!s.thunder2 && s.t >= 5.2) {
+    if (!s.thunder2 && s.t >= 7.2) {
       s.thunder2 = true;
       g.sky.flashSeq = { t: 0, strikes: [0.05, 0.28] };
       g.sky._boltAz = -1.7;
@@ -1421,10 +1471,40 @@ export class Story {
       g.audio.thunderDistant(0.15);
     }
     let px, py, pz, tx, ty, tz, roll = 0;
-    if (s.t < 5.0) {
-      // 【一拍 · 低机位仰拍】蹲在湿沥青上：大巴车身压着镜头驶离，
+    if (s.t < 2.0) {
+      // 【零拍 · 车内】（轮15）末班车里最后两秒：越过椅背与司机的肩，
+      // 挡风玻璃满是水珠，雨刮一躬一躬地扫——刮开的那一瞬能看清
+      // 车灯锥里的雨和黑掉的路，随即又蒙回来
+      const bus = g.world.dynamic.bus;
+      const bx = bus ? bus.position.x : 64.5;
+      const by = bus ? bus.position.y : gnd(64.5, -1.3) + 0.06;
+      const bz = bus ? bus.position.z : -1.3;
+      px = bx + 1.35; py = by + 1.66; pz = bz + 0.32; // 头排座后的坐姿视高
+      tx = bx + 6.5; ty = by + 1.52; tz = bz + 0.02;
+      roll = Math.sin(s.t * 1.7) * 0.01;         // 怠速的车身在轻轻哆嗦
+      py += Math.sin(s.t * 27) * 0.004;
+      // 雨刮：周期 1.15s 一趟——0 停摆位、1 扫到顶；扫过去镜面的水被抹开，
+      // 松开又立刻蒙回来（uWetLens 跟雨刮同拍呼吸）
+      const sw = 0.5 - 0.5 * Math.cos(s.t * (Math.PI * 2 / 1.15));
+      const wip = g.world.dynamic.busWipers;
+      if (wip) {
+        for (let i = 0; i < wip.length; i++) {
+          wip[i].rotation.x = (i ? 0.94 : 1.02) - sw * (1.22 - i * 0.1);
+        }
+      }
+      g.engine.finalPass.uniforms.uWetLens.value = 1 - sw * 0.72;
+      const wipeIdx = Math.floor(s.t / 1.15 + 0.5);
+      if (wipeIdx > s.wipes) { s.wipes = wipeIdx; g.audio.wiperSqueak?.(); }
+    } else if (s.t < 7.0) {
+      // 【一拍 · 低机位仰拍】硬切车外，蹲在湿沥青上：大巴车身压着镜头驶离，
       // 车灯锥扎进雨里，尾灯两点红缩进雾里
-      const u = ss(0, 5.0, s.t);
+      if (!s.cut1) { // 切拍瞬间：镜片水珠回满、雨刮落回停摆位
+        s.cut1 = true;
+        g.engine.finalPass.uniforms.uWetLens.value = 1.0;
+        const wip = g.world.dynamic.busWipers;
+        if (wip) for (let i = 0; i < wip.length; i++) wip[i].rotation.x = i ? 0.94 : 1.02;
+      }
+      const u = ss(2.0, 7.0, s.t);
       px = 60.9 - u * 0.7;
       pz = 2.0 + u * 0.4;
       py = gnd(px, pz) + 0.35;
@@ -1435,12 +1515,12 @@ export class Story {
       tz = -1.3;
       roll = Math.sin(s.t * 0.7) * 0.028;
       // 起步碾动：车轮咬上湿沥青那两秒，地面把抖传给蹲着的镜头
-      const rumble = Math.max(0, 1 - s.t / 2.2) * 0.016;
+      const rumble = Math.max(0, 1 - (s.t - 2.0) / 2.2) * 0.016;
       py += Math.sin(s.t * 31) * rumble;
       roll += Math.sin(s.t * 23.7) * rumble * 0.9;
-    } else if (s.t < 8.4) {
+    } else if (s.t < 10.4) {
       // 【二拍 · 牌坊剪影】低机位仰角咬住「蚀湾」牌坊——双闪把瓦顶石柱烧成剪影，雷声同拍
-      const u = ss(5.0, 8.4, s.t);
+      const u = ss(7.0, 10.4, s.t);
       px = 51.5 - u * 1.6;
       pz = 1.3 - u * 0.4;
       py = gnd(px, pz) + 0.45 + u * 0.4;
@@ -1449,7 +1529,7 @@ export class Story {
       tz = 0;
     } else {
       // 【三拍 · 落回眼睛】从眼前两米倒退着落回眼窝，接第一人称
-      const u = ss(8.4, s.dur, s.t);
+      const u = ss(10.4, s.dur, s.t);
       const ex = p.pos.x, ez = p.pos.z, ey = p.pos.y + 1.62;
       const fdx = -Math.sin(p.yaw), fdz = -Math.cos(p.yaw);
       const back = (1 - u) * 2.2;
@@ -1472,6 +1552,9 @@ export class Story {
     if (this.introSeq.t < this.introSeq.dur - 0.1) {
       this.g.engine.finalPass.uniforms.uWetLens.value = 0.18;
     }
+    // 雨刮落回停摆位（零拍里被扫起过）
+    const wip = this.g.world.dynamic.busWipers;
+    if (wip) for (let i = 0; i < wip.length; i++) wip[i].rotation.x = i ? 0.94 : 1.02;
     this.introSeq = null;
     this.busGo = true;
     this.g.hud.setLetterbox(false);
@@ -1526,6 +1609,7 @@ export class Story {
     g.player.frozen = false;
     for (const e of g.enemies) e.reset?.();
     g.guest?.reset?.();
+    if (this.guestSeq) { this.guestSeq = null; g.hud.setLetterbox(false); } // 回滚打断首见演出
     g.stealth.vibration = 0;
     g.stealth.danger = 0;
     this.drownTimer = 0;
@@ -1912,10 +1996,11 @@ export class Story {
     }
     this.updateBus(dt);
     this.updateCaught(dt);
+    this.updateGuestIntro(dt);
     this.updateDeath(dt);
     this.updateTape(dt);
     if (this.flags.ended) { this.updateEnding(dt); return; }
-    if (g.player.dead || this.caughtSeq || this.tapeSeq) return;
+    if (g.player.dead || this.caughtSeq || this.tapeSeq || this.guestSeq) return;
 
     this.updateDrown(dt);
     this.updateBoothSpy(dt);

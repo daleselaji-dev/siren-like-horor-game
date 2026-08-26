@@ -978,11 +978,39 @@ export class HonoredGuest {
     this.group.visible = false;
     scene.add(this.group);
     this.pos = this.hand; // 供距离判断
+    this.assembling = null; // 首见聚合演出状态（轮15）
+  }
+
+  /** 首见聚合演出（轮15）：大堂挑空的天花上，拆下来的旧料一块跟着一块
+   *  剥离、翻着跟头凌空落进臂位——宴会厅的家具记得自己的次序。
+   *  次序：肩板→前臂板→掌→指节（逐件错拍起飞，各飞 fly 秒落位） */
+  beginAssembly(dur = 5.6) {
+    const parts = [];
+    const ceilY = this.shoulder.y + 0.42; // 挑空顶棚下皮（F3 楼板底）
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const mk = (obj) => parts.push({
+      obj,
+      start: new THREE.Vector3(
+        rnd(this.area.minX + 1.5, this.area.maxX - 1.5),
+        ceilY + rnd(-0.15, 0.08),
+        rnd(this.area.minZ + 2.5, this.area.maxZ - 0.8)),
+      spin: [rnd(-2.2, 2.2), rnd(-3.0, 3.0), rnd(-2.2, 2.2)],
+      done: false,
+    });
+    for (const p of this.armPanels) mk(p);
+    mk(this.palm);
+    for (const f of this.fingers) { mk(f.seg1); mk(f.seg2); mk(f.tip); }
+    const fly = 1.5;
+    this.assembling = { t: 0, dur, fly, stagger: (dur - fly) / (parts.length - 1), parts };
+    // 绳/绸/尘等宿主板落位后才挂出来
+    for (const r of this.ropes) r.grp.visible = false;
+    for (const sk of this.silks) sk.grp.visible = false;
+    this.dust.visible = false;
   }
 
   /** 镁光定影：被拍下的东西必须跟照片对齐——板材「咔」地排齐，僵在上一个稳定形态 */
   flashStun(sec) {
-    if (!this.enabled) return;
+    if (!this.enabled || this.assembling) return;
     this.stunT = Math.max(this.stunT, sec);
     this.handTarget.copy(this.hand);
     this.nameT = 0;
@@ -1005,6 +1033,13 @@ export class HonoredGuest {
     this.nameT = 0;
     this.stunT = 0;
     this.lure = null;
+    // 检查点回滚打断聚合演出：直接成形（演出只属于首见那一眼）
+    if (this.assembling) {
+      this.assembling = null;
+      this.dust.visible = true;
+      for (const r of this.ropes) r.grp.visible = true;
+      for (const sk of this.silks) sk.grp.visible = true;
+    }
   }
 
   update(ctx) {
@@ -1056,7 +1091,7 @@ export class HonoredGuest {
         }
       }
     }
-    const speed = stunned || limeHold ? 0 : vib > 0.5 ? 1.9 : 0.75;
+    const speed = stunned || limeHold || this.assembling ? 0 : vib > 0.5 ? 1.9 : 0.75;
     const d = this.handTarget.clone().sub(this.hand);
     const dist = d.length();
     const moving = speed > 0 && dist > 0.05;
@@ -1072,7 +1107,7 @@ export class HonoredGuest {
 
     // 点名：手贴近玩家 → 数拍子；或振动满格直接点名（僵直中不点）
     const dp = Math.hypot(player.pos.x - this.hand.x, player.pos.z - this.hand.z);
-    if (!player.dead && !stunned && inArea && (dp < 1.35 || vib >= 0.98)) {
+    if (!player.dead && !stunned && !this.assembling && inArea && (dp < 1.35 || vib >= 0.98)) {
       this.nameT += dt;
       if (this.nameT > 0.4) ctx.onCaught?.(this);
     } else {
@@ -1175,6 +1210,47 @@ export class HonoredGuest {
         gy + 0.1 + drum * 1.4 + lift,
         hnd.z + Math.cos(f.ang) * 0.95);
       f.tip.rotation.set(1.35, f.ang, 0);
+    }
+
+    // ---- 首见聚合（轮15）：在常规摆件算完之后，把还没落位的件拉回
+    // 「顶棚出发点→目标位」的插值上——落位那一下带一声闷木响 ----
+    if (this.assembling) {
+      const A = this.assembling;
+      A.t += dt;
+      for (let i = 0; i < A.parts.length; i++) {
+        const P = A.parts[i];
+        const k = Math.min(1, Math.max(0, (A.t - i * A.stagger) / A.fly));
+        if (k >= 1) {
+          if (!P.done) {
+            P.done = true;
+            // 板/掌落位重响；指节每指只响一下（葫芦头落位）
+            if (i <= 8 || (i - 9) % 3 === 2) audio?.woodDock?.(3 + i * 0.3);
+          }
+          continue;
+        }
+        const e2 = k * k * (3 - 2 * k);
+        const o = P.obj;
+        if (k <= 0) { // 还嵌在顶棚里：平贴天花
+          o.position.copy(P.start);
+          o.rotation.set(0, P.spin[1] * 0.2, 0);
+          continue;
+        }
+        _v2.copy(o.position); // 本帧常规摆件算出的目标位
+        o.position.lerpVectors(P.start, _v2, e2);
+        o.position.y += Math.sin(e2 * Math.PI) * 0.45; // 途中略拱——像被什么提着走
+        o.rotation.x += P.spin[0] * (1 - e2);
+        o.rotation.y += P.spin[1] * (1 - e2);
+        o.rotation.z += P.spin[2] * (1 - e2);
+      }
+      for (const r of this.ropes) r.grp.visible = A.parts[r.panel]?.done ?? true;
+      for (const sk of this.silks) sk.grp.visible = A.parts[sk.panel]?.done ?? true;
+      this.dust.visible = A.t > A.dur * 0.55;
+      if (A.t >= A.dur + 0.4) {
+        this.assembling = null;
+        this.dust.visible = true;
+        for (const r of this.ropes) r.grp.visible = true;
+        for (const sk of this.silks) sk.grp.visible = true;
+      }
     }
   }
 }

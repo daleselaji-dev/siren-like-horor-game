@@ -782,6 +782,54 @@ export class AudioEngine {
     o.start(t); o.stop(t + 1.1);
   }
 
+  /** 板材落位闷响（轮15·上宾聚合演出）：厚木头撞进榫位的一声「咚」 */
+  woodDock(dist = 6) {
+    if (!this.started) return;
+    const vol = Math.max(0.08, 1 - dist / 30) * 0.5;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    const f0 = 95 + Math.random() * 45;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.55, t + 0.16);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    o.connect(g).connect(this.sfxGroup);
+    g.connect(this.reverb);
+    o.start(t); o.stop(t + 0.35);
+    // 木纤维碎裂的高频「咔」贴在头上
+    const n = ctx.createBufferSource();
+    n.buffer = this.noiseBuf ?? (this.noiseBuf = this.makeNoiseBuffer(1));
+    const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 1800 + Math.random() * 900; bf.Q.value = 3;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(vol * 0.5, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    n.connect(bf).connect(ng).connect(this.sfxGroup);
+    n.start(t); n.stop(t + 0.1);
+  }
+
+  /** 雨刮扫挡风玻璃（轮15·开场车内拍）：橡胶条蹭湿玻璃的一趟吱声 */
+  wiperSqueak() {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(310, t);
+    o.frequency.linearRampToValueAtTime(430, t + 0.34);
+    o.frequency.linearRampToValueAtTime(280, t + 0.6);
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 11;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(0.045, t + 0.12);
+    g.gain.linearRampToValueAtTime(0.02, t + 0.4);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.62);
+    o.connect(f).connect(g).connect(this.master);
+    o.start(t); o.stop(t + 0.66);
+  }
+
   /** 前台电话铃（2001 年的机械铃） */
   phoneRing() {
     if (!this.started) return;
