@@ -231,9 +231,12 @@ node scripts/verify.mjs looks        # 外观：镇口车站/牌坊/告示墙/�
 node scripts/verify.mjs playthrough  # 主线全流程通关：10 条文书 + 三条规则怪谈的
                                      # 违反与遵守双路径逐 flag 断言
 FULLSPEC=1 node scripts/verify.mjs keepshots   # 精选交付图生成（全画质渲染，落盘 verify/keep/）
+FULLSPEC=1 node scripts/verify.mjs r17         # 轮17取证：酒店立面四机位+司仪近景+驾驶舱两机位
+node scripts/charshot.mjs                      # 人物三视图 + 人体比例铁律断言（头身/颈长/肩宽）
 ```
 
-截图输出到 `verify/`（精选交付图在 `verify/keep/`，人物近景在 `verify/chars/`）。
+截图输出到 `verify/`（精选交付图在 `verify/keep/`，人物近景在 `verify/chars/`，
+轮17门2/门3取证在 `verify/r17/`）。
 全流程脚本断言每个主线 flag（`townGateOpen`、`inHotel`、`leaked`、`imageBroken`、
 `ruleSeaViolated`、`ruleNameExpired`、`ruleTraySeen`、`hasTape`、`finaleBroken`、`ended`……）
 并确认结局结算、全程零控制台报错。
