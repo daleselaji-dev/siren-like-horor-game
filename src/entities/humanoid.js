@@ -1649,8 +1649,11 @@ export class Humanoid {
       elbow.position.y = -0.3;
       shoulder.add(elbow);
       const foreMat = D.drift ? drift : D.gloves ? rubber : (D.torso === 'dress' ? skin : torsoMat);
-      // 肘缝球压扁收窄——藏进两侧管径之内，任何角度不越出袖管剪影（球节人偶根治）
-      elbow.add(mkMesh(G('elbowCap', () => new THREE.SphereGeometry(0.041, 10, 8)), foreMat, 0, 0.002, 0, 0.96 * limbScl, 0.72, 0.96 * limbScl));
+      // 肘缝球压扁收窄——藏进两侧管径之内，任何角度不越出袖管剪影（球节人偶根治）。
+      // 材质永远跟袖管（不跟前臂）且上收 6mm 进袖端：裸前臂角色抬臂时看到的是
+      // 「圆布袖口 + 从袖内长出的前臂」，不是深色袖端顶一颗皮肤球（木偶肘元凶）
+      const elbowCapMat = D.drift ? drift : D.gloves ? rubber : torsoMat;
+      elbow.add(mkMesh(G('elbowCap', () => new THREE.SphereGeometry(0.041, 10, 8)), elbowCapMat, 0, 0.008, 0, 0.96 * limbScl, 0.72, 0.96 * limbScl));
       if (D.drift) {
         elbow.add(mkMesh(driftLimbGeo(0.045, 0.24, 'foreDrift'), drift, 0, 0, 0));
       } else {
