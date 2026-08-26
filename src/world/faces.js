@@ -263,6 +263,16 @@ function compositeFace(M, job, img) {
   const ecx = cx, ecy = D.eyeY * S + mePx * 0.5;
   const eax = ioPx * 1.18, eay = mePx * 2.12;
   const chinPy = D.chinY * S;
+  // 眼裂蒙版（照片空间）：照片自带的眼球/睫毛不许烘进头皮——
+  // 烘进去的「照片眼」垫在 3D 湿眼球后面，照片虹膜+烘焙 AO+3D 睫毛三层叠成黑窟窿；
+  // 眼裂内退回调色底皮当「闭合睑面」，眼睛由 3D 眼球/眼睑/睫毛独立承担
+  const eyeHole = (spx2, spy2) => {
+    const dyE = (spy2 - D.eyeY * S) / (ioPx * 0.115);
+    const dxl = (spx2 - D.eyeLX * S) / (ioPx * 0.185);
+    const dxr = (spx2 - D.eyeRX * S) / (ioPx * 0.185);
+    const rl = Math.hypot(dxl, dyE), rr = Math.hypot(dxr, dyE);
+    return 1 - sstep(0.62, 1.0, Math.min(rl, rr));
+  };
   // 发际线 gate（照片空间）：正中 hairY、向两鬓按抛物线下垂——
   // 发际线及以上的照片头发一个像素都不许烘到头皮上（双重发际涂鸦的根治）。
   // 羽化带整个落在发际线以下（向皮肤渐入 ~4% 画幅）：底皮→照片的过渡是坡不是坎
@@ -355,6 +365,7 @@ function compositeFace(M, job, img) {
           w *= 1 - sstep(0.52, 1.0, err);
           w *= 1 - sstep(chinPy - 8, chinPy + 22, spy);
           w *= gate;
+          w *= 1 - eyeHole(spx, spy);
           if (w > 0.003) {
             // 双线性采样照片
             const xi = spx | 0, yi = spy | 0, xf = spx - xi, yf = spy - yi;
@@ -409,8 +420,8 @@ function compositeFace(M, job, img) {
     for (const sgn of [-1, 1]) {
       const ex2 = (0.5 + sgn * phiE2 / TWO_PI) * S; // 左右眼画布列
       const sideIn = -sgn;                          // 内眦朝画布中线
-      soft(ex2, evy - 4, 56, 42, 0.24);             // 眶缘软影（整窝一层浅）
-      soft(ex2, evy - 13, 42, 12, 0.34);            // 上睑褶皱带（最深的一道）
+      soft(ex2, evy - 4, 56, 42, 0.2);              // 眶缘软影（整窝一层浅）
+      soft(ex2, evy - 13, 42, 12, 0.27);            // 上睑褶皱带（最深的一道）
       soft(ex2 + sideIn * 24, evy + 2, 14, 11, 0.36); // 内眦深影
       soft(ex2, evy + 13, 36, 9, 0.18);             // 下睑接触影
       soft(ex2, evy - 24, 46, 12, 0.14);            // 眉弓下投影
@@ -451,6 +462,7 @@ function compositeFace(M, job, img) {
       w *= 1 - sstep(0.52, 0.95, Math.sqrt(rex * rex + rey * rey)); // 与漫反射同宽的羽化坡
       w *= 1 - sstep(chinPy - 10, chinPy + 16, spy);
       w *= hairGate(spx, spy); // 发际以上的照片头发假法线一并拒绝
+      w *= 1 - eyeHole(spx, spy); // 照片眼球边缘的假法线一并拒绝
       if (w < 0.01) continue;
       const bi = ((spy | 0) * S + (spx | 0)) * 4;
       w *= bgGate(P[bi], P[bi + 1], P[bi + 2]); // 背景边界的假法线一并拒绝
