@@ -202,7 +202,9 @@ function makeSkullField(variant, P, o = {}) {
   const cheekAmp = 0.0035 + P.cheek * 0.007 + (old ? 0.0035 : 0);
   const hollowAmp = (old ? 0.009 : 0.002) + P.hollow * 0.007;
   const browAmp = (fem ? 0.005 : 0.008) + P.brow * 0.005;
-  const eyeNX = 0.3 + P.eyeX * 0.14;   // 眼窝横位
+  // 轮19：眼窝横位下限抬高（0.30→0.38）——旧下限换算瞳距仅 ~50mm（成人 60-66mm），
+  // 正是「五官挤中心」的第一元凶；与 eyeXoff(0.0335+0.0055P) 同一换算系保持眼嵌窝
+  const eyeNX = 0.38 + P.eyeX * 0.062; // 眼窝横位
   const asymAmp = P.asym * 0.004;
   const bare = !!o.bare; // 发壳/帽体共形：只要颅形，不要五官（鼻/唇/颏不许顶进发里）
   // —— 鼻（轮16 真几何）：鼻根凹/鼻梁脊/鼻尖球/鼻翼瓣/鼻孔凹腔/鼻小柱 全部是形体。
@@ -596,8 +598,10 @@ function hairGeo(style = 'crop', variant = 'm', P = null) {
       // 发际线抬高：壳体后移+后仰，额头必须露出来（不能像头盔盖到眉毛）；
       // 壳弧加深到 0.5π——共形贴颅后壳檐要能包住鬓角，不悬在颅顶
       // 轮18：檐羽化带加宽（0.9→0.82）——发际是「渐稀两厘米」，不是一条切口
+      // 轮19：后仰收半（0.3→0.19）+后移收小——旧值把发际推上颅顶，
+      // 额头占掉半张脸，五官被挤进下半中心（face_a/waiter「头长额巨」元凶）
       parts.push(fadeRim(xform(new THREE.SphereGeometry(r, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5),
-        0, 0.03 + lift, -0.018, 0.3, 0, 0, 1.0, scaleY, 1.02), rimV(0.82, 1.0)));
+        0, 0.03 + lift, -0.013, 0.19, 0, 0, 1.0, scaleY, 1.02), rimV(0.82, 1.0)));
       // 后脑+颈窝补片（φ π..2π 是 -z 后半球）——缺了这块，背影读成光头戴小帽
       parts.push(fadeRim(xform(new THREE.SphereGeometry(r - 0.001, 18, 10, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
         0, 0.03 + lift, -0.012, 0.16, 0, 0, 1.0, scaleY * 1.02, 1.0), rimV(0.82, 1.0)));
@@ -614,7 +618,7 @@ function hairGeo(style = 'crop', variant = 'm', P = null) {
       }
       case 'side': { // 三七分：整体壳微偏一侧（分头由轮廓不对称表达，不悬浮贴片）
         parts.push(fadeRim(xform(new THREE.SphereGeometry(0.107, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5),
-          -0.008, 0.03, -0.018, 0.3, 0, -0.06, 1.0, 0.95, 1.02), rimV(0.82, 1.0)));
+          -0.008, 0.03, -0.013, 0.19, 0, -0.06, 1.0, 0.95, 1.02), rimV(0.82, 1.0)));
         parts.push(fadeRim(xform(new THREE.SphereGeometry(0.106, 18, 10, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
           0, 0.03, -0.012, 0.16, 0, 0, 1.0, 0.97, 1.0), rimV(0.82, 1.0)));
         break;
@@ -730,21 +734,23 @@ function torsoProfile(kind) {
   // [r, y] 自腰际(0 附近)到肩颈；躯干组局部 y: 0 → 0.62
   // 半径给窄——肩宽由 torsoGeo 的肩部高斯加宽提供，手臂必须落在躯干轮廓之外
   switch (kind) {
+    // 轮19：领口以下一档（y≈0.57）半径统一收 ~13%——旧值在颈根两侧留出横台，
+    // 与高斯加宽叠成「方肩垫」；成人肩线是颈根→肩峰的连续斜坡
     case 'suit': // 西装：垫肩、下摆过臀（顶圈收进领筒之内——领由 mkCollar 出真几何）
       return [[0.175, -0.14], [0.163, -0.04], [0.148, 0.06], [0.145, 0.16], [0.152, 0.28],
-        [0.162, 0.4], [0.168, 0.48], [0.158, 0.53], [0.125, 0.575], [0.055, 0.605]];
+        [0.162, 0.4], [0.168, 0.48], [0.152, 0.53], [0.108, 0.575], [0.055, 0.605]];
     case 'vest': // 马甲+衬衫：收身（肩段加宽——衬衫肩线仍是成人男 0.40m+ 的肩，收身收在腰）
       return [[0.148, -0.06], [0.14, 0.02], [0.134, 0.12], [0.142, 0.26], [0.156, 0.4],
-        [0.166, 0.48], [0.153, 0.53], [0.12, 0.575], [0.053, 0.605]];
+        [0.166, 0.48], [0.147, 0.53], [0.104, 0.575], [0.053, 0.605]];
     case 'satin': // 缎袄：宽厚、直筒、下摆长
       return [[0.19, -0.24], [0.186, -0.1], [0.178, 0.04], [0.174, 0.2], [0.178, 0.36],
-        [0.182, 0.46], [0.168, 0.52], [0.132, 0.57], [0.056, 0.605]];
+        [0.182, 0.46], [0.162, 0.52], [0.116, 0.57], [0.056, 0.605]];
     case 'work': // 工装夹克：微鼓腹
       return [[0.168, -0.1], [0.16, -0.02], [0.154, 0.08], [0.16, 0.2], [0.163, 0.34],
-        [0.166, 0.44], [0.157, 0.51], [0.122, 0.565], [0.054, 0.605]];
+        [0.166, 0.44], [0.151, 0.51], [0.106, 0.565], [0.054, 0.605]];
     case 'dress': // 连衣裙上身
       return [[0.15, -0.06], [0.135, 0.04], [0.126, 0.14], [0.134, 0.28], [0.146, 0.4],
-        [0.15, 0.47], [0.14, 0.52], [0.11, 0.57], [0.054, 0.615]];
+        [0.15, 0.47], [0.135, 0.52], [0.096, 0.57], [0.054, 0.615]];
     default:
       return torsoProfile('work');
   }
@@ -767,7 +773,10 @@ function torsoGeo(kind) {
     const v = new THREE.Vector3();
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i);
-      const sh = Math.exp(-(((v.y - 0.49) / 0.10) ** 2));
+      // 轮19：肩部高斯加宽在 0.52 以上闸掉——旧高斯一直漫到领口，
+      // 颈根两侧顶出方肩台（waiter「肩过宽」元凶）；成人斜方肌是从颈根
+      // 斜落到肩峰的坡，不是领口下的横梁。峰值 1.3 保持在 0.48（肩宽铁律不动）
+      const sh = Math.exp(-(((v.y - 0.478) / 0.098) ** 2)) * (1 - _ss01(0.52, 0.585, v.y));
       v.x *= 1 + sh * 0.3;
       v.z *= 0.7;
       // 布身垂坠褶（去人偶感）：胸线以下沿方位角低频起伏——
@@ -898,36 +907,76 @@ function driftLimbGeo(r, len, key) {
   });
 }
 
-/** 手：掌+四指(两节链式相接+指节鼓包)+拇指  curl: 'relax'|'open'|'flat'
- *  指节严格首尾相接（上一节终点=下一节起点），指尖向掌心(+z)侧蜷 */
+/** 手（轮19·方块指根治）：掌体+鱼际/小鱼际+四指三节指骨链+两节拇指。
+ *  每指自掌指关节向外扇开（食指内收/小指外张），逐指粗细长短不同，
+ *  高段数胶囊+关节球——0.4m 抬臂近景读成「一只分指的人手」，不是充气手套。
+ *  curl: 'relax'|'open'|'flat'。几何为右手；左手用 mirroredHandGeo 取真镜像。 */
 function handGeo(curl = 'relax') {
   return G('hand_' + curl, () => {
-    // 轮17：整手瘦身——旧香肠指（r8mm）在近景里是「充气手套」；
-    // 指径回到真人（近节 ~7mm 半径以下），掌薄一档
     const parts = [];
-    parts.push(xform(new THREE.SphereGeometry(0.04, 12, 10), 0, -0.048, 0.004, 0.12, 0, 0, 0.82, 1.18, 0.4));
-    const c1 = curl === 'open' ? 0.2 : curl === 'flat' ? 0.06 : 0.55;  // 第一节屈
-    const c2 = curl === 'open' ? 0.25 : curl === 'flat' ? 0.08 : 0.7;  // 第二节屈
+    // 掌体（扁椭球）+ 指蹼缘垫 + 鱼际（拇指侧掌肉）+ 小鱼际
+    parts.push(xform(new THREE.SphereGeometry(0.04, 18, 14), 0, -0.048, 0.004, 0.12, 0, 0, 0.82, 1.18, 0.38));
+    parts.push(xform(new THREE.SphereGeometry(0.03, 12, 9), 0, -0.082, 0.007, 0.1, 0, 0, 1.02, 0.42, 0.42));
+    parts.push(xform(new THREE.SphereGeometry(0.016, 10, 8), 0.02, -0.06, 0.011, 0.3, 0, 0.2, 1.0, 1.3, 0.62));
+    parts.push(xform(new THREE.SphereGeometry(0.0125, 10, 8), -0.024, -0.06, 0.007, -0.15, 0, -0.1, 0.9, 1.35, 0.6));
+    const c1 = curl === 'open' ? 0.2 : curl === 'flat' ? 0.06 : 0.5;   // 近节屈
+    const c2 = curl === 'open' ? 0.2 : curl === 'flat' ? 0.07 : 0.58;  // 中节屈
+    const c3 = curl === 'open' ? 0.1 : curl === 'flat' ? 0.05 : 0.34;  // 远节屈
+    const R1 = [0.0066, 0.0069, 0.0064, 0.0054];   // 逐指近节半径（食/中/环/小）
+    const L1 = [0.033, 0.037, 0.034, 0.026];
+    const L2 = [0.021, 0.024, 0.022, 0.016];
+    const L3 = [0.015, 0.017, 0.016, 0.013];
     for (let i = 0; i < 4; i++) {
-      const x = -0.0245 + i * 0.0165;
-      const l1 = 0.037 - Math.abs(i - 1.4) * 0.006, l2 = 0.027;
-      // 基节起点（掌缘）
-      let py = -0.088, pz = 0.008;
-      parts.push(xform(new THREE.SphereGeometry(0.0073, 6, 5), x, py, pz)); // 掌指指节
-      // 第一节：方向 (0,-cos c1, sin c1)
-      const d1y = -Math.cos(c1), d1z = Math.sin(c1);
-      parts.push(xform(new THREE.CapsuleGeometry(0.0068, l1, 4, 8), x, py + d1y * (l1 * 0.5 + 0.004), pz + d1z * (l1 * 0.5 + 0.004), -c1));
-      py += d1y * (l1 + 0.007); pz += d1z * (l1 + 0.007);
-      parts.push(xform(new THREE.SphereGeometry(0.0063, 6, 5), x, py, pz)); // 近节间关节
-      // 第二节：累计屈曲
-      const a2 = c1 + c2;
-      const d2y = -Math.cos(a2), d2z = Math.sin(a2);
-      parts.push(xform(new THREE.CapsuleGeometry(0.0058, l2, 4, 8), x, py + d2y * (l2 * 0.5 + 0.003), pz + d2z * (l2 * 0.5 + 0.003), -a2));
+      const splay = (i - 1.25) * 0.085;            // 指扇：自掌指关节向小指侧张开
+      const ss = Math.sin(splay), cs = Math.cos(splay);
+      let px = -0.0235 + i * 0.0162, py = -0.088, pz = 0.008;
+      const r1 = R1[i];
+      parts.push(xform(new THREE.SphereGeometry(r1 * 1.12, 10, 8), px, py, pz, 0, 0, 0, 1, 1.15, 1)); // 掌指关节
+      const seg = (a, len, rad) => {
+        const dx = ss * Math.cos(a), dy = -cs * Math.cos(a), dz = Math.sin(a);
+        parts.push(xform(new THREE.CapsuleGeometry(rad, len, 6, 12),
+          px + dx * (len * 0.5 + 0.003), py + dy * (len * 0.5 + 0.003), pz + dz * (len * 0.5 + 0.003), -a, 0, splay));
+        px += dx * (len + 0.006); py += dy * (len + 0.006); pz += dz * (len + 0.006);
+      };
+      seg(c1, L1[i], r1);                                              // 近节
+      parts.push(xform(new THREE.SphereGeometry(r1 * 0.94, 8, 7), px, py, pz)); // 近侧指间关节
+      seg(c1 + c2, L2[i], r1 * 0.88);                                  // 中节
+      parts.push(xform(new THREE.SphereGeometry(r1 * 0.84, 8, 7), px, py, pz)); // 远侧指间关节
+      seg(c1 + c2 + c3, L3[i], r1 * 0.78);                             // 远节
+      // 指尖软垫（微扁）——指头有「肉」，不是圆棍截断
+      parts.push(xform(new THREE.SphereGeometry(r1 * 0.8, 8, 7), px, py, pz, 0, 0, 0, 1, 1.1, 0.85));
     }
-    // 拇指：从掌侧斜出
-    parts.push(xform(new THREE.SphereGeometry(0.0082, 6, 5), 0.036, -0.05, 0.013));
-    parts.push(xform(new THREE.CapsuleGeometry(0.0074, 0.034, 4, 8), 0.044, -0.07, 0.022, -0.5, 0, -0.55));
+    // 拇指两节：自鱼际斜出、向掌心对掌
+    parts.push(xform(new THREE.SphereGeometry(0.0086, 10, 8), 0.033, -0.052, 0.013));
+    parts.push(xform(new THREE.CapsuleGeometry(0.0071, 0.03, 6, 12), 0.0425, -0.066, 0.02, -0.42, 0, -0.58));
+    parts.push(xform(new THREE.SphereGeometry(0.0064, 8, 7), 0.0525, -0.0805, 0.0275));
+    parts.push(xform(new THREE.CapsuleGeometry(0.006, 0.021, 6, 12), 0.059, -0.09, 0.034, -0.6, 0, -0.66));
+    parts.push(xform(new THREE.SphereGeometry(0.0052, 8, 7), 0.0655, -0.0985, 0.0415, 0, 0, 0, 1, 1.1, 0.85));
     return merged(parts);
+  });
+}
+/** 左手：右手几何的真镜像（负缩放+翻转三角形绕向）——
+ *  旧方案两手共用同一几何靠旋转摆位，左手其实是「转过去的右手」，
+ *  拇指长在小指侧（分指手一做实立刻穿帮）。 */
+function mirroredHandGeo(curl = 'relax') {
+  return G('handMir_' + curl, () => {
+    const g = handGeo(curl).clone();
+    g.scale(-1, 1, 1);
+    // 负缩放翻面：逐三角交换 1/2 号顶点恢复绕向
+    for (const name of ['position', 'normal', 'uv']) {
+      const at = g.attributes[name];
+      if (!at) continue;
+      const it = at.itemSize;
+      for (let t = 0; t + 2 < at.count; t += 3) {
+        for (let k = 0; k < it; k++) {
+          const a = (t + 1) * it + k, b = (t + 2) * it + k;
+          const tmp = at.array[a]; at.array[a] = at.array[b]; at.array[b] = tmp;
+        }
+      }
+      at.needsUpdate = true;
+    }
+    g.computeVertexNormals();
+    return g;
   });
 }
 
@@ -1272,9 +1321,11 @@ export class Humanoid {
       const nkG = G('neckSkirt', () => {
         // 轮18：颈柱几何加宽（顶径 87→97mm）+ 下段更快铺进斜方肌——
         // 「大头顶细管」的对比消失；配合头组下移，裸颈段只剩喉那 2cm
+        // 轮19：整柱再 +8%（成人男颈横径 ~110mm）——face_a「大头细颈」终审否决项；
+        // 领筒/颌裙环/喉结同步扩径
         const prof = [
-          [0.0455, 0.105], [0.0485, 0.085], [0.0505, 0.06], [0.0505, 0.035],
-          [0.052, 0.012], [0.0575, -0.008], [0.067, -0.026], [0.083, -0.042], [0.104, -0.055],
+          [0.0491, 0.105], [0.0524, 0.085], [0.0545, 0.06], [0.0545, 0.035],
+          [0.0562, 0.012], [0.0621, -0.008], [0.0724, -0.026], [0.0896, -0.042], [0.1123, -0.055],
         ].map(([r, y2]) => new THREE.Vector2(r, y2));
         const g2 = new THREE.LatheGeometry(prof, 18);
         g2.scale(1, 1, 0.8); // 颈截面前后略薄（加宽后压回——颈前不许越过下巴）
@@ -1305,8 +1356,8 @@ export class Humanoid {
           // 头组局部（按 head.scale=1.16 重标；轮18 随颈柱加宽同步扩径——
           // 环径仍只比颈裙宽 2mm=颌影圈，不许退化成「导管颈后的灰板」）
           const prof = [
-            [0.0428, 0.0362], [0.0438, 0.0224], [0.0442, 0.0043],
-            [0.0438, -0.0087], [0.0426, -0.0164],
+            [0.0448, 0.0362], [0.0458, 0.0224], [0.0462, 0.0043],
+            [0.0458, -0.0087], [0.0446, -0.0164],
           ].map(([r, y2]) => new THREE.Vector2(r, y2));
           const g2 = new THREE.LatheGeometry(prof, 18);
           g2.scale(1, 1, 0.8);
@@ -1337,21 +1388,23 @@ export class Humanoid {
           const g2 = new THREE.SphereGeometry(0.012, 8, 6);
           g2.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g2.attributes.position.count * 3).fill(1.0), 3));
           return g2;
-        }), neckMat, 0, 0.672, 0.0368, 0.66, 0.9, 0.13));
+        }), neckMat, 0, 0.672, 0.0405, 0.66, 0.9, 0.13));
       }
     }
     // 轮18·斜方肌过渡：颈根—肩峰两道衣料包着的斜坡（capsule 斜置）——
-    // 头/肩/胸的连接不再是「领筒插在圆胸顶上」，正面剪影从颈根顺着斜方肌落到肩，
-    // 肩线读成成人的肩，颈也因此在视觉上「埋」进了躯干
+    // 头/肩/胸的连接不再是「领筒插在圆胸顶上」，正面剪影从颈根顺着斜方肌落到肩。
+    // 轮19：胶囊减径压扁放平（r58→42mm、倾角 1.18→1.30、竖向压 0.8）——
+    // 旧参数是两只骑在领口两侧的「肩球」（face_a 近景否决项），现在是贴着
+    // 肩线走的薄坡，剪影里只剩「斜方肌的坡度」，没有独立圆辊
     {
       const trapG = G('trapWedge', () => {
-        const g2 = new THREE.CapsuleGeometry(0.058, 0.112, 6, 10);
-        g2.scale(1, 1, 0.8);
+        const g2 = new THREE.CapsuleGeometry(0.042, 0.128, 6, 10);
+        g2.scale(1, 1, 0.72);
         return g2;
       });
       for (const s of [-1, 1]) {
-        const tp = mkMesh(trapG, torsoMat, s * 0.08 * shW, 0.568, -0.004, 1, 1, chD);
-        tp.rotation.z = s * 1.18;
+        const tp = mkMesh(trapG, torsoMat, s * 0.086 * shW, 0.552, -0.004, 1, 0.8, chD);
+        tp.rotation.z = s * 1.3;
         this.torso.add(tp);
       }
     }
@@ -1370,9 +1423,10 @@ export class Humanoid {
     const mkCollar = (mat, style = 'fold') => {
       // 轮18：领筒随加宽颈柱扩径 4mm、上移 4mm——颈裙与领筒之间不再留一圈「壕沟」，
       // 领口厚度环命名 collarRim 供 charshot 世界空间「颏-领口」断言取顶
-      this.torso.add(mkMesh(G('collarBand', () => new THREE.CylinderGeometry(0.0545, 0.072, 0.088, 16, 1, true)), mat, 0, 0.618, 0.004));
+      // 轮19：随 +8% 颈柱再扩 4.5mm
+      this.torso.add(mkMesh(G('collarBand', () => new THREE.CylinderGeometry(0.059, 0.0765, 0.088, 16, 1, true)), mat, 0, 0.618, 0.004));
       const rim = mkMesh(G('collarRim', () => {
-        const t = new THREE.TorusGeometry(0.0545, 0.0044, 6, 18);
+        const t = new THREE.TorusGeometry(0.059, 0.0044, 6, 18);
         t.rotateX(Math.PI / 2);
         return t;
       }), mat, 0, 0.662, 0.004);
@@ -1380,7 +1434,7 @@ export class Humanoid {
       this.torso.add(rim);
       if (style === 'fold') {
         // 翻领面：领筒外翻出的一圈坡面（2001 工装/衬衫的软翻领）
-        this.torso.add(mkMesh(G('collarFold', () => new THREE.CylinderGeometry(0.062, 0.09, 0.058, 16, 1, true)), mat, 0, 0.608, 0.004));
+        this.torso.add(mkMesh(G('collarFold', () => new THREE.CylinderGeometry(0.0665, 0.0945, 0.058, 16, 1, true)), mat, 0, 0.608, 0.004));
       }
     };
     if (D.lapel) {
@@ -1389,7 +1443,7 @@ export class Humanoid {
       const sv = mkMesh(shirtVGeo(), shirtMat, 0, 0.27, 0.104); sv.rotation.x = 0.1; this.torso.add(sv);
       mkCollar(shirtMat, 'band');       // 白衬衫领贴颈（领口厚度环=衬衫布缘）
       // 西装外领面：披在衬衫领外的一圈坡面（前低后高的驳领根）
-      this.torso.add(mkMesh(G('collarFoldSuit', () => new THREE.CylinderGeometry(0.066, 0.096, 0.06, 16, 1, true)), torsoMat, 0, 0.602, 0.002));
+      this.torso.add(mkMesh(G('collarFoldSuit', () => new THREE.CylinderGeometry(0.0705, 0.1005, 0.06, 16, 1, true)), torsoMat, 0, 0.602, 0.002));
     }
     if (D.shirtV) {
       const sv = mkMesh(shirtVGeo(), shirtMat, 0, 0.27, 0.102); sv.rotation.x = 0.1; this.torso.add(sv);
@@ -1484,7 +1538,9 @@ export class Humanoid {
     const glintMat = pick(Mtl('eyeGlintM', () => new THREE.MeshBasicMaterial({
       color: 0xd8e4e8, transparent: true, opacity: 0.85, depthWrite: false,
     })));
-    const eyeXoff = 0.028 + P.eyeX * 0.009;
+    // 轮19：瞳距按成人男模板重算——旧 0.028 下限世界瞳距 ~50mm（五官挤中心元凶），
+    // 抬到 0.0335..0.039 → 世界瞳距 60-70mm；skull 域 eyeNX 同步（除以 0.0882 换算）
+    const eyeXoff = 0.0335 + P.eyeX * 0.0055;
     const eyeYoff = 0.113 + (P.eyeH - 0.5) * 0.006; // 眼睛在头高一半处（婴儿化=眼太高）
     const eyeScl = 0.92 + P.eyeS * 0.12;
     this.eyeSclY = eyeScl;
@@ -1660,7 +1716,8 @@ export class Humanoid {
       // 湿唇件缩成贴床的一层薄壳，只贡献唇面湿高光与口裂缝，不再是浮在脸上的香肠
       this.mouthG.position.set(0, 0.0745, 0.0862 * HZ);
       this.mouthG.rotation.z = this.mouthBaseTilt;
-      this.mouthG.scale.set(1.02 * HX, 0.78, 0.62);
+      // 轮19：嘴加宽一档（1.02→1.14）——瞳距拉开后嘴不能还缩在中轴上
+      this.mouthG.scale.set(1.14 * HX, 0.78, 0.62);
       this.mouthG.add(mkMesh(lipsGeo(P), lipMat));
       this.mouthG.add(mkMesh(lipSeamGeo(P),
         pick(Mtl('lipSeam', () => new THREE.MeshStandardMaterial({ color: 0x301c18, roughness: 0.9 }))),
@@ -1848,13 +1905,15 @@ export class Humanoid {
     const limbScl = 0.94 + rnd() * 0.12;
     const mkArm = (side) => {
       const shoulder = new THREE.Group();
-      shoulder.position.set(0.198 * shW * side, 0.49 - this.gait.droop * 0.03 * side, 0);
+      shoulder.position.set(0.194 * shW * side, 0.49 - this.gait.droop * 0.03 * side, 0);
       this.torso.add(shoulder);
       // 袖山（去球关节读感）：斜切椭球顺着三角肌走向塌进肩线——
       // 不再是躯干旁边并排一颗光球，是袖管从肩缝里「长」出来的布肩
+      // 轮19：再压扁（0.74→0.66）+ 内塌 + 顺坡加斜（0.42→0.52）——正面剪影上
+      // 袖山融进斜方肌坡线，肩点不再各顶一颗独立球
       const capM = mkMesh(G('shoulderCap', () => new THREE.SphereGeometry(0.05, 14, 11)), torsoMat,
-        -0.014 * side, -0.024, 0, 1.02 * limbScl, 0.74, 0.86 * limbScl);
-      capM.rotation.z = 0.42 * side;
+        -0.02 * side, -0.028, 0, 0.96 * limbScl, 0.66, 0.86 * limbScl);
+      capM.rotation.z = 0.52 * side;
       shoulder.add(capM);
       // 袖管过肘 12mm（管-管重叠盖住缝球）：屈肘时张口被袖管自己的延伸接住
       shoulder.add(mkMesh(limbGeo(0.05, 0.0405, 0.312, 'upperArm', 0.1, { peak: 0.42, wrinkle: 0.002 }), torsoMat, 0, 0, 0, limbScl, 1, limbScl));
@@ -1893,10 +1952,12 @@ export class Humanoid {
       }
       const handMat = D.drift ? drift : D.gloves ? rubber : skin;
       const flat = D.tray && side < 0;
-      // 手整体收 8%：近景里旧手掌大过半张脸（人偶手元凶之一）
-      const hand = mkMesh(handGeo(flat ? 'flat' : 'relax'), handMat, 0, -0.252, 0.004, 0.92, 0.92, 0.92);
+      // 手整体收 8%：近景里旧手掌大过半张脸（人偶手元凶之一）。
+      // 轮19：左手换真镜像几何（拇指在拇指侧）——两手不再共用一只「转过去的右手」
+      const handG = side < 0 ? mirroredHandGeo(flat ? 'flat' : 'relax') : handGeo(flat ? 'flat' : 'relax');
+      const hand = mkMesh(handG, handMat, 0, -0.252, 0.004, 0.92, 0.92, 0.92);
       // 静息掌心朝腿（解剖静息位是半旋前），托盘手保持掌心向上的旧取向
-      hand.rotation.y = flat ? Math.PI : (side < 0 ? Math.PI - 1.2 : -1.2);
+      hand.rotation.y = flat ? Math.PI : (side < 0 ? 1.2 : -1.2);
       elbow.add(hand);
       return { shoulder, elbow, hand, fair };
     };
