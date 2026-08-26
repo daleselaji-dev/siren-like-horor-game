@@ -793,8 +793,10 @@ export function buildHotel(ctx) {
     // 钥匙柜（807 钥匙）
     box(M.ironDark, 9.5, F2 + 1.4, -10.5, 1.0, 1.2, 0.3);
     locations.keyCabinet = world(9.5, F2 + 1.4, -10.3);
-    // 行军床
+    // 行军床 + 床头的发条闹钟（值夜的人靠它掐点——现在给你用）
     box(M.clothWork, 14.5, F2 + 0.25, -10.3, 1.9, 0.3, 0.8);
+    box(M.brass, 15.35, F2 + 0.47, -10.3, 0.1, 0.14, 0.08);
+    locations.securityClock = world(15.35, F2 + 0.5, -10.1);
     // CRT 冷光
     addLight(0x9fd8e8, 6, 7, 15.2, F2 + 1.8, -7, 0.5);
     box(plateMat('保卫科', { w: 160, h: 64, bg: '#3a3a3a', fg: '#d8d0b8', font: 0.44 }), 8.16, F2 + 2.2, -4.4, 0.05, 0.35, 0.8);
@@ -1143,6 +1145,9 @@ export function buildHotel(ctx) {
     // 水槽 + 皂
     box(M.steel, 51, 0.5, -2.4, 1.2, 1.0, 0.8);
     colliders.push({ minX: hx + 50.4, maxX: hx + 51.6, minZ: hz - 2.8, maxZ: hz - 2.0, minY: hb, maxY: hb + 1.0, noSightBlock: true });
+    // 贝灰袋（理骨员刷骨用的灰——也能倒一道界）
+    box(M.salt, 51.9, 1.13, -2.35, 0.5, 0.36, 0.4, 0.2);
+    locations.limeBag = world(51.9, 1.1, -2.1);
     // 挂钩上的胶皮围裙（空的三副）
     for (let i = 0; i < 3; i++) {
       box(M.ironDark, 52.4 + i * 1.1, 2.3, 0.9, 0.04, 0.3, 0.04);

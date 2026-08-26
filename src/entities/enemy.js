@@ -15,6 +15,15 @@ function angleWrap(a) {
   return a;
 }
 
+/** 点到线段距离（XZ 平面）——贝灰线判定 */
+function distToSeg(px, pz, l) {
+  const dx = l.x2 - l.x1, dz = l.z2 - l.z1;
+  const len2 = dx * dx + dz * dz;
+  let t = len2 > 0 ? ((px - l.x1) * dx + (pz - l.z1) * dz) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (l.x1 + dx * t), pz - (l.z1 + dz * t));
+}
+
 export class Enemy {
   /**
    * def: {
@@ -86,6 +95,9 @@ export class Enemy {
     this.gurgleT = 0;           // 追击喉音计时
     this.searchLook = 0;        // 搜索张望计时
     this.searchRing = 0;        // 搜索圈数（越搜越大）
+    this.stunT = 0;             // 镁光定身剩余秒
+    this.stunDur = 0;
+    this.limeStall = 0;         // 贝灰线前的僵持秒
 
     // 参数
     this.fov = (def.fov ?? 75) * Math.PI / 180;
@@ -125,6 +137,8 @@ export class Enemy {
     this.searchLook = 0;
     this.searchRing = 0;
     this.searchTarget = null;
+    this.stunT = 0;
+    this.limeStall = 0;
     this.syncBody(0);
   }
 
@@ -158,10 +172,10 @@ export class Enemy {
     const diff = Math.abs(angleWrap(angTo - this.yaw));
     const halfFov = this.fov / 2 * (this.state === 'ALERT' ? 1.5 : 1);
     if (diff > halfFov) return 0;
-    // 遮挡
+    // 遮挡（地形采样带自身楼层参考——多层楼内不许把楼上楼板当地形）
     _v1.set(this.pos.x, this.pos.y + 1.55, this.pos.z);
     _v2.copy(player.pos); _v2.y += player.crouching ? 0.8 : 1.5;
-    if (!hasLineOfSight(_v1, _v2, this.world.colliders, this.world.heightAt)) return 0;
+    if (!hasLineOfSight(_v1, _v2, this.world.colliders, (x, z) => this.world.heightAt(x, z, this.pos.y))) return 0;
     // 越近越清楚
     return Math.min(1, (1 - dist / range) * 1.6 + 0.15);
   }
@@ -230,6 +244,19 @@ export class Enemy {
       this._eye = 4;
       this.body.setEyeIntensity(4);
       this.body.animate('grab', dt, 1);
+      this.syncBody(dt);
+      return;
+    }
+
+    // ---- 镁光定身：看见闪光的人捂着眼，愣在原地 ----
+    if (this.stunT > 0) {
+      this.stunT -= dt;
+      this.visibilityOfPlayer = 0;
+      const recoil = (this.stunDur - this.stunT) < 0.8;
+      this.body.animate(recoil ? 'backstep' : 'idle', dt, recoil ? 1.2 : 0.4);
+      this.yaw += Math.sin(this.stateTimer * 0.9) * dt * 0.3; // 晃着脑袋等视野回来
+      this._eye = 0.15; // 眼点几乎熄灭——看不见
+      this.body.setEyeIntensity(0.15);
       this.syncBody(dt);
       return;
     }
@@ -311,7 +338,25 @@ export class Enemy {
         } else {
           this.loseTimer += dt;
         }
-        this.moveToward(this.lastSeenPos.x, this.lastSeenPos.z, this.chaseSpeed, dt);
+        // 贝灰线：追到界前站定——它们对「界」比对你更认真
+        const lime = this.limeAhead(this.lastSeenPos.x, this.lastSeenPos.z);
+        if (lime) {
+          anim = 'alert';
+          this.faceToward(this.lastSeenPos.x, this.lastSeenPos.z, dt, 6);
+          this.limeStall += dt;
+          if (this.limeStall > 2.8) {
+            // 僵持够久：认了。只肯在界这一侧筛
+            this.limeStall = 0;
+            this.lastSeenPos.copy(this.pos);
+            this.state = 'SEARCH'; this.stateTimer = 0;
+            this.searchTotal = 0; this.searchRing = 0; this.searchLook = 0;
+            this.searchTarget = null;
+            break;
+          }
+        } else {
+          this.limeStall = Math.max(0, this.limeStall - dt);
+          this.moveToward(this.lastSeenPos.x, this.lastSeenPos.z, this.chaseSpeed, dt);
+        }
         // 追击声：侍应无声（只有托盘沉积面的细响），镇民是喘着追
         if (!this.def.mute) {
           this.gurgleT -= dt;
@@ -320,8 +365,8 @@ export class Enemy {
             audio?.chaseGurgle?.(distToPlayer);
           }
         }
-        // 抓住玩家（须在同一层）
-        if (distToPlayer < 1.15 && Math.abs(player.pos.y - this.pos.y) < 1.7 && !player.dead) ctx.onCaught(this);
+        // 抓住玩家（须在同一层，且没被界拦住）
+        if (!lime && distToPlayer < 1.15 && Math.abs(player.pos.y - this.pos.y) < 1.7 && !player.dead) ctx.onCaught(this);
         // 丢失目标
         if (this.loseTimer > 5.5) {
           this.state = 'SEARCH'; this.stateTimer = 0;
@@ -339,6 +384,9 @@ export class Enemy {
           anim = 'idle';
           this.yaw += Math.sin(this.stateTimer * 1.35) * dt * 1.15; // 缓慢左右扫头
           if (this.searchLook <= 0) this.pickSearchPoint();
+        } else if (this.limeAhead(this.searchTarget.x, this.searchTarget.z)) {
+          anim = 'idle';
+          this.pickSearchPoint(); // 这一点在界外——换一处筛
         } else {
           anim = 'walk'; animSpeed = 0.75;
           const left = this.moveToward(this.searchTarget.x, this.searchTarget.z, this.walkSpeed * 1.2, dt);
@@ -438,6 +486,51 @@ export class Enemy {
     this.stateTimer = 0;
     this.suspectMeter = 0.5;
     this.suspectPos.copy(pos);
+  }
+
+  /** 镁光定身：看见闪光——捂眼、断追踪 */
+  flashStun(sec) {
+    if (!this.enabled || this.grabbing) return;
+    this.stunT = this.stunDur = Math.max(this.stunT, sec);
+    this.stateTimer = 0;
+    if (this.state === 'ALERT' || this.state === 'SUSPECT') {
+      // 视野白掉的那几秒你跑了——醒来后只会围着自己站的地方筛
+      if (this.state === 'SUSPECT') this.lastSeenPos.copy(this.pos);
+      this.state = 'SEARCH';
+      this.searchTotal = 0; this.searchRing = 0;
+      this.searchLook = 0; this.searchTarget = null;
+      this.loseTimer = 0;
+      this.suspectMeter = 0;
+    }
+  }
+
+  /** 闹钟诱饵：注意力被钓到一点——绕着它一圈圈筛 */
+  lureTo(x, z) {
+    if (!this.enabled || this.grabbing || this.stunT > 0) return;
+    if (this.state === 'ALERT') {
+      if (this.visibilityOfPlayer > 0) return; // 正看着你的人骗不走
+      this.lastSeenPos.set(x, this.pos.y, z);
+      return;
+    }
+    this.lastSeenPos.set(x, this.pos.y, z);
+    this.state = 'SEARCH';
+    this.stateTimer = 0; this.searchTotal = 0; this.searchRing = 0;
+    this.searchLook = 0; this.searchTarget = null;
+    this.suspectMeter = 0;
+  }
+
+  /** 贝灰线判定：脚下或去路一步之内有界 → 返回该线 */
+  limeAhead(tx, tz) {
+    const lines = this.world.dynamic.limeLines;
+    if (!lines || !lines.length) return null;
+    const dx = tx - this.pos.x, dz = tz - this.pos.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const nx = this.pos.x + (dx / d) * 0.6, nz = this.pos.z + (dz / d) * 0.6;
+    for (const l of lines) {
+      if (Math.abs(l.y - this.pos.y) > 1.6) continue;
+      if (distToSeg(nx, nz, l) < 0.5 || distToSeg(this.pos.x, this.pos.z, l) < 0.42) return l;
+    }
+    return null;
   }
 
   syncBody(dt) {

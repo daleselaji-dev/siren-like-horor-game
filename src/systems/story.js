@@ -694,6 +694,75 @@ export class Story {
         g.hud.subtitle('你拨了厨房的内线，把听筒搁在台上。', 4);
       },
     });
+
+    // —— 反击工具（有限资源；都不是武器，只买时间） ——
+    add({
+      id: 'toolCamera', pos: L.photoCamera, r: 2.0, prompt: '取下三脚架上的海鸥牌相机',
+      cond: () => !F.tookCamera,
+      act: () => {
+        F.tookCamera = true;
+        g.tools.pickupCamera(2);
+        g.audio.blip(700, 0.08, 0.15);
+        g.hud.subtitle('皮腔相机沉得压手。皮套里还塞着两颗镁光泡。', 4.5);
+        g.hud.subtitle('看见光的东西会愣住。愣多久——看它是什么。', 5, 'song');
+        g.hud.objective('按 F 打闪：定住看见光的人');
+      },
+    });
+    add({
+      id: 'toolBulbs1', pos: L.darkroom, r: 1.8, prompt: '翻检显影台',
+      cond: () => !F.tookDarkBulbs,
+      act: () => {
+        F.tookDarkBulbs = true;
+        g.tools.addBulbs(2);
+        g.audio.paper();
+        g.hud.subtitle('显影盘底下压着两颗镁光泡，用报纸包着。', 4);
+        g.hud.subtitle('报纸是一九九八年的。头版整版是填湾竣工。', 4.5);
+      },
+    });
+    add({
+      id: 'toolBulbs2', pos: L.dormBattery, r: 1.8, prompt: '拉开五斗橱',
+      cond: () => !F.tookDormBulbs,
+      act: () => {
+        F.tookDormBulbs = true;
+        g.tools.addBulbs(2);
+        g.audio.paper();
+        g.hud.subtitle('大新照相馆的纸袋。两颗镁光泡，还有一张全家福的取件单。', 4.5);
+        g.hud.subtitle('取件日期空着。', 3.5, 'song');
+      },
+    });
+    add({
+      id: 'toolClock1', pos: L.dormClock, r: 1.8, prompt: '拿走发条闹钟',
+      cond: () => !F.tookClock1,
+      act: () => {
+        F.tookClock1 = true;
+        g.tools.addClocks(1);
+        g.audio.blip(1400, 0.05, 0.05);
+        g.hud.subtitle('发条闹钟。铃帽擦得很亮，像每天都有人上弦。', 4.5);
+        g.hud.objective('按 G 放闹钟：它替你在别处响');
+      },
+    });
+    add({
+      id: 'toolClock2', pos: L.securityClock, r: 1.8, prompt: '拿走值班闹钟',
+      cond: () => !F.tookClock2,
+      act: () => {
+        F.tookClock2 = true;
+        g.tools.addClocks(1);
+        g.audio.blip(1400, 0.05, 0.05);
+        g.hud.subtitle('行军床头的闹钟。指针停在十一点四十七分。', 4.5);
+      },
+    });
+    add({
+      id: 'toolLime', pos: L.limeBag, r: 1.9, prompt: '拎起贝灰袋',
+      cond: () => !F.tookLime,
+      act: () => {
+        F.tookLime = true;
+        g.tools.addLime(3);
+        g.audio.paper();
+        g.hud.subtitle('理骨用的贝灰。烧过的壳，磨得极细，呛喉咙。', 4.5);
+        g.hud.subtitle('袋口用红绳扎着三道。够倒三条界。', 4, 'song');
+        g.hud.objective('按 V 倒灰线：守规矩的东西不肯踩过去');
+      },
+    });
   }
 
   // ---------- 触发区 ----------

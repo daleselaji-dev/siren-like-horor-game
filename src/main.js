@@ -15,6 +15,7 @@ import { Humanoid } from './entities/humanoid.js';
 import { SightjackSystem } from './systems/sightjack.js';
 import { StealthSystem } from './systems/stealth.js';
 import { CRTSystem } from './systems/crt.js';
+import { ToolsSystem } from './systems/tools.js';
 import { Agenda } from './systems/agenda.js';
 import { Story, NOTES } from './systems/story.js';
 import { HUD } from './ui/hud.js';
@@ -200,11 +201,12 @@ const sightjack = new SightjackSystem(engine, player, audio);
 const stealth = new StealthSystem(world, player);
 const crt = new CRTSystem(engine, world);
 crt.gainLight = sky.hemi; // 监控头自动增益用
+const tools = new ToolsSystem({ scene: engine.scene, engine, player, world, stealth, hud, audio, enemies });
 
 const game = {
   scene: engine.scene, engine, world, player, hud, audio,
   enemies, byId, viewers, watchers, floaters, gaze, guest,
-  sightjack, stealth, crt, ocean, sky, M,
+  sightjack, stealth, crt, tools, ocean, sky, M,
   state: 'TITLE', // TITLE | PLAY | NOTE | PAUSE | ENDED
   openNote(note) {
     hud.showNote(note);
@@ -309,6 +311,11 @@ function handleInput(dt) {
     return; // 视奸中不处理互动
   }
 
+  // 反击工具：F 镁光闪 / G 发条闹钟 / V 贝灰线
+  if (input.justPressed('KeyF')) tools.flash();
+  if (input.justPressed('KeyG')) tools.placeClock();
+  if (input.justPressed('KeyV')) tools.pourLime();
+
   // 互动
   const it = story.findInteractable();
   hud.prompt(it ? it.prompt : null);
@@ -385,6 +392,7 @@ function loop() {
 
     // 系统
     stealth.update(dt, enemies);
+    tools.update(dt);
     agenda.update(dt);
     story.update(dt);
     sightjack.update(dt, elapsed);
@@ -397,8 +405,8 @@ function loop() {
     rain.update(dt, engine.renderPass.camera, world);
     updateLightBudget(dt, engine.camera.position);
 
-    // 远处无声闪电 → 后处理闪光；数秒后隔海传来一声闷雷
-    engine.finalPass.uniforms.uFlash.value = sky.flash;
+    // 远处无声闪电 + 镁光泡 → 后处理闪光；数秒后隔海传来一声闷雷
+    engine.finalPass.uniforms.uFlash.value = sky.flash + tools.flashVal;
     if (sky.thunderQueued) {
       sky.thunderQueued = 0;
       audio.thunderDistant(2.5 + Math.random() * 2);
@@ -464,5 +472,5 @@ loop();
 window.__game = {
   engine, player, world, ocean, sky, input, enemies, byId, dog, birds, watchers,
   floaters, gaze, guest, crt, agenda, M,
-  sightjack, stealth, story, hud, audio, game,
+  sightjack, stealth, tools, story, hud, audio, game,
 };

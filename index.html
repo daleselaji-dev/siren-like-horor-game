@@ -268,6 +268,28 @@
       100% { box-shadow: 0 0 0 rgba(210,150,60,0); color: #c8a468; }
     }
 
+    /* 反击工具栏（左下角：拿到过什么才显示什么） */
+    #tools-bar {
+      position: fixed; left: 4%; bottom: 10%; z-index: 20; pointer-events: none;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    #tools-bar .tool-item {
+      font-size: 12px; letter-spacing: .18em; color: #97a6a4;
+      background: rgba(4,6,8,.5); border: 1px solid rgba(120,140,138,.22);
+      padding: 5px 12px; border-radius: 2px; text-shadow: 0 1px 2px #000;
+      transition: opacity .4s;
+    }
+    #tools-bar .tool-item.empty { color: #55605e; opacity: .6; }
+    #tools-bar .tool-item kbd {
+      font-family: monospace; color: #cdb87e; border: 1px solid #5a4f36;
+      padding: 0 5px; border-radius: 3px; margin-right: 8px;
+    }
+    #tools-bar .tool-item.used { animation: toolUsed .5s ease; }
+    @keyframes toolUsed {
+      0% { border-color: rgba(230,220,180,.85); color: #e8e0c4; }
+      100% { border-color: rgba(120,140,138,.22); color: #97a6a4; }
+    }
+
     /* 检查点提示 */
     #checkpoint-toast {
       position: fixed; left: 4%; bottom: 6%; z-index: 20; pointer-events: none;
@@ -419,6 +441,7 @@
   <div id="objective-toast"><div class="obj-label">目 标</div><div class="obj-rule"></div><div class="obj-text"></div></div>
   <div id="interact-prompt"><kbd>E</kbd><span></span></div>
   <div id="stealth-indicator">— 潜 行 —</div>
+  <div id="tools-bar"></div>
   <div id="checkpoint-toast">潮位记住了你</div>
   <div id="agenda-indicator"></div>
 
@@ -451,7 +474,8 @@
     <div id="pause-notes"></div>
     <div id="pause-controls">
       <kbd>WASD</kbd> 移动 · <kbd>鼠标</kbd> 视角 · <kbd>Shift</kbd> 潜行 · <kbd>E</kbd> 互动<br/>
-      <kbd>Q</kbd>/<kbd>Tab</kbd> 视奸（切入他者视野） · <kbd>Esc</kbd> 暂停
+      <kbd>Q</kbd>/<kbd>Tab</kbd> 视奸（切入他者视野） · <kbd>Esc</kbd> 暂停<br/>
+      <kbd>F</kbd> 镁光闪（定住看见光的） · <kbd>G</kbd> 发条闹钟（响给别人听） · <kbd>V</kbd> 贝灰线（划一道界）
     </div>
   </div>
 
