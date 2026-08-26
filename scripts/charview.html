@@ -91,6 +91,12 @@ tick();
 window.__names = figures.map((f) => f.name);
 // 轮17 比例铁律断言口：每个活体角色的数值化人体测量（米）
 window.__metrics = figures.map((f) => (f.h ? { name: f.name, ...f.h.metrics } : null));
+// 轮18 渲染后世界空间测量口：逐顶点过 matrixWorld 实测（颏底/领口顶/露颈段/颈头宽比）——
+// 断言测的就是画面里那段颈，不再是内部骨骼公式
+window.__measure = (i) => {
+  const f = figures[i];
+  return f.h ? { name: f.name, ...f.h.measureWorld() } : null;
+};
 const moveLights = (x) => {
   key.position.set(x + 2.5, 3.5, 3.5);
   key.target.position.set(x, 1.2, 0);

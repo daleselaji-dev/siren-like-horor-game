@@ -55,23 +55,23 @@ export async function run(page, h) {
   const bi = await page.evaluate(() => {
     const g = window.__game;
     const bus = g.world.dynamic.bus;
-    let drops = 0, meshes = 0, wheel = 0, hands = 0;
+    let drops = 0, meshes = 0, wheel = 0, driverMeshes = 0;
     bus.traverse((o) => {
       if (!o.isMesh) return;
       meshes++;
       if (o.name === 'busShieldDrops') drops++;
       const hex = o.material?.color?.getHex?.();
       if (hex === 0x454c54) wheel++;
-      if (hex === 0x8a6f56) hands++;
     });
-    return { drops, meshes, wipers: g.world.dynamic.busWipers.length, wheel, hands };
+    g.world.dynamic.busDriver?.traverse((o) => { if (o.isMesh) driverMeshes++; });
+    return { drops, meshes, wipers: g.world.dynamic.busWipers.length, wheel, driverMeshes };
   });
   console.log('[verify] r17 bus:', JSON.stringify(bi));
   assert(bi.drops === 1, 'windshield raindrop layer missing');
   assert(bi.wipers === 2, 'wipers missing');
   assert(bi.meshes > 150, 'bus interior too sparse: ' + bi.meshes);
   assert(bi.wheel >= 5, 'steering wheel missing: ' + bi.wheel);  // 盘缘+三辐条+中毂
-  assert(bi.hands === 2, 'driver hands missing: ' + bi.hands);
+  assert(bi.driverMeshes >= 5, 'baked humanoid driver missing: ' + bi.driverMeshes); // 轮18：真人形司机
 
   const HO = await page.evaluate(() => {
     const o = window.__game.world.dynamic.hotelInfo.origin;

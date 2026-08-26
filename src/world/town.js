@@ -7,6 +7,7 @@ import { Batcher, GEO } from './batcher.js';
 import { mulberry32 } from './textures.js';
 import { makeLightCone } from './materials.js';
 import { buildHotel, plateMat } from './hotel.js';
+import { bakeFigure, poseAs } from '../entities/humanoid.js';
 
 // ---------------- 地形 ----------------
 
@@ -1152,8 +1153,9 @@ export function buildTown(scene, M) {
       // 司机背影（他没熄火，等的不是你）/乘客椅背两排/顶棚扶手杆
       {
         const darkM = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.85 });
-        const seatM = new THREE.MeshStandardMaterial({ color: 0x2e323a, roughness: 0.95 });
-        const drvM = new THREE.MeshStandardMaterial({ color: 0x1f2227, roughness: 0.98 });
+        // 轮18·舱内配色分层：椅面换洗旧墨绿人造革（2001 长途车的椅色）——
+        // 与炭灰仪表台/土黄顶棚/暗红过道胶条拉开三个色相，舱内不再是一锅灰
+        const seatM = new THREE.MeshStandardMaterial({ color: 0x39463c, roughness: 0.93 });
         mkBox(new THREE.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.97 }),
           0, 0.74, 0, 8.2, 0.06, 2.2);                               // 车内地板（低视线不能穿到车底）
         mkBox(new THREE.MeshStandardMaterial({ color: 0x4a2622, roughness: 0.95 }),
@@ -1240,46 +1242,25 @@ export function buildTown(scene, M) {
         col.rotation.z = 1.0;
         bus.add(col);
         mkBox(seatM, 2.88, 1.14, 0.55, 0.13, 0.56, 0.5);             // 司机座矮背（90年代客车——越肩能读到盘）
-        // 司机背影躯干（轮17三稿）：舱内近景里他不能是一块平板墙——
-        // 上收下阔的椭圆筒（肩斜）+ 两肩圆头 + 立领，背影读成「穿外套的人」
-        const dtorso = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.205, 0.62, 12), drvM);
-        dtorso.position.set(3.0, 1.45, 0.55);
-        dtorso.scale.set(0.72, 1, 1.18);
-        bus.add(dtorso);
-        for (const s of [-1, 1]) {
-          const sh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), drvM);
-          sh.position.set(3.0, 1.72, 0.55 + s * 0.155);
-          sh.scale.set(0.85, 0.75, 1);
-          bus.add(sh);
-        }
-        const dhead = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), drvM);
-        dhead.position.set(3.02, 1.95, 0.55);
-        dhead.scale.set(0.92, 1.08, 0.98);
-        bus.add(dhead);
-        // 司机的旧解放帽（帽檐压着后颈线——不能是一颗光球）
-        const dcap = new THREE.Mesh(new THREE.CylinderGeometry(0.118, 0.125, 0.07, 10), darkM);
-        dcap.position.set(3.02, 2.02, 0.55);
-        bus.add(dcap);
-        const dneck = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.06, 0.14, 8), drvM);
-        dneck.position.set(3.02, 1.78, 0.55);
-        bus.add(dneck);
-        // 外套立领（环着颈根一圈厚边——背影的「衣领线」）
-        const dcol = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.022, 6, 12), darkM);
-        dcol.position.set(3.01, 1.76, 0.55);
-        dcol.rotation.x = Math.PI / 2;
-        bus.add(dcol);
-        // 司机双臂扶盘（「有人在开这台车」的最强证物）：小臂от肩头斜下探到盘缘十点/两点位
-        for (const az of [0.38, 0.72]) {
-          const arm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.062, 0.062), drvM);
-          arm.position.set(3.16, 1.53, az);
-          arm.rotation.z = -0.32;
-          arm.rotation.y = (az < 0.55 ? -1 : 1) * 0.22;
-          bus.add(arm);
-          const hand = new THREE.Mesh(new THREE.SphereGeometry(0.038, 8, 6),
-            new THREE.MeshStandardMaterial({ color: 0x8a6f56, roughness: 0.85 }));
-          hand.position.set(3.3, 1.485, az < 0.55 ? 0.345 : 0.755);
-          hand.scale.set(1.15, 0.8, 1);
-          bus.add(hand);
+        // 司机（轮18）：灰筒假人废除——与镇民同一套 humanoid 骨相烘焙成静态扶盘姿：
+        // 制服外套+大檐帽，双手前伸扶到盘缘，头微低看路。bakeFigure 按材质合并成
+        // 少量网格（制服布/皮肤/帽体/领口各自分层），舱内近景读成「一个真的司机」
+        {
+          const driver = bakeFigure(M, { role: 'driver', seed: 20114 }, (h) => {
+            poseAs('sit')(h);
+            h.armL.shoulder.rotation.x = -0.92; h.armL.elbow.rotation.x = -0.3;
+            h.armR.shoulder.rotation.x = -0.78; h.armR.elbow.rotation.x = -0.42;
+            h.armL.shoulder.rotation.z = -0.1; h.armR.shoulder.rotation.z = 0.14;
+            h.neck.rotation.x = 0.1;
+            h.torso.rotation.x = 0.08;
+            h.updateJointFairings();
+            h.group.updateMatrixWorld(true);
+          });
+          driver.name = 'busDriver';
+          driver.position.set(2.94, 0.47, 0.55);
+          driver.rotation.y = Math.PI / 2;
+          bus.add(driver);
+          dynamic.busDriver = driver;
         }
         // 轮17：椅背有缝线槽/包边，头枕罩白椅套（2001 长途车标配·洗旧的灰白——
         // 太白的布贴着舱灯会顶穿泛光阈值），坐垫有厚度与前缘滚边
