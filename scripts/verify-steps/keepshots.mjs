@@ -64,10 +64,28 @@ export async function run(page, h) {
   await look('18_lobby_desk', -2, -47, -10, -52, 3.5);
   await look('19_lobby_up', -4, -50, -4, -46, 3.5, 0.5);
   await look('20_banquet_stage', -13, -58, -16.5, -64.6, 3.5);
+  // 席面满摆近景（轮9）：骨碟/倒扣碗/绿瓶/暖瓶——都摆好了，人还没「到」
+  const bt = await page.evaluate(() => {
+    const t = window.__game.world.dynamic.banquetTables[1];
+    return { x: t.x, z: t.z };
+  });
+  await look('20b_banquet_table_close', bt.x + 1.9, bt.z + 1.4, bt.x, bt.z, 3.5, -0.34);
   await look('21_service_dado', -9, -65.5, 2, -65.5, 3.5);
   await look('22_stairwell', 8.2, -54.6, 11.5, -56.6, 3.5);
   await look('23_security_9crt', 7.5, -62, 10.5, -66, 6.9);
+  // 配电间保险丝板（轮11 箱庭）：三只瓷座各管一路
+  const fp = await page.evaluate(() => {
+    const p = window.__game.world.locations.fusePanel;
+    return { x: p.x, z: p.z };
+  });
+  await look('23b_fuse_panel', fp.x, fp.z + 1.3, fp.x, fp.z, 3.5, -0.06);
   await look('24_suite_807_bride', -12, -60, -13.5, -64.6, 10.3);
+  // 2F 棋牌室：牌桌上的手提录音机（轮11 箱庭）——按键停在半局
+  const rc = await page.evaluate(() => {
+    const p = window.__game.world.locations.recorder;
+    return { x: p.x, z: p.z };
+  });
+  await look('24b_mahjong_recorder', rc.x + 1.4, rc.z + 1.2, rc.x, rc.z, 6.9, -0.5);
 
   // ---------- D. 海洋馆（巨物厅 + 处理间） ----------
   await look('25_skeleton_wide', 37, -46, 44, -52, 3.5);
@@ -262,6 +280,18 @@ export async function run(page, h) {
     g.game.state = 'PLAY';
     g.guest.reset();
   });
+
+  // ---------- I. 幻潮面（轮12 里世界）：悬空的海 / 鱼影 / 缆绳浮子 / 泡透的街 ----------
+  // 大鱼影停到镇心上空（r→0 = 原地悬停），仰拍那层没有水的海
+  await page.evaluate(() => {
+    const g = window.__game;
+    const td = g.world.dynamic.leakState.tide;
+    td.giant.cx = 2; td.giant.cz = -9; td.giant.r = 0.01;
+    g.world.updateFx(520);
+  });
+  await look('48_leak_phantom_tide', 2, -2, 2, -30, undefined, 1.08);
+  await look('49_leak_float_ropes', 2, -6, -4, -14, undefined, 0.55);
+  await look('50_leak_wet_street', 12, -4, -2, -20, undefined, -0.12);
 
   console.log('[verify] keepshots done');
 }
