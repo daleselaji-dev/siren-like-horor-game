@@ -1064,6 +1064,39 @@ export function wallpaperTexture(seed = 331, size = 512) {
   }, 1.0);
 }
 
+/** 内墙漆面（营业中的酒店）：乳白辊涂 + 烟熏浮渍 + 磕碰划痕 + 发丝裂——旧，但没塌 */
+export function paintedWallTexture(seed = 335, size = 512) {
+  const fbm = makeFbm(seed, 5);
+  const ridge = makeRidged(seed + 7, 4);
+  return buildMaps(size, (u, v, out) => {
+    // 辊涂肌理：细密各向同性起伏（灯一斜照就读出来）
+    const roller = fbm(u * 22, v * 22);
+    // 大片云状变色：烟熏与岁月不均——幅度小、面积大
+    const cloud = fbm(u * 1.4 + 5, v * 1.4 + 11);
+    let r = 208, g = 200, b = 182;
+    const tint = (cloud - 0.5) * 28;
+    r += tint; g += tint * 0.9; b += tint * 0.6;
+    // 烟渍云（暖褐）：几十年香烟和开水房的汽——淡淡一层就够
+    const smoke = clamp01((fbm(u * 2.2 + 9, v * 2.2 + 3) - 0.62) * 2.6);
+    r = r * (1 - smoke * 0.1) + smoke * 20;
+    g = g * (1 - smoke * 0.13) + smoke * 15;
+    b = b * (1 - smoke * 0.17) + smoke * 8;
+    // 磕碰划痕：稀疏横向暗擦痕（行李车/椅背磕的）
+    const scuff = clamp01((ridge(u * 2.5, v * 14) - 0.9) * 9) *
+      clamp01((fbm(u * 3 + 17, v * 3 + 6) - 0.58) * 4);
+    r *= 1 - scuff * 0.26; g *= 1 - scuff * 0.26; b *= 1 - scuff * 0.24;
+    // 发丝裂：极稀的细线（漆面裂，不是墙体裂——密了会读成大理石纹）
+    const crack = clamp01((ridge(u * 1.8 + 4, v * 1.8 + 8) - 0.982) * 40) *
+      clamp01((fbm(u * 1.1 + 23, v * 1.1 + 14) - 0.5) * 5);
+    r *= 1 - crack * 0.22; g *= 1 - crack * 0.22; b *= 1 - crack * 0.2;
+    const grain = (fbm(u * 9 + 3, v * 9 + 7) - 0.5) * 7;
+    out[0] = r + grain; out[1] = g + grain; out[2] = b + grain;
+    out[3] = clamp01(0.6 + (roller - 0.5) * 0.12 - crack * 0.12 - scuff * 0.04);
+    // 半光调和漆：底子微亮，烟渍/擦痕处发乌
+    out[4] = clamp01(0.62 + roller * 0.1 + smoke * 0.12 + scuff * 0.15);
+  }, 1.0);
+}
+
 /** 矿棉吊顶板：0.6m T 型龙骨格 + 针孔肌理 + 板边水渍圈（2.4m 一周期=4×4 板） */
 export function ceilingTexture(seed = 345, size = 512) {
   const fbm = makeFbm(seed, 4);
@@ -1445,6 +1478,7 @@ export function buildTextureSet(lowspec = false) {
     carpet: carpetTexture(311, [98, 18, 16], mid),
     marble: marbleTexture(321, mid),
     wallpaper: wallpaperTexture(331, mid),
+    paintedWall: paintedWallTexture(335, mid),
     tile: tileTexture(341, mid),
     ceiling: ceilingTexture(345, mid),
     veneer: veneerTexture(351, mid),

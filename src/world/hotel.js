@@ -216,7 +216,8 @@ export function buildHotel(ctx) {
   }
 
   // 外墙（瓷砖）——含全部窗洞
-  const TILE = M.tile, PLA = M.plaster, WP = M.wallpaper;
+  // 内墙画风区间：前场 PLA=乳白调和漆（营业中的旧），后勤/楼梯间 SVC=冷灰漆+机关绿墙裙
+  const TILE = M.tile, PLA = M.hotelWall, SVC = M.serviceWall, WP = M.wallpaper;
   // 北立面 z=11：大堂玻璃门区 x -6..6 留空(1F)，宴会厅窗、东翼窗
   wallX(TILE, -17, -6, 11, 0, F2, [
     { from: -15.5, to: -13, top: 2.6, sill: 0.9 }, { from: -12, to: -9.5, top: 2.6, sill: 0.9 },
@@ -321,6 +322,63 @@ export function buildHotel(ctx) {
     locations.hotelEntrance = world(0, 0.5, 12);
   }
 
+  // ================= 门斗（风除室）：外门与大堂之间的阈限一格 =================
+  // 低吊顶把人压一口气，再放进六米挑空的大堂——酒店的第一道「预先空间」。
+  // 伞架里三把没人回来取的伞；行李车上一只旧箱；地垫的字磨得只剩个轮廓。
+  {
+    const VZ1 = 8.6, VZ2 = 11, VH = 2.5;
+    // 低吊顶（顶面从二层回廊可见——门斗是大堂里的一只盒子）
+    slabRect(-3.6, VZ1, 3.6, VZ2, VH, null, { walk: false });
+    // 红漆木饰面侧壁（与总台同一副漆——门斗就是柜台的延伸）
+    wallZ(M.veneerRed, VZ1, VZ2, -3.6, 0, VH);
+    wallZ(M.veneerRed, VZ1, VZ2, 3.6, 0, VH);
+    // 内侧玻璃隔断：黄铜框，中缝常开 1.6m
+    for (const [gx, gw] of [[-2.2, 2.8], [2.2, 2.8]]) {
+      box(M.shopGlass, gx, 1.25, VZ1, gw, 2.3, 0.05);
+      colliders.push({
+        minX: hx + gx - gw / 2, maxX: hx + gx + gw / 2,
+        minZ: hz + VZ1 - 0.08, maxZ: hz + VZ1 + 0.08,
+        minY: hb, maxY: hb + 2.4, noSightBlock: true,
+      });
+    }
+    box(M.shopGlass, 0, 2.32, VZ1, 1.56, 0.26, 0.04); // 门顶亮子
+    for (const px of [-3.55, -0.8, 0.8, 3.55]) {
+      box(M.brass, px, 1.25, VZ1, 0.09, 2.5, 0.09);
+      colliders.push({ x: hx + px, z: hz + VZ1, r: 0.07, maxY: hb + 2.5 });
+    }
+    box(M.brass, 0, 2.47, VZ1, 7.3, 0.07, 0.1);
+    // 常开的一扇内门叶（玻璃+黄铜边，斜停着）
+    box(M.brass, 1.5, 1.2, 8.25, 0.06, 2.35, 0.06, 0.55);
+    box(M.shopGlass, 1.62, 1.2, 8.05, 0.72, 2.2, 0.04, 0.55);
+    colliders.push({ x: hx + 1.6, z: hz + 8.1, r: 0.28, maxY: hb + 2.35, noSightBlock: true });
+    // 地垫：字磨得快没了（压在红毯之上——红毯顶面 0.075）
+    box(plateMat('宾至如归', { w: 256, h: 96, bg: '#48120e', fg: '#7c6a42', font: 0.5 }), 0, 0.088, 9.8, 1.9, 0.035, 0.85);
+    // 伞架（三把黑伞，没人回来取）
+    cyl(M.ironDark, -3.0, 0.36, 9.35, 0.24, 0.72, 0.24);
+    colliders.push({ x: hx - 3.0, z: hz + 9.35, r: 0.26, maxY: hb + 0.75, noSightBlock: true });
+    for (const [ox, oz, rx] of [[-0.07, 0.05, 0.16], [0.06, -0.04, -0.1], [0.0, 0.09, 0.06]]) {
+      cyl(M.ironDark, -3.0 + ox, 0.82, 9.35 + oz, 0.035, 1.0, 0.035, 0, rx, 0.12);
+    }
+    // 行李推车：黄铜架+旧皮箱（客人再没下来拿）
+    box(M.brass, 2.7, 0.18, 9.75, 1.1, 0.06, 0.55);
+    for (const [ox, oz] of [[-0.45, -0.2], [0.45, -0.2], [-0.45, 0.2], [0.45, 0.2]]) {
+      cyl(M.ironDark, 2.7 + ox, 0.08, 9.75 + oz, 0.07, 0.07, 0.07, 0, Math.PI / 2, 0);
+    }
+    for (const ox of [-0.52, 0.52]) {
+      box(M.brass, 2.7 + ox, 0.98, 9.75, 0.05, 1.55, 0.05);
+      box(M.brass, 2.7 + ox, 1.74, 9.75, 0.05, 0.05, 0.5);
+    }
+    box(M.veneer, 2.7, 0.4, 9.75, 0.62, 0.36, 0.42, 0.12);
+    colliders.push({ minX: hx + 2.1, maxX: hx + 3.3, minZ: hz + 9.4, maxZ: hz + 10.1, minY: hb, maxY: hb + 1.78, noSightBlock: true });
+    // 内门玻璃上的红纸条 + 门斗侧「欢迎」旧牌
+    box(plateMat('今夜核册 · 请勿喧哗', { w: 320, h: 96, bg: '#8c1616', fg: '#f0d28c', font: 0.32 }), -1.9, 1.52, VZ1 - 0.06, 0.68, 0.32, 0.03);
+    box(plateMat('南方大酒店欢迎您', { w: 384, h: 56, bg: '#5a1414', fg: '#c8a860', font: 0.5 }), 0, 2.28, VZ1 + 0.12, 1.7, 0.2, 0.04);
+    // 门斗顶灯：一支接触不良的暖管
+    box(M.tungsten, 0, VH - 0.07, 9.8, 0.55, 0.07, 0.2);
+    addLight(0xffc880, 5, 6, 0, VH - 0.45, 9.8, 0.55);
+    locations.vestibule = world(0, 0.5, 9.8);
+  }
+
   // ================= 内墙骨架 1F =================
   // 大堂/宴会厅隔墙 x=-8：双开门洞 z 4.5..6.5 + 服务门 z -9.5..-8
   wallZ(PLA, -11, 11, -8, 0, F2, [
@@ -332,23 +390,23 @@ export function buildHotel(ctx) {
   // 大堂东墙 x=8：东廊门 z 5..6.8
   wallZ(PLA, 0, 11, 8, 0, F2, [{ from: 5, to: 6.8, top: 2.4 }]);
   // 服务走廊北墙 z=-8（与员工区分隔）：门 x -5..-3.6 / x 3..4.4
-  wallX(PLA, -8, 8, -8, 0, F2, [
+  wallX(SVC, -8, 8, -8, 0, F2, [
     { from: -5, to: -3.6, top: 2.1 }, { from: 3, to: 4.4, top: 2.1 },
   ]);
   // 员工区被大楼梯一分为二：楼梯两侧封板（经理室/布草间的内墙）
-  for (const sx of [-1.9, 1.9]) box(PLA, sx, F2 / 2, -3.05, 0.12, F2, 6.5);
+  for (const sx of [-1.9, 1.9]) box(SVC, sx, F2 / 2, -3.05, 0.12, F2, 6.5);
   // 布草间东墙缺口段 x=8, z -2..0
-  wallZ(PLA, -2, 0, 8, 0, F2);
+  wallZ(SVC, -2, 0, 8, 0, F2);
   // 厨房西墙 x=8：走廊门 z -10.4..-9
-  wallZ(PLA, -11, -2, 8, 0, F2, [{ from: -10.4, to: -9, top: 2.1 }]);
+  wallZ(SVC, -11, -2, 8, 0, F2, [{ from: -10.4, to: -9, top: 2.1 }]);
   // 厨房北墙 z=-2 (x 8..17)
-  wallX(PLA, 8, 17, -2, 0, F2);
+  wallX(SVC, 8, 17, -2, 0, F2);
   // 楼梯间（x 11..16.5, z -2..3）西墙带门
-  wallZ(PLA, -2, 3, 11, 0, F2, [{ from: 0.6, to: 2.0, top: 2.1 }]);
-  wallX(PLA, 11, 17, 3, 0, F2);
+  wallZ(SVC, -2, 3, 11, 0, F2, [{ from: 0.6, to: 2.0, top: 2.1 }]);
+  wallX(SVC, 11, 17, 3, 0, F2);
   // 配电间 x 11..17, z 3..6（门在 x=11, z 4..5.2）
-  wallZ(PLA, 3, 6, 11, 0, F2, [{ from: 4, to: 5.2, top: 2.1 }]);
-  wallX(PLA, 11, 17, 6, 0, F2);
+  wallZ(SVC, 3, 6, 11, 0, F2, [{ from: 4, to: 5.2, top: 2.1 }]);
+  wallX(SVC, 11, 17, 6, 0, F2);
   // 卫生间 x 11..17, z 6..9.2（门 x=11, z 7..8.2）
   wallZ(PLA, 6, 9.2, 11, 0, F2, [{ from: 7, to: 8.2, top: 2.1 }]);
   wallX(PLA, 11, 17, 9.2, 0, F2);
@@ -418,17 +476,19 @@ export function buildHotel(ctx) {
       B.add(GEO.sphere, M.plasticGreen, hx + px + 0.15, hb + 1.7, hz + pz, 0, 0.35, 0.5, 0.35);
       colliders.push({ x: hx + px, z: hz + pz, r: 0.35, maxY: hb + 1.1, noSightBlock: true });
     }
-    // 沙发组（西北角）
-    box(M.clothRed, -4.5, 0.3, 9.7, 2.2, 0.6, 0.9);
-    box(M.clothRed, -4.5, 0.85, 10.1, 2.2, 0.6, 0.25);
-    box(M.veneer, -2.6, 0.28, 9.7, 0.8, 0.56, 0.8);
-    colliders.push({ minX: hx - 5.6, maxX: hx - 2.2, minZ: hz + 9.2, maxZ: hz + 10.3, minY: hb, maxY: hb + 0.9, noSightBlock: true });
+    // 沙发组（西窗角，门斗以西）
+    box(M.clothRed, -5.4, 0.3, 9.7, 2.2, 0.6, 0.9);
+    box(M.clothRed, -5.4, 0.85, 10.1, 2.2, 0.6, 0.25);
+    colliders.push({ minX: hx - 6.5, maxX: hx - 4.3, minZ: hz + 9.2, maxZ: hz + 10.3, minY: hb, maxY: hb + 0.9, noSightBlock: true });
+    // 茶几挪去东窗角绿植旁
+    box(M.veneer, 5.9, 0.28, 9.8, 0.8, 0.56, 0.8);
+    colliders.push({ x: hx + 5.9, z: hz + 9.8, r: 0.45, maxY: hb + 0.6, noSightBlock: true });
     // 大堂山水壁画（南墙上方，跨楼梯口）
     box(M.mural, 0, 4.6, 0.18, 7.5, 2.4, 0.08);
-    // 核册指示水牌
-    box(M.brass, 3.2, 0.8, 9.0, 0.05, 1.6, 0.05);
-    box(plateMat('核册 · 宴会厅', { w: 256, h: 128, bg: '#8c1616', fg: '#f0d28c' }), 3.2, 1.35, 9.0, 0.9, 0.62, 0.05);
-    colliders.push({ x: hx + 3.2, z: hz + 9.0, r: 0.2, maxY: hb + 1.6, noSightBlock: true });
+    // 核册指示水牌（出门斗第一眼）
+    box(M.brass, 2.4, 0.8, 7.3, 0.05, 1.6, 0.05);
+    box(plateMat('核册 · 宴会厅', { w: 256, h: 128, bg: '#8c1616', fg: '#f0d28c' }), 2.4, 1.35, 7.3, 0.9, 0.62, 0.05);
+    colliders.push({ x: hx + 2.4, z: hz + 7.3, r: 0.2, maxY: hb + 1.6, noSightBlock: true });
     // 挂钟（停在 11:47）
     cyl(M.brass, -7.85, 2.6, 8.0, 0.45, 0.1, 0.45, 0, 0, Math.PI / 2);
     box(plateMat('11:47', { w: 96, h: 96, bg: '#e8e0cc', fg: '#33291e', font: 0.34 }), -7.78, 2.6, 8.0, 0.03, 0.62, 0.62);
@@ -456,7 +516,7 @@ export function buildHotel(ctx) {
       colliders.push({ minX: hx + sx - 0.06, maxX: hx + sx + 0.06, minZ: hz - 6.3, maxZ: hz + 0.2, minY: hb, maxY: hb + F2 + 0.9, noSightBlock: true });
     }
     // 梯下储物围板（1F 走廊侧看到的斜顶储物间门）
-    wallX(PLA, -1.9, 1.9, -6.3, 0, 2.2);
+    wallX(SVC, -1.9, 1.9, -6.3, 0, 2.2);
     // 2F 井口三面栏杆
     railing(-1.9, -6.3, -1.9, 0.4, F2);
     railing(1.9, -6.3, 1.9, 0.4, F2);
@@ -578,6 +638,12 @@ export function buildHotel(ctx) {
     // 走廊冷荧光
     for (const px of [-5, 0.5, 6]) box(M.fluorescent, px, F2 - 0.06, -9.5, 1.4, 0.05, 0.14);
     addLight(0xdfe8d8, 9, 11, 0.5, F2 - 0.9, -9.5, 0.8);
+    // 机关绿墙裙：前场红金一翻面就是这种颜色（画风区间切换的第一信号）
+    box(M.paintDado, -6.5, 0.6, -8.17, 2.9, 1.2, 0.05);
+    box(M.paintDado, -0.3, 0.6, -8.17, 6.5, 1.2, 0.05);
+    box(M.paintDado, 6.2, 0.6, -8.17, 3.5, 1.2, 0.05);
+    box(M.paintDado, -5.75, 0.6, -10.8, 4.4, 1.2, 0.05);
+    box(M.paintDado, 1.8, 0.6, -10.8, 6.5, 1.2, 0.05);
     // 员工告示 + 员工须知（文书⑤：空托盘规则）
     box(plateMat('今晚核册 全员留守', { w: 256, h: 96, bg: '#c8bfa8', fg: '#4a3428', font: 0.36 }), -1.5, 1.6, -8.16, 0.9, 0.4, 0.04);
     {
@@ -646,12 +712,12 @@ export function buildHotel(ctx) {
     // 地面
     box(M.terrazzo, 13.75, 0.02, 0.5, 5.4, 0.045, 4.9);
     // 内部隔墙已由外围完成；补 2F/3F 层的围墙（门在西墙）
-    wallZ(PLA, sw.z1, sw.z2, sw.x1, F2, F3, [{ from: 0.6, to: 2.0, top: 2.1 }]);
-    wallX(PLA, sw.x1, 17, sw.z2, F2, F3);
-    wallX(PLA, sw.x1, 17, sw.z1, F2, F3);
-    wallZ(PLA, sw.z1, sw.z2, sw.x1, F3, ROOF, [{ from: 0.6, to: 2.0, top: 2.1 }]);
-    wallX(PLA, sw.x1, 17, sw.z2, F3, ROOF);
-    wallX(PLA, sw.x1, 17, sw.z1, F3, ROOF);
+    wallZ(SVC, sw.z1, sw.z2, sw.x1, F2, F3, [{ from: 0.6, to: 2.0, top: 2.1 }]);
+    wallX(SVC, sw.x1, 17, sw.z2, F2, F3);
+    wallX(SVC, sw.x1, 17, sw.z1, F2, F3);
+    wallZ(SVC, sw.z1, sw.z2, sw.x1, F3, ROOF, [{ from: 0.6, to: 2.0, top: 2.1 }]);
+    wallX(SVC, sw.x1, 17, sw.z2, F3, ROOF);
+    wallX(SVC, sw.x1, 17, sw.z1, F3, ROOF);
     // 1F 内的南北墙(z=-2 已由厨房北墙覆盖 x8..17)
     // 梯段：1F→半层平台(东端)→2F；2F→半层→3F
     const flight = (yBase) => {
@@ -664,7 +730,7 @@ export function buildHotel(ctx) {
       box(M.ironDark, 13.4, yBase + 3.05, 1.15, 3.6, 0.06, 0.06, 0, Math.atan2(1.7, 3.6), 0);
       // 中隔护板（两跑之间）
       colliders.push({ minX: hx + 11.8, maxX: hx + 15.2, minZ: hz + 0.35, maxZ: hz + 0.65, minY: hb + yBase, maxY: hb + yBase + 3.4, noSightBlock: true });
-      box(PLA, 13.5, yBase + 1.7, 0.5, 3.4, 3.2, 0.12);
+      box(SVC, 13.5, yBase + 1.7, 0.5, 3.4, 3.2, 0.12);
     };
     flight(0);
     flight(F2);
@@ -678,6 +744,14 @@ export function buildHotel(ctx) {
     box(M.fluorescent, 13.75, ROOF - 0.5, 0.5, 1.3, 0.05, 0.13);
     addLight(0xdfe8d8, 6, 7, 13.75, F2 - 0.4, 0.5, 1.6);
     addLight(0xdfe8d8, 6, 7, 13.75, F3 - 0.4, 0.5, 0.3);
+    // 三层通高的机关绿墙裙：楼梯间不属于前场——它是酒店的骨头缝
+    for (const fy of [0, F2, F3]) {
+      box(M.paintDado, 16.83, fy + 0.6, 0.5, 0.05, 1.2, 4.9);
+      box(M.paintDado, 11.17, fy + 0.6, -0.7, 0.05, 1.2, 2.6);
+      box(M.paintDado, 11.17, fy + 0.6, 2.5, 0.05, 1.2, 1.0);
+      box(M.paintDado, 13.75, fy + 0.6, 2.82, 5.4, 1.2, 0.05);
+      box(M.paintDado, 13.75, fy + 0.6, -1.82, 5.4, 1.2, 0.05);
+    }
     locations.stairwell1F = world(12, 0.5, 1.3);
   }
 
@@ -777,6 +851,8 @@ export function buildHotel(ctx) {
     addLight(0xffc880, 7, 9, 5, F3 + 2.2, 1.5, 0.12);
     // 走廊尽头镜（理册婆早一拍点位②）
     mirror('corridor3F', -12.9, F3 + 1.5, 1.5, Math.PI / 2, 1.4, 1.8);
+    // 楼梯间口的安全出口牌：整条暖走廊里唯一一点绿
+    box(plateMat('安全出口', { w: 224, h: 64, bg: '#0e2e1a', fg: '#6fe89a', font: 0.4, emissive: 0.85 }), 10.78, F3 + 2.3, 1.5, 0.05, 0.26, 0.72);
     // 门与门牌
     const doorAt = (px, pz, num, open = 0) => {
       const doorM = M.veneer;
@@ -921,9 +997,9 @@ export function buildHotel(ctx) {
       box(M.fluorescent, px2, 4.52, pz2, 1.3, 0.05, 0.14);
       addLight(0xcfdcd4, 6, 10, px2, 4.1, pz2, 1.1);
     }
-    // 值班室（西南角）：母带柜
-    wallZ(PLA, -3, 1.5, 36, 0, 2.6, [{ from: -0.5, to: 0.7, top: 2.05 }]);
-    wallX(PLA, 36, 39, 1.5, 0, 2.6);
+    // 值班室（西南角）：母带柜——停业馆保持风化灰面
+    wallZ(M.plaster, -3, 1.5, 36, 0, 2.6, [{ from: -0.5, to: 0.7, top: 2.05 }]);
+    wallX(M.plaster, 36, 39, 1.5, 0, 2.6);
     box(M.veneer, 38, 1.1, -1.5, 0.6, 2.2, 1.6);
     colliders.push({ minX: hx + 37.7, maxX: hx + 38.3, minZ: hz - 2.3, maxZ: hz - 0.7, minY: hb, maxY: hb + 2.2 });
     box(M.veneer, 37, 0.4, 0.5, 1.2, 0.8, 0.7);
@@ -1056,8 +1132,8 @@ export function buildHotel(ctx) {
     locations.aquaMainHall = world(48, 0.6, 4);
 
     // —— 处理间（东南角）：骨要一根根刷。母带的铁柜也在这儿。 ——
-    wallX(PLA, 50, 57, 1, 0, 2.8, [{ from: 51, to: 52.2, top: 2.05 }]);
-    wallZ(PLA, -3, 1, 50, 0, 2.8);
+    wallX(M.plaster, 50, 57, 1, 0, 2.8, [{ from: 51, to: 52.2, top: 2.05 }]);
+    wallZ(M.plaster, -3, 1, 50, 0, 2.8);
     slabRect(50, -3, 57, 1, 2.8, null, { walk: false });
     box(plateMat('处理间', { w: 160, h: 64, bg: '#3a3a3a', fg: '#d8d0b8', font: 0.44 }), 51.6, 2.35, 1.08, 0.8, 0.32, 0.05);
     // 不锈钢理骨台 + 未理完的骨
@@ -1083,7 +1159,8 @@ export function buildHotel(ctx) {
 
   // ================= 巡逻/工位 =================
   patrols.waiterBanquet = [[-14.5, -6.8], [-10.5, -6.8], [-9.2, 2.8], [-13.5, 2.8], [-15.6, -2]].map(([x, z]) => [hx + x, hz + z]);
-  patrols.waiterLobby = [[3, -9.5], [-6, -9.5], [-6.5, -3], [-4.5, 1.8], [4.5, 3.5], [6.8, 8.5], [0, 9.6]].map(([x, z]) => [hx + x, hz + z]);
+  // 门斗隔断后：末段沿玻璃缝正中穿进风除室，在地垫上停一拍再折返
+  patrols.waiterLobby = [[3, -9.5], [-6, -9.5], [-6.5, -3], [-4.5, 1.8], [4.5, 3.5], [5.5, 7.0], [0.9, 7.6], [0, 9.7]].map(([x, z]) => [hx + x, hz + z]);
   patrols.waiterEast = [[9.5, 1.5], [9.5, 9.6], [22, 9.8], [30.5, 5.5], [33, 1]].map(([x, z]) => [hx + x, hz + z]);
   // 理骨员：绕残骸台座一圈，末了在处理间门口停一拍
   patrols.osteoHall = [[43, 8.6], [52.5, 8.6], [55.5, 3.2], [51.6, 0.4], [43.5, -0.8], [40.6, 3.4]].map(([x, z]) => [hx + x, hz + z]);

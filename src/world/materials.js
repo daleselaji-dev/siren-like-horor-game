@@ -108,6 +108,8 @@ export function buildMaterials(lowspec = false) {
   M.carpet = std(T.carpet, { normalScale: 1.2, envInt: 0.25 });
   M.marble = std(T.marble, { normalScale: 0.5, envInt: 1.7, roughness: 0.8 });
   M.wallpaper = std(T.wallpaper, { normalScale: 0.9, envInt: 0.5 });
+  M.hotelWall = std(T.paintedWall, { normalScale: 0.6, envInt: 0.75 });   // 前场乳白漆内墙：营业中的旧，不是废墟的旧
+  M.serviceWall = std(T.paintedWall, { color: 0xaeb6ac, normalScale: 0.6, envInt: 0.5 }); // 后勤冷灰漆（上方配机关绿墙裙）
   M.tile = std(T.tile, { normalScale: 0.8, envInt: 1.5 });
   M.veneer = std(T.veneer, { normalScale: 0.9, envInt: 1.0, roughness: 0.85 });
   M.veneerRed = std(T.veneer, { color: 0xb05540, normalScale: 0.9, envInt: 1.1, roughness: 0.8 }); // 红漆总台
@@ -160,6 +162,9 @@ export function buildMaterials(lowspec = false) {
     color: 0x9aa8a2, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.16,
     envMapIntensity: 1.8,
   }); // 沿街门市橱窗玻璃（薄透、留一点旧灰）
+  M.paintDado = new THREE.MeshStandardMaterial({
+    color: 0x2b4a3c, roughness: 0.38, envMapIntensity: 0.9,
+  }); // 机关绿油漆墙裙（后勤走廊/楼梯间——前场红金一翻面就是这种颜色）
 
   M.net = new THREE.MeshStandardMaterial({
     map: T.net, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide,
