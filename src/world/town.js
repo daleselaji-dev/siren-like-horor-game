@@ -632,6 +632,10 @@ export function buildTown(scene, M) {
       const puddleM = new THREE.MeshStandardMaterial({
         color: 0x11171a, roughness: 0.04, metalness: 0.92, envMapIntensity: 1.8,
       });
+      // 写模板=1：异化后幻潮镜像层（潮网/鱼影）只在洼内像素显形
+      puddleM.stencilWrite = true;
+      puddleM.stencilRef = 1;
+      puddleM.stencilZPass = THREE.ReplaceStencilOp;
       const puddleG = new THREE.CircleGeometry(1, 18);
       for (const [px, pz, s, sq] of [
         [60.5, 0.8, 1.3, 0.55], [55, 1.7, 0.9, 0.5], [50.5, 0.9, 1.5, 0.45],
@@ -2664,6 +2668,40 @@ export function buildTown(scene, M) {
       fishParams.push(giant);
       leak.add(fish);
 
+      // —— 洼中镜像世界：潮面光网与鱼影关于街面的镜像副本，只在水洼像素内显形 ——
+      // 水洼材质写模板=1；镜像层关深度测试 + 模板等值测试、绘序垫后——
+      // 低头看洼：洼里是天上那层潮，鱼从洼底游过（带真视差的平面反射，
+      // 巨影经过头顶时也同时经过脚下的洼）
+      const MIRROR_Y = g(0, -8) + 0.05; // 近似镜面高：主街街面
+      const stTest = (m) => {
+        m.stencilWrite = true;        // three 语义：开启模板状态
+        m.stencilWriteMask = 0;       // 只测不写
+        m.stencilFunc = THREE.EqualStencilFunc;
+        m.stencilRef = 1;
+        return m;
+      };
+      // fog 必须关：镜像几何在地下 11m「远」，雾会把加色网糊成一片亮灰——
+      // 反射的光程其实只是眼到洼面的距离，洼近网就该清晰
+      const mirNetM = stTest(new THREE.MeshBasicMaterial({
+        map: t0, color: 0xbfe8da, transparent: true, opacity: 0.34,
+        blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false,
+        side: THREE.DoubleSide, fog: false,
+      }));
+      const mirNet = new THREE.Mesh(plane, mirNetM);
+      mirNet.rotation.x = -Math.PI / 2;
+      mirNet.position.set(-8, MIRROR_Y * 2 - TIDE_Y, -1);
+      mirNet.renderOrder = 8;
+      leak.add(mirNet);
+      const mirFishM = stTest(new THREE.MeshBasicMaterial({
+        color: 0x04080a, transparent: true, opacity: 0.85,
+        depthWrite: false, depthTest: false, fog: false,
+      }));
+      const mirFish = new THREE.InstancedMesh(fishGeo, mirFishM, 24);
+      mirFish.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mirFish.frustumCulled = false;
+      mirFish.renderOrder = 9;
+      leak.add(mirFish);
+
       // —— 光柱：潮面漏下来的三根淡光（椅阵/CRT冢/街心） ——
       const rayMat = new THREE.MeshBasicMaterial({
         color: 0x9fd2c0, transparent: true, opacity: 0.032,
@@ -2680,7 +2718,7 @@ export function buildTown(scene, M) {
       }
 
       Object.assign(dynamic.leakState, {
-        tide: { mats: [mat0, mat1], op: [0.34, 0.2], fish, fishParams, giant, y: TIDE_Y },
+        tide: { mats: [mat0, mat1], op: [0.34, 0.2], fish, fishParams, giant, y: TIDE_Y, mirFish, mirY: MIRROR_Y },
       });
     }
 
@@ -2711,6 +2749,10 @@ export function buildTown(scene, M) {
       const puddleMat = new THREE.MeshStandardMaterial({
         color: 0x11181c, roughness: 0.05, metalness: 0.55, envMapIntensity: 2.4,
       });
+      // 写模板=1：这些洼是幻潮镜像层（潮网/鱼影）的「窗」
+      puddleMat.stencilWrite = true;
+      puddleMat.stencilRef = 1;
+      puddleMat.stencilZPass = THREE.ReplaceStencilOp;
       const puddleGeo = new THREE.CylinderGeometry(1, 1, 0.02, 10);
       const puddles = new THREE.InstancedMesh(puddleGeo, puddleMat, 26);
       const m4 = new THREE.Matrix4(); const q = new THREE.Quaternion();
@@ -2885,13 +2927,22 @@ export function buildTown(scene, M) {
           const z = f.cz + Math.sin(a) * f.r;
           const s = Math.sign(f.speed) || 1;
           const ry = Math.atan2(-Math.cos(a) * s, -Math.sin(a) * s); // 鼻尖对切线
-          _e.set(0, ry, Math.sin(time * f.wag + f.phase) * 0.07);
+          const roll = Math.sin(time * f.wag + f.phase) * 0.07;
+          _e.set(0, ry, roll);
           _q.setFromEuler(_e);
           _s.set(f.len, f.len * 0.9, f.len);
           _m4.compose(_v3.set(x, f.y, z), _q, _s);
           td.fish.setMatrixAt(i, _m4);
+          // 镜像副本：关于街面对折（滚转随镜像取反）——洼里那条与头顶这条同步游
+          if (td.mirFish) {
+            _e.set(0, ry, -roll);
+            _q.setFromEuler(_e);
+            _m4.compose(_v3.set(x, td.mirY * 2 - f.y, z), _q, _s);
+            td.mirFish.setMatrixAt(i, _m4);
+          }
         }
         td.fish.instanceMatrix.needsUpdate = true;
+        if (td.mirFish) td.mirFish.instanceMatrix.needsUpdate = true;
       }
     },
   };

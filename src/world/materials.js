@@ -2,7 +2,7 @@
 // v2：接入粗糙度图（湿面真正反光）+ 环境反射强度分级
 import * as THREE from 'three';
 import { buildTextureSet } from './textures.js';
-import { buildFaceMaterials, applySkinRim } from './faces.js';
+import { buildFaceMaterials, applySkinRim, applySoakedSSS } from './faces.js';
 
 export function buildMaterials(lowspec = false) {
   const T = buildTextureSet(lowspec);
@@ -55,7 +55,13 @@ export function buildMaterials(lowspec = false) {
   M.rock = std(T.rock, { normalScale: 1.9, envInt: 1.1 });
 
   // 潮尸皮肤：灌水的湿油光（清漆层拉满——泡过的皮面浮一层水膜）
-  M.corpseSkin = skinPhys(T.corpseSkin, { normalScale: 0.9, envInt: 1.5, cc: 0.55, ccRough: 0.18, poreScale: 0.7 });
+  // + 泡发次表面（覆掉暖红 rim）：宽瓣冷青肉里光 + 窄瓣贴体水线——
+  //   近景轮廓一圈「光从皮下透出来」的青，正视是水膜的碎高光
+  M.corpseSkin = skinPhys(T.corpseSkin, {
+    normalScale: 0.9, envInt: 1.5, cc: 0.55, ccRough: 0.14, poreScale: 0.7,
+    sheen: 0.42, sheenColor: 0xd6efe8,
+  });
+  applySoakedSSS(M.corpseSkin, 0.9);
   M.clothNavy = std(T.clothNavy, { envInt: 0.4 });
   M.clothGrey = std(T.clothGrey, { envInt: 0.4 });
   M.clothRed = std(T.clothRed, { envInt: 0.55 });

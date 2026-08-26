@@ -108,8 +108,11 @@ export class Engine {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 900);
 
-    // 后处理链
-    this.composer = new EffectComposer(this.renderer);
+    // 后处理链——自带模板缓冲的 RT：幻潮镜洼要水洼写模板、镜像层限洼绘制
+    const rtSize = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(rtSize.x, rtSize.y, {
+      type: THREE.HalfFloatType, stencilBuffer: true,
+    }));
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
 

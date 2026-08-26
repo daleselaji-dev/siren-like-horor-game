@@ -11,7 +11,7 @@
 //             理骨员(胶皮围裙长手套+永久歪头听缸)、浮客(脚尖离地)、回眸客(残影)
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
-import { faceAnchor, applySkinRim } from '../world/faces.js';
+import { faceAnchor, applySkinRim, applySoakedSSS } from '../world/faces.js';
 
 // ---- 共享几何/材质缓存 ----
 const _geoCache = new Map();
@@ -39,8 +39,10 @@ function hdSkinVariant(base) {
       m.clearcoatNormalMap.repeat.multiplyScalar(1.6);
       if (m.clearcoatNormalScale) m.clearcoatNormalScale.multiplyScalar(1.3);
     }
-    // clone() 不带走 onBeforeCompile——耳缘/鼻翼透红 rim 要重挂，否则近距 LOD 换模瞬间掉层
-    if (base.userData?.rimK) applySkinRim(m, base.userData.rimK);
+    // clone() 不带走 onBeforeCompile——耳缘/鼻翼透红 rim / 湿客泡发次表面要重挂，
+    // 否则近距 LOD 换模瞬间掉层
+    if (base.userData?.soakK) applySoakedSSS(m, base.userData.soakK);
+    else if (base.userData?.rimK) applySkinRim(m, base.userData.rimK);
     return m;
   });
 }

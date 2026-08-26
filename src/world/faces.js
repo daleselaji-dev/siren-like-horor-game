@@ -106,6 +106,29 @@ export function applySkinRim(m, k = 0.6) {
   return m;
 }
 
+/** 泡发次表面近似（湿客潮尸皮）：泡透的组织把光含在皮下——
+ *  宽瓣冷青「肉里光」+ 窄瓣贴体水线（比皮脂高光更硬更细），都受光门控。
+ *  活人皮走 applySkinRim 的暖红透光；这层冷的正是「不再是活人」的读法。 */
+export function applySoakedSSS(m, k = 0.85) {
+  m.userData.soakK = k;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uSoakK = { value: m.userData.soakK ?? 0.85 };
+    sh.fragmentShader = ('uniform float uSoakK;\n' + sh.fragmentShader).replace(
+      '#include <opaque_fragment>',
+      `{
+        vec3 sV = normalize( vViewPosition );
+        float sF = pow( clamp( 1.0 - dot( normal, sV ), 0.0, 1.0 ), 2.0 );
+        float sLit = clamp( dot( reflectedLight.directDiffuse + reflectedLight.indirectDiffuse, vec3( 1.7 ) ), 0.0, 1.0 );
+        outgoingLight += vec3( 0.10, 0.17, 0.16 ) * ( sF * sLit * uSoakK );
+        float wF = pow( sF, 3.5 );
+        outgoingLight += vec3( 0.13, 0.155, 0.15 ) * ( wF * sLit * uSoakK );
+      }
+      #include <opaque_fragment>`);
+  };
+  m.customProgramCacheKey = () => 'soakSSS';
+  return m;
+}
+
 /**
  * 同步建立逐脸头皮材质（底皮=程序化皮肤，照片稍后异步烘焙进同一张 Canvas）。
  * M.faceMats[key]   头皮 MeshPhysicalMaterial（漫反射/法线为独立 Canvas）
