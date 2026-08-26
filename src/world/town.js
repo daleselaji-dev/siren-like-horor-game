@@ -1081,6 +1081,134 @@ export function buildTown(scene, M) {
       dynamic.videoHallRect = { minX: vx - w / 2, maxX: vx + w / 2, minZ: vz - d / 2, maxZ: vz + d / 2 };
     }
 
+    // —— 大新照相馆（可进：门市 + 暗房——旧相机与镁光灯所在地）——
+    {
+      const vx = 14, vz = 2.8, base = g(vx, vz);
+      const w = 6, d = 5.2, h = 3.0, t = 0.3;
+      B.add(GEO.box, M.stone, vx, base + 0.12, vz, 0, w + 0.6, 0.5, d + 0.6);
+      B.add(GEO.box, M.wood, vx, base + 0.4, vz, 0, w - 0.25, 0.08, d - 0.25);
+      // 北墙/东西墙
+      B.add(GEO.box, M.plaster, vx, base + h / 2 + 0.3, vz + d / 2 - t / 2, 0, w, h, t);
+      aabb(vx, vz + d / 2 - t / 2, w, t, base + h + 0.3);
+      B.add(GEO.box, M.plaster, vx - w / 2 + t / 2, base + h / 2 + 0.3, vz, 0, t, h, d);
+      aabb(vx - w / 2 + t / 2, vz, t, d, base + h + 0.3);
+      B.add(GEO.box, M.plaster, vx + w / 2 - t / 2, base + h / 2 + 0.3, vz, 0, t, h, d);
+      aabb(vx + w / 2 - t / 2, vz, t, d, base + h + 0.3);
+      // 南墙：西段门洞 1.1 + 东段橱窗
+      const dcx = vx - 1.6, swz = vz - d / 2 + t / 2;
+      B.add(GEO.box, M.plaster, vx - 2.72, base + h / 2 + 0.3, swz, 0, 0.55, h, t);
+      aabb(vx - 2.72, swz, 0.55, t, base + h + 0.3);
+      B.add(GEO.box, M.plaster, dcx, base + 2.55 + 0.3, swz, 0, 1.15, h - 2.25, t); // 门楣
+      B.add(GEO.box, M.plaster, vx - 0.62, base + h / 2 + 0.3, swz, 0, 0.85, h, t);
+      aabb(vx - 0.62, swz, 0.85, t, base + h + 0.3);
+      B.add(GEO.box, M.plaster, vx + 1.35, base + 0.55, swz, 0, 3.1, 1.1 - 0.2, t);  // 橱窗下槛
+      B.add(GEO.box, M.plaster, vx + 1.35, base + 2.65, swz, 0, 3.1, h - 2.3, t);    // 橱窗上楣
+      B.add(GEO.box, M.plaster, vx + 2.86, base + h / 2 + 0.3, swz, 0, 0.28, h, t);
+      aabb(vx + 2.86, swz, 0.28, t, base + h + 0.3);
+      // 橱窗玻璃 + 展架全家福（每张脸上有指痕——只在近看时读出）
+      const shopGlass = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.6, 0.04), M.shopGlass);
+      shopGlass.position.set(vx + 1.35, base + 1.65, swz);
+      scene.add(shopGlass);
+      aabb(vx + 1.35, swz, 3.1, t, base + h + 0.3, { noSightBlock: true });
+      B.add(GEO.box, M.veneer, vx + 1.35, base + 1.0, vz - d / 2 + 0.55, 0, 2.8, 0.08, 0.5);
+      // 程序化老照片：合影人数不等，脸一律被拇指抹糊——近看才读得出
+      const photoMat = (seed) => {
+        const cv = document.createElement('canvas');
+        cv.width = 96; cv.height = 128;
+        const c = cv.getContext('2d');
+        const rnd = (() => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+        c.fillStyle = '#d8d0ba'; c.fillRect(0, 0, 96, 128);          // 相纸白边
+        const ix = 9, iy = 9, iw = 78, ih = 100;
+        const gr = c.createLinearGradient(0, iy, 0, iy + ih);
+        gr.addColorStop(0, '#a89878'); gr.addColorStop(1, '#7c6c50');
+        c.fillStyle = gr; c.fillRect(ix, iy, iw, ih);                // 影像区（室内背景）
+        c.fillStyle = 'rgba(60,50,36,0.5)'; c.fillRect(ix, iy + ih * 0.62, iw, ih * 0.38);
+        const n = 2 + Math.floor(rnd() * 3);
+        for (let k = 0; k < n; k++) {
+          const px = ix + 12 + (iw - 24) * (n === 1 ? 0.5 : k / (n - 1)) + (rnd() - 0.5) * 6;
+          const py = iy + ih * 0.42 + (rnd() - 0.5) * 8;
+          c.fillStyle = '#3a3228';                                    // 深色衣身
+          c.beginPath(); c.ellipse(px, py + 26, 11, 20, 0, 0, Math.PI * 2); c.fill();
+          c.fillStyle = '#c4b394';                                    // 头
+          c.beginPath(); c.ellipse(px, py, 6.5, 8, 0, 0, Math.PI * 2); c.fill();
+          // 拇指抹痕：脸区一道斜向糊光
+          c.save(); c.globalAlpha = 0.75; c.fillStyle = '#b6a888';
+          c.translate(px, py); c.rotate(0.5 + rnd() * 0.6);
+          c.fillRect(-8, -3.5, 16, 7); c.restore();
+        }
+        c.fillStyle = 'rgba(40,32,20,0.25)';                          // 四角褪色
+        c.fillRect(ix, iy, iw, 3); c.fillRect(ix, iy + ih - 3, iw, 3);
+        const tex = new THREE.CanvasTexture(cv);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        return new THREE.MeshBasicMaterial({ map: tex });
+      };
+      for (let i = 0; i < 5; i++) {
+        const ph = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.44), photoMat(1013 + i * 77));
+        ph.position.set(vx + 0.35 + i * 0.5, base + 1.35, vz - d / 2 + 0.42 - (i % 2) * 0.08);
+        ph.rotation.y = Math.PI + (i - 2) * 0.06;
+        scene.add(ph);
+      }
+      // 屋顶 + 门脸招牌
+      B.add(GEO.box, M.roof, vx, base + h + 0.42, vz, 0, w + 0.8, 0.18, d + 0.8, 0, 0.03);
+      B.add(GEO.box, plateMat('大新照相', { w: 288, h: 88, bg: '#173a4a', fg: '#f0d28c', font: 0.46, emissive: 0.5 }), vx, base + h + 0.02, vz - d / 2 - 0.12, 0, 2.5, 0.58, 0.12);
+      // 半开的门
+      B.add(GEO.box, M.woodDark, dcx - 0.32, base + 1.3, vz - d / 2 + 0.3, 1.05, 0.85, 2.0, 0.05);
+      // 门市：柜台 + 背景布 + 道具椅 + 三脚架相机（道具点位）
+      B.add(GEO.box, M.veneerRed, vx - 1.9, base + 0.55, vz + 0.2, 0, 1.1, 1.0, 2.2);
+      aabb(vx - 1.9, vz + 0.2, 1.15, 2.25, base + 1.05, { noSightBlock: true });
+      const bd = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 2.0), M.mural);
+      bd.position.set(vx + 0.9, base + 1.45, vz + d / 2 - 0.35);
+      bd.rotation.y = Math.PI;
+      scene.add(bd);
+      B.add(GEO.box, M.woodDark, vx + 0.9, base + 2.5, vz + d / 2 - 0.32, 0, 3.0, 0.1, 0.1);
+      for (const ox of [-1.45, 1.45]) {
+        B.add(GEO.box, M.curtain, vx + 0.9 + ox, base + 1.45, vz + d / 2 - 0.34, 0, 0.5, 2.1, 0.1);
+      }
+      B.add(GEO.box, M.woodDark, vx + 0.9, base + 0.28, vz + 1.0, 0.2, 0.45, 0.55, 0.45); // 道具方凳
+      // 三脚架 + 旧相机（皮腔机；镁光灯泡一盒在暗房）
+      for (const a of [0, 2.1, 4.2]) {
+        B.add(GEO.cyl, M.woodDark, vx + 0.7 + Math.sin(a) * 0.3, base + 0.65, vz - 0.8 + Math.cos(a) * 0.3, 0, 0.04, 1.3, 0.04, 0, a === 0 ? 0.22 : a === 2.1 ? -0.15 : 0.1);
+      }
+      B.add(GEO.box, M.ironDark, vx + 0.7, base + 1.42, vz - 0.8, 0, 0.32, 0.3, 0.42);
+      B.add(GEO.box, M.clothGrey, vx + 0.7, base + 1.42, vz - 0.5, 0, 0.26, 0.24, 0.2);
+      circle(vx + 0.7, vz - 0.8, 0.3, base + 1.5, { noSightBlock: true });
+      locations.photoCamera = new THREE.Vector3(vx + 0.7, base + 1.4, vz - 0.8);
+      // 暗房（西北角小隔间：红灯、显影盘、挂绳底片）
+      const kx = vx - 1.85, kz = vz + 1.6;
+      // 东隔墙留 0.72 门洞（帘位在南端），墙体只封门洞以北
+      B.add(GEO.box, M.plaster, kx + 1.05, base + 1.5 + 0.3, kz + 0.525, 0, 0.16, 3.0, 1.45);
+      aabb(kx + 1.05, kz + 0.525, 0.16, 1.45, base + h + 0.3);
+      B.add(GEO.box, M.plaster, kx + 0.2, base + 1.5 + 0.3, kz - 1.0, 0, 1.9, 3.0, 0.16);
+      aabb(kx + 0.2, kz - 1.0, 1.9, 0.16, base + h + 0.3);
+      // 暗房门帘（可穿过，只挡视线）
+      B.add(GEO.box, M.curtain, kx + 1.05, base + 1.15, kz - 0.56, 0, 0.14, 1.9, 0.72);
+      B.add(GEO.box, M.veneer, kx - 0.3, base + 0.5, kz + 0.6, 0, 1.2, 0.9, 0.6);
+      aabb(kx - 0.3, kz + 0.6, 1.25, 0.65, base + 1.0, { noSightBlock: true });
+      for (let i = 0; i < 3; i++) {
+        B.add(GEO.box, M.steel, kx - 0.6 + i * 0.34, base + 0.97, kz + 0.55, 0, 0.28, 0.05, 0.4);
+      }
+      B.add(GEO.box, M.ironDark, kx - 0.2, base + 2.2, kz + 0.2, 0, 1.6, 0.02, 0.02);
+      for (let i = 0; i < 4; i++) {
+        const neg = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.4),
+          new THREE.MeshBasicMaterial({ color: 0x2a2e30 }));
+        neg.position.set(kx - 0.75 + i * 0.38, base + 1.98, kz + 0.2);
+        scene.add(neg);
+      }
+      const rl = new THREE.PointLight(0xc42818, 5, 5, 2);
+      rl.position.set(kx, base + 2.3, kz + 0.4);
+      scene.add(rl);
+      lights.push(rl);
+      locations.darkroom = new THREE.Vector3(kx - 0.3, base + 1.0, kz + 0.6);
+      // 门市顶灯
+      const sl2 = new THREE.PointLight(0xffe6c0, 7, 9, 2);
+      sl2.position.set(vx + 0.3, base + 2.5, vz - 0.4);
+      scene.add(sl2);
+      lights.push(sl2);
+      locations.photoStudio = new THREE.Vector3(vx, base + 0.8, vz - 0.6);
+      locations.photoWindow = new THREE.Vector3(vx + 1.35, base + 1.3, vz - d / 2 - 0.6);
+      dynamic.photoStudioRect = { minX: vx - w / 2, maxX: vx + w / 2, minZ: vz - d / 2, maxZ: vz + d / 2 };
+    }
+
     // —— 电话亭（磁卡机；路过时它会响一次）——
     {
       const px = 29, pz = -6.5, base = g(px, pz);
@@ -1127,73 +1255,308 @@ export function buildTown(scene, M) {
       arrow('家属区 →', 1.5, -Math.PI / 2);
     }
 
-    // —— 家属楼（水产公司旧宿舍：一栋筒子楼，只有一扇窗亮）——
-    {
-      const dx = -37, dz = 25, base = g(dx, dz);
-      const W = 16, D = 5.2, FH = 2.7;
-      // 主体
-      B.add(GEO.box, M.plaster, dx, base + FH * 1.5 + 0.3, dz + 1.2, 0, W, FH * 3, D);
-      aabb(dx, dz + 1.2, W, D, base + FH * 3 + 0.3);
-      B.add(GEO.box, M.roof, dx, base + FH * 3 + 0.42, dz + 1.2, 0, W + 0.8, 0.2, D + 0.8);
-      // 南向外廊（三层）+ 栏杆
-      for (let f = 0; f < 3; f++) {
-        const fy = base + 0.3 + f * FH;
-        B.add(GEO.box, M.stone, dx, fy + (f === 0 ? -0.08 : 0.0), dz - 1.9, 0, W, 0.18, 1.6);
-        if (f === 0) addPatch(dx, dz - 1.9, 0, W, 1.6, fy + 0.1, fy + 0.1);
-        if (f > 0) {
-          for (let i = 0; i <= 16; i++) {
-            B.add(GEO.cyl, M.ironDark, dx - W / 2 + i * (W / 16), fy + 0.5, dz - 2.6, 0, 0.04, 0.9, 0.04);
-          }
-          B.add(GEO.box, M.ironDark, dx, fy + 0.95, dz - 2.6, 0, W, 0.06, 0.06);
-        }
-        // 每层五个门窗洞（暗色内衬）
+    // —— 家属楼（水产公司旧宿舍两栋：可进可探——住户里外间、外廊、外挂楼梯、天台）——
+    // 外廊朝南（-z），外挂水泥楼梯在东山墙外；每栋两户可进（1F 一户 + 2F 一户），
+    // 其余户门落锁、锁眼塞红纸。核册之夜「人走灯不灭」：可进户的灯亮着，人不在。
+    function dormBlock(bx, bz, name, opts = {}) {
+      const W = 16, D = 6.0, FH = 2.7, t = 0.24;
+      const base = g(bx, bz);
+      const f1 = base + 0.32, f2 = f1 + FH, roofY = f2 + FH;
+      const bayXs = [-6.4, -3.2, 0, 3.2, 6.4];
+      const open1 = opts.open1 ?? 1;   // 1F 可进开间
+      const open2 = opts.open2 ?? 2;   // 2F 可进开间
+      const surnames = opts.surnames ?? ['周', '陈', '林', '黄', '吴'];
+      // 台基 + 1F 楼板
+      B.add(GEO.box, M.stone, bx, base + 0.14, bz, 0, W + 0.8, 0.44, D + 0.8);
+      B.add(GEO.box, M.slab, bx, f1 - 0.03, bz, 0, W - 0.2, 0.08, D - 0.2);
+      addPatch(bx, bz, 0, W - 0.4, D - 0.4, f1, f1);
+      // 北墙（整面，双层高）+ 外侧暗窗内衬
+      B.add(GEO.box, M.plaster, bx, base + FH + 0.34, bz + D / 2 - t / 2, 0, W, FH * 2 + 0.4, t);
+      aabb(bx, bz + D / 2 - t / 2, W, t, roofY + 0.4);
+      for (let f = 0; f < 2; f++) {
         for (let i = 0; i < 5; i++) {
-          const wx = dx - W / 2 + 1.8 + i * 3.1;
-          B.add(GEO.box, M.ironDark, wx, fy + 1.45, dz - 1.35, 0, 0.9, 1.9, 0.1);
-          B.add(GEO.box, M.woodDark, wx - 0.52, fy + 1.45, dz - 1.32, 0, 0.09, 1.95, 0.12);
-          B.add(GEO.box, M.woodDark, wx + 0.52, fy + 1.45, dz - 1.32, 0, 0.09, 1.95, 0.12);
+          B.add(GEO.box, M.ironDark, bx + bayXs[i] + 0.3, (f ? f2 : f1) + 1.5, bz + D / 2 + 0.02, 0, 1.0, 1.1, 0.08);
         }
       }
-      // 只有 2F 中间那扇窗亮着——灯后头没有人影
-      const litW = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.1),
-        new THREE.MeshBasicMaterial({ color: 0xffd9a0 }));
-      litW.position.set(dx + 0.3, base + 0.3 + FH + 1.5, dz - 1.28);
-      litW.rotation.y = Math.PI;
-      scene.add(litW);
-      const dl = new THREE.PointLight(0xffd9a0, 8, 10, 2);
-      dl.position.set(dx + 0.3, base + 0.3 + FH + 1.4, dz - 2.4);
-      scene.add(dl);
-      lights.push(dl);
-      // 楼道口（东端）楼梯剪影
-      B.add(GEO.box, M.stone, dx + W / 2 - 0.8, base + 1.0, dz - 1.6, 0, 1.4, 1.8, 0.14, 0, 0.5);
-      // 晾衣绳 + 挂着的旧衣（夜里没人收）
-      for (const [ox, oz] of [[-4, -5.5], [2, -6.5]]) {
-        B.add(GEO.cyl, M.woodDark, dx + ox - 2.2, base + 1.25, dz + oz, 0, 0.07, 2.5, 0.07);
-        B.add(GEO.cyl, M.woodDark, dx + ox + 2.2, base + 1.25, dz + oz, 0, 0.07, 2.5, 0.07);
-        B.add(GEO.box, M.ironDark, dx + ox, base + 2.35, dz + oz, 0, 4.4, 0.03, 0.03);
+      // 东西山墙（双层高）
+      for (const sx of [-W / 2 + t / 2, W / 2 - t / 2]) {
+        B.add(GEO.box, M.plaster, bx + sx, base + FH + 0.34, bz, 0, t, FH * 2 + 0.4, D);
+        aabb(bx + sx, bz, t, D, roofY + 0.4);
+      }
+      // 2F 楼板 + 天台板
+      B.add(GEO.box, M.slab, bx, f2 - 0.09, bz, 0, W, 0.18, D);
+      addPatch(bx, bz, 0, W - 0.4, D - 0.4, f2, f2);
+      B.add(GEO.box, M.slab, bx, roofY - 0.09, bz, 0, W + 0.3, 0.18, D + 0.3);
+      // 南墙：每开间「门洞+窗洞」，锁户实门+红纸，开户半开门
+      const sz2 = bz - D / 2 + t / 2;
+      const doorH2 = 2.0;
+      for (let f = 0; f < 2; f++) {
+        const fy = f === 0 ? f1 : f2;
+        const openBay = f === 0 ? open1 : open2;
+        for (let i = 0; i < 5; i++) {
+          const cxb = bx + bayXs[i];
+          const dcx = cxb - 0.8, wcx = cxb + 0.85; // 门中心/窗中心
+          const wall = (wx, ww, wy, wh) => {
+            B.add(GEO.box, M.plaster, wx, fy + wy, sz2, 0, ww, wh, t);
+          };
+          wall(cxb - 1.44, 0.33, FH / 2, FH);                    // 左边条
+          wall(cxb + 0.03, 0.68, FH / 2, FH);                    // 门窗之间
+          wall(cxb + 1.48, 0.25, FH / 2, FH);                    // 右边条
+          wall(dcx, 0.95, doorH2 + (FH - doorH2) / 2, FH - doorH2); // 门楣
+          wall(wcx, 1.0, 0.45, 0.9);                             // 窗下槛
+          wall(wcx, 1.0, 2.35, FH - 2.35 + 0.35);                // 窗楣
+          // 门框
+          B.add(GEO.box, M.woodDark, dcx - 0.53, fy + doorH2 / 2, sz2, 0, 0.1, doorH2, t + 0.06);
+          B.add(GEO.box, M.woodDark, dcx + 0.53, fy + doorH2 / 2, sz2, 0, 0.1, doorH2, t + 0.06);
+          // 户牌（红漆姓氏，新描的）+ 门牌号
+          B.add(GEO.box, plateMat(surnames[i], { w: 64, h: 64, bg: '#d8d0bc', fg: '#8c1616', font: 0.6 }), dcx + 0.72, fy + 1.7, sz2 - t / 2 - 0.02, 0, 0.22, 0.22, 0.04);
+          B.add(GEO.box, plateMat(`${f + 1}0${i + 1}`, { w: 96, h: 48, bg: '#2e3438', fg: '#d8cfb8', font: 0.5 }), dcx, fy + doorH2 + 0.22, sz2 - t / 2 - 0.02, 0, 0.4, 0.18, 0.04);
+          const isOpen = i === openBay;
+          if (isOpen) {
+            // 半开的旧木门（可进）
+            B.add(GEO.box, M.wood, dcx - 0.28, fy + doorH2 / 2, sz2 - 0.36, 1.0, 0.86, doorH2 - 0.05, 0.05);
+            // 窗帘拉严，只透一线灯
+            B.add(GEO.box, M.ironDark, wcx, fy + 1.4, sz2 - 0.03, 0, 0.96, 1.0, 0.06);
+            const slit = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.92),
+              new THREE.MeshBasicMaterial({ color: 0xffd9a0 }));
+            slit.position.set(wcx + 0.18, fy + 1.42, bz - D / 2 - 0.03);
+            slit.rotation.y = Math.PI;
+            scene.add(slit);
+            aabb(wcx, sz2, 1.05, t, fy + 2.4);
+            // 门口煤炉
+            B.add(GEO.cyl, M.ironDark, dcx - 1.1, fy + 0.24, sz2 - 0.75, 0, 0.2, 0.48, 0.2);
+          } else {
+            // 落锁实门 + 锁眼红纸
+            B.add(GEO.box, M.woodDark, dcx, fy + doorH2 / 2, sz2, 0, 0.95, doorH2, t + 0.02);
+            aabb(dcx, sz2, 1.0, t + 0.05, fy + doorH2 + 0.4);
+            B.add(GEO.box, M.clothRed, dcx + 0.3, fy + 0.95, sz2 - t / 2 - 0.02, 0.2, 0.05, 0.09, 0.02);
+            // 暗窗
+            B.add(GEO.box, M.ironDark, wcx, fy + 1.4, sz2 - 0.03, 0, 0.96, 1.0, 0.06);
+            aabb(wcx, sz2, 1.05, t, fy + 2.4);
+          }
+          // 洞口两侧墙的碰撞（细分而非整面，门洞可通行）
+          aabb(cxb - 1.44, sz2, 0.33, t, fy + FH);
+          aabb(cxb + 0.03, sz2, 0.68, t, fy + FH);
+          aabb(cxb + 1.48, sz2, 0.25, t, fy + FH);
+        }
+      }
+      // 南向外廊：1F 走台基，2F 挑廊 + 栏杆
+      const gz = bz - D / 2 - 0.75; // 外廊中心
+      B.add(GEO.box, M.stone, bx + 1.3, f1 - 0.08, gz, 0, W + 2.9, 0.18, 1.5);
+      addPatch(bx + 1.3, gz, 0, W + 2.9, 1.5, f1, f1);
+      B.add(GEO.box, M.stone, bx + 1.3, f2 - 0.08, gz, 0, W + 2.9, 0.2, 1.5);
+      addPatch(bx + 1.3, gz, 0, W + 2.9, 1.5, f2, f2);
+      const railZ = bz - D / 2 - 1.46;
+      for (let i = 0; i <= 18; i++) {
+        B.add(GEO.cyl, M.ironDark, bx - W / 2 + i * ((W + 2.6) / 18), f2 + 0.5, railZ, 0, 0.04, 1.0, 0.04);
+      }
+      B.add(GEO.box, M.ironDark, bx + 1.3, f2 + 0.98, railZ, 0, W + 2.6, 0.06, 0.06);
+      colliders.push({ minX: bx - W / 2 - 0.1, maxX: bx + W / 2 + 2.6, minZ: railZ - 0.08, maxZ: railZ + 0.08, minY: f2, maxY: f2 + 1.1, noSightBlock: true });
+      // 2F 外廊西端封头
+      colliders.push({ minX: bx - W / 2 - 0.1, maxX: bx - W / 2 + 0.02, minZ: railZ, maxZ: bz - D / 2, minY: f2, maxY: f2 + 1.1, noSightBlock: true });
+      // —— 外挂水泥楼梯（东山墙外，直跑上 2F 外廊）——
+      const stX = bx + W / 2 + 0.75;   // 楼梯中线
+      {
+        const zTop = bz - D / 2 - 0.75, zBot = bz + 3.0;
+        const len = zBot - zTop;
+        addPatch(stX, (zTop + zBot) / 2, Math.PI / 2, len, 1.2, f2 + 0.02, base);
+        const steps = 13;
+        for (let s = 0; s < steps; s++) {
+          const tt = s / (steps - 1);
+          const zc = zBot + (zTop - zBot) * tt;
+          const hh = base + (f2 + 0.02 - base) * tt;
+          B.add(GEO.box, M.slab, stX, hh - 0.09, zc, 0, 1.24, 0.2, len / steps + 0.12);
+        }
+        // 外侧扶手 + 防坠碰撞
+        for (let i = 0; i <= 6; i++) {
+          const tt = i / 6;
+          B.add(GEO.cyl, M.ironDark, stX + 0.62, base + (f2 - base) * tt + 0.55, zBot + (zTop - zBot) * tt, 0, 0.04, 1.0, 0.04);
+        }
+        colliders.push({ minX: stX + 0.55, maxX: stX + 0.7, minZ: zTop - 0.2, maxZ: zBot + 0.2, minY: base, maxY: roofY + 0.6, noSightBlock: true });
+      }
+      // —— 天台（可选）：第二跑楼梯 + 女儿墙 + 水塔/晾衣 ——
+      if (opts.roof) {
+        const st2X = stX + 1.3;
+        const zBot2 = bz - D / 2 - 0.75, zTop2 = bz + 2.55;
+        addPatch(st2X, (zBot2 + zTop2) / 2, Math.PI / 2, zTop2 - zBot2, 1.2, f2 + 0.02, roofY + 0.02);
+        const steps2 = 13;
+        for (let s = 0; s < steps2; s++) {
+          const tt = s / (steps2 - 1);
+          const zc = zBot2 + (zTop2 - zBot2) * tt;
+          const hh = f2 + 0.02 + (roofY - f2) * tt;
+          B.add(GEO.box, M.slab, st2X, hh - 0.09, zc, 0, 1.24, 0.2, (zTop2 - zBot2) / steps2 + 0.12);
+        }
+        colliders.push({ minX: st2X + 0.55, maxX: st2X + 0.7, minZ: zBot2 - 0.2, maxZ: zTop2 + 0.2, minY: f2, maxY: roofY + 1.2, noSightBlock: true });
+        // 顶端小平台接天台
+        addPatch(bx + W / 2 + 1.4, bz + 2.85, 0, 3.2, 1.3, roofY + 0.02, roofY + 0.02);
+        B.add(GEO.box, M.slab, bx + W / 2 + 1.4, roofY - 0.07, bz + 2.85, 0, 3.2, 0.18, 1.3);
+        addPatch(bx, bz, 0, W - 0.2, D - 0.2, roofY + 0.02, roofY + 0.02);
+        // 女儿墙（南边东端留口接平台）
+        const pp = (cx, cz, w, d) => {
+          B.add(GEO.box, M.plaster, cx, roofY + 0.26, cz, 0, w, 0.52, d);
+          colliders.push({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, minY: roofY, maxY: roofY + 0.55, noSightBlock: true });
+        };
+        pp(bx, bz + D / 2 - 0.09, W, 0.18);
+        pp(bx - W / 2 + 0.09, bz, 0.18, D);
+        pp(bx + W / 2 - 0.09, bz - 1.4, 0.18, D - 2.8); // 东侧留口（接楼梯平台）
+        pp(bx, bz - D / 2 + 0.09, W, 0.18);
+        // 水塔 + 天线 + 晾衣绳
+        for (const [lx, lz] of [[-0.5, 0.5], [0.5, 0.5], [-0.5, -0.5], [0.5, -0.5]]) {
+          B.add(GEO.cyl, M.ironDark, bx - 4 + lx, roofY + 0.6, bz + lz, 0, 0.07, 1.2, 0.07);
+        }
+        B.add(GEO.cyl, M.steel, bx - 4, roofY + 1.75, bz, 0, 0.9, 1.3, 0.9);
+        circle(bx - 4, bz, 0.95, roofY + 2.4);
+        B.add(GEO.cyl, M.ironDark, bx + 3, roofY + 1.1, bz + 1, 0, 0.04, 2.2, 0.04);
+        B.add(GEO.box, M.ironDark, bx + 3, roofY + 2.1, bz + 1, 0.5, 1.4, 0.04, 0.04);
+        B.add(GEO.box, M.ironDark, bx, roofY + 1.55, bz - 0.8, 0, 6.5, 0.03, 0.03);
         for (let i = 0; i < 3; i++) {
-          const c = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.8), i % 2 ? M.clothGrey : M.clothShirt);
-          c.position.set(dx + ox - 1.2 + i * 1.2, base + 1.92, dz + oz);
+          const c = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.1), i % 2 ? M.clothGrey : M.clothShirt);
+          c.position.set(bx - 2.4 + i * 2.2, roofY + 1.0, bz - 0.8);
           scene.add(c);
         }
+        locations[`dormRoof${name === '一栋' ? 1 : 2}`] = new THREE.Vector3(bx, roofY + 0.5, bz);
       }
-      // 公用水龙头 + 煤球堆 + 自行车两辆
-      B.add(GEO.cyl, M.stone, dx - 6, base + 0.3, dz - 5, 0, 0.5, 0.6, 0.5);
-      B.add(GEO.cyl, M.ironDark, dx - 6, base + 0.75, dz - 5, 0, 0.05, 0.4, 0.05);
+      // 栋号牌（西山墙）
+      B.add(GEO.box, plateMat(`水产 · ${name}`, { w: 224, h: 72, bg: '#2e3438', fg: '#d8cfb8', font: 0.42 }), bx - W / 2 - 0.03, f2 + 0.6, bz - 1, Math.PI / 2, 1.5, 0.5, 0.05);
+      return { base, f1, f2, roofY, bayXs, unitDoorZ: sz2 };
+    }
+
+    /** 住户内间外间（外间：八仙桌/灶/CRT；里间：床/五斗橱）。variant 决定叙事细节 */
+    function dormUnit(bk, bx, bz, bayI, floor, variant) {
+      const cxb = bx + bk.bayXs[bayI];
+      const fy = floor === 1 ? bk.f1 : bk.f2;
+      const t = 0.18;
+      // 木地板
+      B.add(GEO.box, M.wood, cxb, fy + 0.02, bz + 0.12, 0, 3.0, 0.05, 5.2);
+      // 两侧隔户墙
+      for (const sx of [-1.6, 1.6]) {
+        B.add(GEO.box, M.plaster, cxb + sx, fy + 1.32, bz + 0.12, 0, t, 2.6, 5.3);
+        aabb(cxb + sx, bz + 0.12, t, 5.3, fy + 2.7);
+      }
+      // 里外间隔断（门洞在西侧）
+      const pz = bz + 0.55;
+      B.add(GEO.box, M.plaster, cxb + 0.43, fy + 1.32, pz, 0, 2.34, 2.6, t);
+      aabb(cxb + 0.43, pz, 2.34, t, fy + 2.7);
+      B.add(GEO.box, M.plaster, cxb - 1.17, fy + 2.35, pz, 0, 0.86, 0.6, t); // 内门楣
+      B.add(GEO.box, M.woodDark, cxb - 0.72, fy + 1.0, pz, 0, 0.08, 2.0, t + 0.05);
+      // —— 外间（南）——
+      // 八仙桌 + 条凳
+      B.add(GEO.box, M.wood, cxb - 0.4, fy + 0.76, bz - 1.5, 0, 1.15, 0.07, 1.15);
+      B.add(GEO.box, M.woodDark, cxb - 0.4, fy + 0.38, bz - 1.5, 0, 0.9, 0.72, 0.08);
+      B.add(GEO.box, M.woodDark, cxb - 0.4, fy + 0.38, bz - 1.5, Math.PI / 2, 0.9, 0.72, 0.08);
+      aabb(cxb - 0.4, bz - 1.5, 1.2, 1.2, fy + 0.85, { noSightBlock: true });
+      B.add(GEO.box, M.wood, cxb - 0.4, fy + 0.24, bz - 2.35, 0, 1.2, 0.06, 0.28);
+      // 碗筷（摆好没动）
+      const bowlN = variant === 'lone' ? 1 : 3;
+      for (let i = 0; i < bowlN; i++) {
+        B.add(GEO.cyl, M.clothShirt, cxb - 0.7 + i * 0.32, fy + 0.83, bz - 1.3 - (i % 2) * 0.35, 0, 0.09, 0.07, 0.09);
+      }
+      // 灶台（东北角）+ 铁锅 + 水缸
+      B.add(GEO.box, M.stone, cxb + 1.05, fy + 0.42, bz - 0.1, 0, 0.9, 0.8, 0.75);
+      aabb(cxb + 1.05, bz - 0.1, 0.95, 0.8, fy + 0.9, { noSightBlock: true });
+      B.add(GEO.cyl, M.ironDark, cxb + 1.05, fy + 0.86, bz - 0.1, 0, 0.28, 0.12, 0.28);
+      B.add(GEO.cyl, M.wood, cxb + 1.15, fy + 0.4, bz - 1.15, 0, 0.32, 0.75, 0.32);
+      // 挂历（撕到十一月三日）
+      B.add(GEO.box, plateMat('二〇〇一年十一月', { w: 160, h: 224, bg: '#e6e0d0', fg: '#33291e', font: 0.16 }), cxb - 1.48, fy + 1.7, bz - 1.2, Math.PI / 2, 0.5, 0.7, 0.04);
+      // CRT 电视（矮柜上）
+      B.add(GEO.box, M.veneer, cxb + 1.05, fy + 0.3, bz - 2.35, 0, 0.9, 0.55, 0.5);
+      B.add(GEO.box, M.crtShell, cxb + 1.05, fy + 0.85, bz - 2.35, 0, 0.62, 0.52, 0.5);
+      aabb(cxb + 1.05, bz - 2.35, 0.95, 0.55, fy + 1.15, { noSightBlock: true });
+      if (variant === 'lit') {
+        const sscreen = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.4),
+          new THREE.MeshBasicMaterial({ color: 0x9aa4a8 }));
+        sscreen.position.set(cxb + 1.05, fy + 0.86, bz - 2.09);
+        scene.add(sscreen);
+        dynamic.staticScreens = dynamic.staticScreens ?? [];
+        dynamic.staticScreens.push(sscreen);
+      }
+      // —— 里间（北）——
+      B.add(GEO.box, M.woodDark, cxb - 0.55, fy + 0.24, bz + 1.9, 0, 1.95, 0.42, 1.15);
+      B.add(GEO.box, variant === 'lit' ? M.clothGrey : M.clothShirt, cxb - 0.55, fy + 0.52, bz + 1.9, variant === 'lit' ? 0.35 : 0, 1.85, 0.18, 1.05);
+      aabb(cxb - 0.55, bz + 1.9, 2.0, 1.2, fy + 0.7, { noSightBlock: true });
+      B.add(GEO.box, M.veneer, cxb + 1.1, fy + 0.65, bz + 2.15, 0, 0.75, 1.25, 0.5);   // 五斗橱
+      aabb(cxb + 1.1, bz + 2.15, 0.8, 0.55, fy + 1.3, { noSightBlock: true });
+      B.add(GEO.box, M.woodDark, cxb + 1.1, fy + 0.3, bz + 1.15, 0, 0.8, 0.55, 0.55);  // 樟木箱
+      // 一盏白炽灯（人走灯不灭）
+      const ul = new THREE.PointLight(0xffd9a0, variant === 'lit' ? 9 : 6, 8, 2);
+      ul.position.set(cxb, fy + 2.25, bz - 0.6);
+      scene.add(ul);
+      lights.push(ul);
+      if (variant === 'lit') {
+        // 203：搪瓷缸还温着（一缕细汽），一把椅子倒着
+        B.add(GEO.cyl, M.clothShirt, cxb - 0.15, fy + 0.86, bz - 1.62, 0, 0.07, 0.13, 0.07);
+        makeSmoke(cxb - 0.15, fy + 0.95, bz - 1.62, { count: 8, rise: 0.7, spread: 0.05, size: 0.1, opacity: 0.2 });
+        B.add(GEO.box, M.woodDark, cxb + 0.5, fy + 0.2, bz - 2.0, 0.7, 0.42, 0.8, 0.42, 0, Math.PI / 2 - 0.12);
+      }
+      if (variant === 'book' || variant === 'circle') {
+        // 户口簿摊在桌上
+        B.add(GEO.box, M.clothShirt, cxb - 0.4, fy + 0.82, bz - 1.5, 0.3, 0.3, 0.025, 0.22);
+        B.add(GEO.box, M.clothRed, cxb - 0.28, fy + 0.85, bz - 1.42, 0.3, 0.06, 0.015, 0.06);
+      }
+      if (variant === 'sew') {
+        // 缝纫机 + 叠好的素白布条
+        B.add(GEO.box, M.ironDark, cxb - 1.1, fy + 0.55, bz - 2.2, 0, 0.7, 0.09, 0.45);
+        B.add(GEO.box, M.ironDark, cxb - 1.1, fy + 0.25, bz - 2.2, 0, 0.55, 0.5, 0.35);
+        B.add(GEO.box, M.crtShell, cxb - 1.1, fy + 0.72, bz - 2.28, 0, 0.3, 0.26, 0.2);
+        aabb(cxb - 1.1, bz - 2.2, 0.75, 0.5, fy + 0.9, { noSightBlock: true });
+        for (let i = 0; i < 3; i++) {
+          B.add(GEO.box, M.clothShirt, cxb + 1.1, fy + 1.33 + i * 0.05, bz + 2.15, 0.1 * i, 0.5, 0.04, 0.3);
+        }
+      }
+      return { cxb, fy };
+    }
+
+    {
+      const b1 = dormBlock(-37, 26, '一栋', { open1: 1, open2: 2, roof: true, surnames: ['周', '陈', '林', '黄', '吴'] });
+      const b2 = dormBlock(-37, 14.2, '二栋', { open1: 3, open2: 0, surnames: ['郑', '周', '苏', '柯', '连'] });
+      // 一栋 102：桌上户口簿（打勾）；里间五斗橱=电池点位
+      const u102 = dormUnit(b1, -37, 26, 1, 1, 'book');
+      locations.dormBook1 = new THREE.Vector3(u102.cxb - 0.4, u102.fy + 0.85, 26 - 1.5);
+      locations.dormBattery = new THREE.Vector3(u102.cxb + 1.1, u102.fy + 1.35, 26 + 2.15);
+      // 一栋 203：灯亮着的那扇窗——人不在
+      const u203 = dormUnit(b1, -37, 26, 2, 2, 'lit');
+      dynamic.dorm203 = { x: u203.cxb, z: 26, y: u203.fy };
+      // 203 的窗没拉严——整面亮着（外景地标：灯后头没有人影）
+      const litW = new THREE.Mesh(new THREE.PlaneGeometry(0.88, 1.02),
+        new THREE.MeshBasicMaterial({ color: 0xffd9a0 }));
+      litW.position.set(-37 + 0.85, b1.f2 + 1.42, 26 - 3.0 - 0.04);
+      litW.rotation.y = Math.PI;
+      scene.add(litW);
+      // 二栋 104：只摆一副碗筷 + 发条闹钟点位
+      const u104 = dormUnit(b2, -37, 14.2, 3, 1, 'lone');
+      locations.dormClock = new THREE.Vector3(u104.cxb + 1.1, u104.fy + 1.35, 14.2 + 2.15);
+      // 二栋 201：户口簿（红圈）+ 缝纫机白布
+      const u201 = dormUnit(b2, -37, 14.2, 0, 2, 'sew');
+      locations.dormBook2 = new THREE.Vector3(u201.cxb + 1.1, u201.fy + 1.4, 14.2 + 2.15);
+      // 弄堂：石板 + 公用水龙头 + 煤球堆 + 自行车
+      laySlabPath([[-45, 20], [-29, 20]], 1.3);
+      const ay = g(-43, 20);
+      B.add(GEO.cyl, M.stone, -43, ay + 0.3, 20, 0, 0.5, 0.6, 0.5);
+      B.add(GEO.cyl, M.ironDark, -43, ay + 0.75, 20, 0, 0.05, 0.4, 0.05);
       for (let i = 0; i < 8; i++) {
-        B.add(GEO.cyl, M.ironDark, dx + 6.5 + (i % 4) * 0.28, base + 0.1 + Math.floor(i / 4) * 0.18, dz - 4.5 + (i % 2) * 0.24, 0, 0.11, 0.18, 0.11);
+        B.add(GEO.cyl, M.ironDark, -31 + (i % 4) * 0.28, ay + 0.1 + Math.floor(i / 4) * 0.18, 19.4 + (i % 2) * 0.24, 0, 0.11, 0.18, 0.11);
       }
-      for (const ox of [3.5, 4.4]) {
-        const bx2 = dx + ox, bz2 = dz - 3.4;
+      for (const ox of [-34.5, -33.6]) {
         for (const wz of [-0.5, 0.5]) {
           const wl = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.03, 6, 14), M.ironDark);
-          wl.position.set(bx2, base + 0.34, bz2 + wz);
+          wl.position.set(ox, ay + 0.34, 20.4 + wz);
           wl.rotation.y = Math.PI / 2 + 0.15;
           scene.add(wl);
         }
-        B.add(GEO.box, M.ironDark, bx2, base + 0.62, bz2, 0.15, 0.05, 0.06, 1.1, 0, 0.25);
+        B.add(GEO.box, M.ironDark, ox, ay + 0.62, 20.4, 0.15, 0.05, 0.06, 1.1, 0, 0.25);
       }
-      locations.dorm = new THREE.Vector3(dx, base + 0.8, dz - 3);
+      // 弄堂晾衣绳（夜里没人收）
+      for (const [ox, oz] of [[-41, 20.6], [-33, 19.6]]) {
+        B.add(GEO.cyl, M.woodDark, ox - 2.2, ay + 1.25, oz, 0, 0.07, 2.5, 0.07);
+        B.add(GEO.cyl, M.woodDark, ox + 2.2, ay + 1.25, oz, 0, 0.07, 2.5, 0.07);
+        B.add(GEO.box, M.ironDark, ox, ay + 2.35, oz, 0, 4.4, 0.03, 0.03);
+        for (let i = 0; i < 3; i++) {
+          const c = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.8), i % 2 ? M.clothGrey : M.clothShirt);
+          c.position.set(ox - 1.2 + i * 1.2, ay + 1.92, oz);
+          scene.add(c);
+        }
+      }
+      locations.dorm = new THREE.Vector3(-37, ay + 0.8, 20);
     }
   }
 
@@ -1673,7 +2036,9 @@ export function buildTown(scene, M) {
     { minX: 20.0, maxX: 29.0, minZ: 0.7, maxZ: 7.7 },     // 录像厅
     { minX: 29.8, maxX: 34.2, minZ: -19.9, maxZ: -16.1 }, // 广播站
     { minX: 28.2, maxX: 29.8, minZ: -7.3, maxZ: -5.7 },   // 电话亭
-    { minX: -45.2, maxX: -28.8, minZ: 22.3, maxZ: 27.7 }, // 家属筒子楼
+    { minX: -45.4, maxX: -26.8, minZ: 21.4, maxZ: 29.4 }, // 水产家属楼·一栋（含外廊/楼梯）
+    { minX: -45.4, maxX: -26.8, minZ: 9.6, maxZ: 17.6 },  // 水产家属楼·二栋
+    { minX: 10.7, maxX: 17.3, minZ: 0.0, maxZ: 5.7 },     // 大新照相馆
   ];
 
   // ================= 区域(叙事触发) =================
@@ -1682,7 +2047,7 @@ export function buildTown(scene, M) {
     dikeArea: { minX: -26, maxX: 60, minZ: 40, maxZ: 86 },
     busStation: { minX: 50, maxX: 74, minZ: -8, maxZ: 12 },
     frontStreet: { minX: 14, maxX: 46, minZ: -10, maxZ: 10 },
-    dormArea: { minX: -48, maxX: -26, minZ: 14, maxZ: 34 },
+    dormArea: { minX: -48, maxX: -26, minZ: 8, maxZ: 34 },
     aquaMain: dynamic.aquaMainRect,
     villageCenter: { minX: -30, maxX: 40, minZ: -36, maxZ: 38 },
     saltField: { minX: -58, maxX: -26, minZ: -8, maxZ: 18 },

@@ -156,6 +156,10 @@ export function buildMaterials(lowspec = false) {
     color: 0x18424a, roughness: 0.1, metalness: 0, transparent: true, opacity: 0.55,
     envMapIntensity: 1.6,
   }); // 海洋馆展缸玻璃
+  M.shopGlass = new THREE.MeshPhysicalMaterial({
+    color: 0x9aa8a2, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.16,
+    envMapIntensity: 1.8,
+  }); // 沿街门市橱窗玻璃（薄透、留一点旧灰）
 
   M.net = new THREE.MeshStandardMaterial({
     map: T.net, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide,
