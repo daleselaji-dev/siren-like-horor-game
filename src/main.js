@@ -16,6 +16,7 @@ import { SightjackSystem } from './systems/sightjack.js';
 import { StealthSystem } from './systems/stealth.js';
 import { CRTSystem } from './systems/crt.js';
 import { ToolsSystem } from './systems/tools.js';
+import { PowerSystem } from './systems/power.js';
 import { Agenda } from './systems/agenda.js';
 import { Story, NOTES } from './systems/story.js';
 import { HUD } from './ui/hud.js';
@@ -222,11 +223,14 @@ const stealth = new StealthSystem(world, player);
 const crt = new CRTSystem(engine, world);
 crt.gainLight = sky.hemi; // 监控头自动增益用
 const tools = new ToolsSystem({ scene: engine.scene, engine, player, world, stealth, hud, audio, enemies, guest });
+const power = new PowerSystem({ world, hud, audio, player });
+tools.power = power;
+power.onChanged = () => tools.syncHud();
 
 const game = {
   scene: engine.scene, engine, world, player, hud, audio,
   enemies, byId, viewers, watchers, floaters, gaze, guest, dog,
-  sightjack, stealth, crt, tools, ocean, sky, M,
+  sightjack, stealth, crt, tools, power, ocean, sky, M,
   state: 'TITLE', // TITLE | PLAY | NOTE | PAUSE | ENDED
   openNote(note) {
     hud.showNote(note);
@@ -331,10 +335,18 @@ function handleInput(dt) {
     return; // 视奸中不处理互动
   }
 
-  // 反击工具：F 镁光闪 / G 发条闹钟 / V 贝灰线
+  // 反击工具：F 镁光闪 / G 发条闹钟 / V 贝灰线 / R 录音对照
   if (input.justPressed('KeyF')) tools.flash();
   if (input.justPressed('KeyG')) tools.placeClock();
   if (input.justPressed('KeyV')) tools.pourLime();
+  if (input.justPressed('KeyR')) tools.playTape();
+
+  // 保险丝板开着：1/2/3 拔插三路分闸
+  if (power.panelOpen) {
+    if (input.justPressed('Digit1')) power.toggle(0);
+    if (input.justPressed('Digit2')) power.toggle(1);
+    if (input.justPressed('Digit3')) power.toggle(2);
+  }
 
   // 互动
   const it = story.findInteractable();
@@ -386,7 +398,7 @@ function loop() {
     // 敌人/实体 AI
     const ctx = {
       player, dt, audio,
-      envSightFactor: stealth.envSightFactor,
+      envSightFactor: stealth.envSightFactor * power.playerSightK(), // 断电堂口里的人不容易被看见
       noiseEvents: stealth.noiseEvents,
       vibration: stealth.vibration,      // 上宾循振
       leaked: story.flags.leaked,        // 望潮者转身
@@ -413,6 +425,7 @@ function loop() {
     // 系统
     stealth.update(dt, enemies);
     tools.update(dt);
+    power.update(dt);
     agenda.update(dt);
     story.update(dt);
     sightjack.update(dt, elapsed);
@@ -492,5 +505,5 @@ loop();
 window.__game = {
   engine, player, world, ocean, sky, input, enemies, byId, dog, birds, watchers,
   floaters, gaze, guest, crt, agenda, M,
-  sightjack, stealth, tools, story, hud, audio, game,
+  sightjack, stealth, tools, power, story, hud, audio, game,
 };

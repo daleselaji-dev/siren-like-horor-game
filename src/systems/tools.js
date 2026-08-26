@@ -25,6 +25,13 @@ export class ToolsSystem {
     this.clocks = 0;
     this.lime = 0;
 
+    // 手提录音机 + 对照磁带（轮11 箱庭）：磁带在「它录下的地方」放，能听出对不上的那一处
+    this.hasRecorder = false;
+    this.tapesOwned = [];   // {id,label,spot,r,lines,compare,hint,done}
+    this.tapePlayT = 0;     // 回放冷却（一盘放完才能放下一盘）
+    this.tapeCycle = 0;
+    this.onTapeMatch = null; // (id)=>void 由剧情侧接：解锁奖励点
+
     this.flashVal = 0;        // 叠加到后处理 uFlash
     this.flashCd = 0;         // 换泡时间
     this.activeClocks = [];   // {mesh,x,z,y,t,phase:'wind'|'ring'|'dead',trill}
@@ -47,9 +54,58 @@ export class ToolsSystem {
   addBulbs(n) { this.bulbs += n; this.syncHud(); }
   addClocks(n) { this.clocks += n; this.syncHud(); }
   addLime(n) { this.lime += n; this.syncHud(); }
+  pickupRecorder() { this.hasRecorder = true; this.syncHud(); }
+  addTape(t) { this.tapesOwned.push({ ...t, done: false }); this.syncHud(); }
 
   syncHud() {
-    this.hud.setTools({ camera: this.hasCamera, bulbs: this.bulbs, clocks: this.clocks, lime: this.lime });
+    this.hud.setTools({
+      camera: this.hasCamera, bulbs: this.bulbs, clocks: this.clocks, lime: this.lime,
+      recorder: this.hasRecorder, tapes: this.tapesOwned.filter((t) => !t.done).length,
+      fuses: this.power?.spare ?? 0, fusesEver: this.power?.everPulled ?? false,
+    });
+  }
+
+  // ---------- ④ 手提录音机（R）：对照回放 ----------
+  playTape() {
+    if (!this.hasRecorder) return false;
+    if (this.tapePlayT > 0) return false;
+    if (this.tapesOwned.length === 0) {
+      this.audio.blip(500, 0.05, 0.06);
+      this.hud.subtitle('录音机里没有磁带。仓门里积着盐末。', 3);
+      return false;
+    }
+    const p = this.player.pos;
+    // 站在某盘磁带的「录制地」半径内 → 对照回放；否则平放（给提示）
+    let tape = null;
+    for (const t of this.tapesOwned) {
+      if (t.done) continue;
+      const d = Math.hypot(p.x - t.spot.x, p.z - t.spot.z);
+      if (d <= t.r && Math.abs(p.y - t.spot.y) < 3.5) { tape = t; break; }
+    }
+    const onSpot = !!tape;
+    if (!tape) {
+      const undone = this.tapesOwned.filter((t) => !t.done);
+      const pool = undone.length ? undone : this.tapesOwned;
+      tape = pool[this.tapeCycle++ % pool.length];
+    }
+    this.tapePlayT = 9;
+    // 磁头咬带：沙沙底噪 + 断续的浊音（说话声闷在铁皮匣里）
+    this.audio.paper();
+    this.audio.blip(160, 0.12, 0.5, 0.3);
+    this.audio.blip(210, 0.1, 0.4, 1.1);
+    this.audio.blip(140, 0.12, 0.6, 2.0);
+    this.hud.subtitle(`〔磁带 · ${tape.label}〕`, 2.2);
+    for (const ln of tape.lines) this.hud.subtitle(ln, 4.2, 'radio');
+    if (onSpot && !tape.done) {
+      tape.done = true;
+      for (const ln of tape.compare) this.hud.subtitle(ln, 4.8, 'song');
+      this.audio.wrong?.();
+      this.onTapeMatch?.(tape.id);
+      this.syncHud();
+    } else if (!onSpot) {
+      this.hud.subtitle(tape.hint, 4.2);
+    }
+    return true;
   }
 
   // ---------- ① 镁光闪 ----------
@@ -160,6 +216,7 @@ export class ToolsSystem {
   update(dt) {
     if (this.flashVal > 0) this.flashVal = Math.max(0, this.flashVal - dt * 6.5);
     if (this.flashCd > 0) this.flashCd -= dt;
+    if (this.tapePlayT > 0) this.tapePlayT -= dt;
 
     // 闹钟：上弦 2.5s 后响 9s；响时持续制造噪音事件 + 把附近的人骗去绕圈搜
     for (const c of this.activeClocks) {

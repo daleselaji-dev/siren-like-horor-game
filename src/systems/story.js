@@ -763,6 +763,124 @@ export class Story {
         g.hud.objective('按 V 倒灰线：守规矩的东西不肯踩过去');
       },
     });
+
+    // —— 轮11 箱庭①：手提录音机 + 对照磁带（在录下它的地方放，听出对不上的那一处） ——
+    add({
+      id: 'toolRecorder', pos: L.recorder, r: 2.0, prompt: '拿走牌桌上的录音机',
+      cond: () => !F.tookRecorder,
+      act: () => {
+        F.tookRecorder = true;
+        g.tools.pickupRecorder();
+        g.tools.addTape({
+          id: 't1', label: '核册 · 西翼', spot: L.banquetCenter, r: 7,
+          lines: ['「……东三桌，九位。九副碗，九盅茶。」', '带子里的人顿了顿，又数了一遍：「九位。」'],
+          compare: ['你数了数眼前的席——每一桌都只摆八副碗。', '多出来的那一副，收在上宾席的桌布底下。'],
+          hint: '标签写着「核册·西翼」。得对着宴会厅放。',
+        });
+        g.audio.blip(700, 0.08, 0.15);
+        g.hud.subtitle('铁皮壳的手提录音机。按键停在半局，磁带没退出来。', 4.5);
+        g.hud.subtitle('牌桌上四副牌都码得整整齐齐——没有人输，也没有人赢。', 4.5, 'song');
+        g.hud.objective('按 R 回放磁带：在录下它的地方放，能听出对不上的');
+      },
+    });
+    add({
+      id: 'tape2', pos: L.videoHall, r: 2.2, prompt: '从还带箱里抽出一盘磁带',
+      cond: () => !F.tookTape2,
+      act: () => {
+        F.tookTape2 = true;
+        g.tools.addTape({
+          id: 't2', label: '点名 · 家属楼', spot: L.dorm, r: 9,
+          lines: ['「二〇一，到。二〇三，到。一〇四——」', '带子空转了几秒。「一〇四，到。」是另一个嗓子替答的。'],
+          compare: ['楼道的门牌少了一块——104 的名字是后来补写的。', '替答的那个嗓子，是从 201 的方向录进来的。'],
+          hint: '标签写着「点名·家属楼」。得对着筒子楼中庭放。',
+        });
+        g.audio.paper();
+        g.hud.subtitle('还带箱里只有这一盘。标签不是店里的字。', 4);
+        if (!F.tookRecorder) g.hud.subtitle('得有台能放的机子。', 3, 'song');
+      },
+    });
+    add({
+      id: 'tape3', pos: L.aquaOffice, r: 2.0, prompt: '打开值班桌抽屉',
+      cond: () => !F.tookTape3,
+      act: () => {
+        F.tookTape3 = true;
+        g.tools.addTape({
+          id: 't3', label: '广播底带', spot: L.ruleBoard, r: 6,
+          lines: ['「……第三条：桥不在名册上，请勿在桥上停留。」', '广播念完，底噪里有人小声说：不对。重录。'],
+          compare: ['墙上的第三条告示写的不是这句。', '那张纸比另外两张新——是后来换过的。揭开看看。'],
+          hint: '标签写着「广播底带」。得对着镇口的告示墙放。',
+        });
+        g.audio.paper();
+        g.hud.subtitle('抽屉里一盘缠了防潮纸的磁带，和半盒受潮的曲别针。', 4.5);
+      },
+    });
+    // 对照成功 → 奖励点亮起
+    g.tools.onTapeMatch = (id) => {
+      if (id === 't1') F.tapeCmp1 = true;
+      if (id === 't2') F.tapeCmp2 = true;
+      if (id === 't3') F.tapeCmp3 = true;
+      this.saveCheckpoint?.('tape_' + id);
+    };
+    add({
+      id: 'tapeR1', pos: L.guestSeat, r: 2.2, prompt: '掀开上宾席的桌布',
+      cond: () => F.tapeCmp1 && !F.tapeRw1,
+      act: () => {
+        F.tapeRw1 = true;
+        g.tools.addBulbs(2);
+        g.audio.paper();
+        g.hud.subtitle('桌布底下压着第九副碗——碗里码着两颗镁光泡。', 4.5);
+        g.hud.subtitle('有人早就数出来了。他把答案留给下一个数的人。', 4.5, 'song');
+      },
+    });
+    add({
+      id: 'tapeR2', pos: L.dormBook2, r: 2.0, prompt: '摸 201 床板的夹缝',
+      cond: () => F.tapeCmp2 && !F.tapeRw2,
+      act: () => {
+        F.tapeRw2 = true;
+        g.tools.addClocks(1);
+        g.tools.addLime(1);
+        g.audio.blip(1400, 0.05, 0.05);
+        g.hud.subtitle('床板夹缝里塞着一只上好弦的闹钟，和一小包贝灰。', 4.5);
+        g.hud.subtitle('替 104 答到的人睡在这儿。他替人答到，也替人备好了跑的东西。', 5, 'song');
+      },
+    });
+    add({
+      id: 'tapeR3', pos: L.ruleBoard, r: 2.4, prompt: '揭开第三张告示',
+      cond: () => F.tapeCmp3 && this.notesFound.has('note9') && !F.tapeRw3,
+      act: () => {
+        F.tapeRw3 = true;
+        g.tools.addLime(1);
+        g.tools.addBulbs(1);
+        g.audio.paper();
+        g.hud.subtitle('第三张告示背面用炭笔写着原文：「第三条：桥上点过的名不算。」', 5);
+        g.hud.subtitle('纸和墙之间贴着一小包贝灰、一颗镁光泡——换告示的人留下的。', 4.5, 'song');
+      },
+    });
+
+    // —— 轮11 箱庭②：配电间保险丝板（黑暗是能搬运的行装） ——
+    add({
+      id: 'fusePanel', pos: L.fusePanel, r: 1.9, prompt: '看保险丝板',
+      cond: () => true,
+      act: () => {
+        g.power.openPanel(L.fusePanel);
+        if (!F.fuseTipDone) {
+          F.fuseTipDone = true;
+          g.hud.subtitle('三只瓷座，三路灯：拔哪路，哪路的堂口就归黑暗管。', 4.5);
+          g.hud.subtitle('黑处的你不容易被看见。黑处的它们也一样。', 4.5, 'song');
+        }
+      },
+    });
+    add({
+      id: 'toolFuse', pos: L.kitchen, r: 2.0, prompt: '翻检传菜台下的纸箱',
+      cond: () => !F.tookFuse,
+      act: () => {
+        F.tookFuse = true;
+        g.power.addSpare(1);
+        g.audio.blip(900, 0.06, 0.06);
+        g.hud.subtitle('纸箱里是备品：一枚瓷底保险丝，芯是新的。', 4);
+        g.hud.subtitle('揣上它——就多一路灯归你管。', 3.5, 'song');
+      },
+    });
   }
 
   // ---------- 触发区 ----------

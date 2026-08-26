@@ -128,6 +128,8 @@ export class HUD {
     if (t.camera) rows.push(`<div class="tool-item${t.bulbs > 0 ? '' : ' empty'}"><kbd>F</kbd>镁光闪 × ${t.bulbs}</div>`);
     if (t.clocks > 0 || this._hadClock) { this._hadClock = true; rows.push(`<div class="tool-item${t.clocks > 0 ? '' : ' empty'}"><kbd>G</kbd>发条闹钟 × ${t.clocks}</div>`); }
     if (t.lime > 0 || this._hadLime) { this._hadLime = true; rows.push(`<div class="tool-item${t.lime > 0 ? '' : ' empty'}"><kbd>V</kbd>贝灰线 × ${t.lime}</div>`); }
+    if (t.recorder) rows.push(`<div class="tool-item${t.tapes > 0 ? '' : ' empty'}"><kbd>R</kbd>录音对照 × ${t.tapes}</div>`);
+    if (t.fusesEver) rows.push(`<div class="tool-item${t.fuses > 0 ? '' : ' empty'}">⌁ 保险丝 × ${t.fuses}</div>`);
     el.innerHTML = rows.join('');
     // 数量变化时闪一下边框
     const last = el.lastElementChild;

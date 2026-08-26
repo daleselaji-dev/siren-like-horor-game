@@ -772,6 +772,15 @@ export function buildHotel(ctx) {
     locations.mainBreaker = world(14, 1.5, 4.7);
     box(plateMat('配电重地', { w: 160, h: 64, bg: '#7a2020', fg: '#e8d8b8', font: 0.4 }), 11.16, 1.9, 4.6, 0.05, 0.36, 0.8);
     addLight(0xffc880, 3, 5, 14, 2.4, 4.5, 0.6);
+    // 分闸保险丝板（轮11 箱庭）：总闸旁的灰铁盒——三只瓷座保险丝各管一路
+    box(M.steel, 15.3, 1.55, 4.52, 0.72, 0.9, 0.16);
+    colliders.push({ minX: hx + 14.9, maxX: hx + 15.7, minZ: hz + 4.4, maxZ: hz + 4.62, minY: hb + 1.1, maxY: hb + 2.0, noSightBlock: true });
+    for (let i = 0; i < 3; i++) {
+      cyl(M.porcelain, 15.08 + i * 0.22, 1.62, 4.62, 0.09, 0.12, 0.09);   // 瓷座
+      cyl(M.brass, 15.08 + i * 0.22, 1.7, 4.62, 0.035, 0.05, 0.035);      // 铜帽
+    }
+    box(plateMat('大堂·西翼·客房', { w: 256, h: 48, bg: '#3a3a3a', fg: '#d8d0b8', font: 0.5 }), 15.3, 1.32, 4.62, 0.6, 0.12, 0.03);
+    locations.fusePanel = world(15.3, 1.5, 4.75);
     // 卫生间：隔断+洗手台+镜(理册婆镜像点位①)
     box(M.tile, 14, 0.02, 7.6, 5.9, 0.045, 3.1);
     box(M.marble, 12.5, 0.75, 8.9, 2.2, 0.1, 0.55);
@@ -888,6 +897,12 @@ export function buildHotel(ctx) {
     }
     colliders.push({ x: hx - 12.5, z: hz - 1, r: 0.75, maxY: hb + F2 + 0.9, noSightBlock: true });
     addLight(0xffc880, 6, 8, -12.5, F2 + 2.3, -1, 0.2);
+    // 手提录音机（轮11）：牌桌上搁着一台——按停在半局，旁边一盘贴标签的磁带
+    box(M.ironDark, -12.1, F2 + 0.93, -0.7, 0.3, 0.12, 0.2);
+    cyl(M.steel, -12.16, F2 + 1.0, -0.7, 0.05, 0.02, 0.05);
+    cyl(M.steel, -12.04, F2 + 1.0, -0.7, 0.05, 0.02, 0.05);
+    box(M.crtShell, -12.4, F2 + 0.9, -1.15, 0.11, 0.02, 0.07, 0.3);
+    locations.recorder = world(-12.2, F2 + 0.95, -0.8);
     // 布草间：布草架成排（视线遮挡好地形）
     for (const pz of [5.5, 7.5, 9.5]) {
       box(M.steel, -12.5, F2 + 1.0, pz, 6.5, 2.0, 0.5);

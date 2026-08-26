@@ -2573,7 +2573,7 @@ export function buildTown(scene, M) {
           k = 1 - Math.max(0, drop - (1.85 - fl * 0.55)) * 1.6;
           k = Math.max(0.08, k) * (1 + Math.sin(time * 47 + i) * 0.04 * fl);
         }
-        hl.pl.intensity = hl.base * k;
+        hl.pl.intensity = hl.base * k * (hl.powerK ?? 1); // powerK: 保险丝板拔掉该路=0
       }
     },
   };
