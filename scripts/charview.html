@@ -119,6 +119,10 @@ window.__profile = (i) => {
   cam.lookAt(p.x, p.y, p.z);
 };
 window.__lookAt(0);
+// 调试探针口（eggprobe 等临时脚本射线定位用）
+window.__THREE = THREE;
+window.__camera = cam;
+window.__scene = scene;
 window.__ready = true;
 </script>
 </body>

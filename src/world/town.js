@@ -1160,7 +1160,9 @@ export function buildTown(scene, M) {
           0.2, 0.775, 0, 7.6, 0.012, 0.6);                           // 过道胶条（磨旧的暗红）
         // 仪表台专用炭灰（轮17）：0x14161a 近黑吸光——舱内光下必须读得出台面
         const dashM = new THREE.MeshStandardMaterial({ color: 0x2e3338, roughness: 0.78 });
-        mkBox(dashM, 3.62, 1.36, 0, 0.55, 0.3, 2.05);                // 仪表台上沿
+        // 上沿收进（进深0.55→0.36）：老配方台板一直盖到方向盘正上方，盘从舱内任何
+        // 机位都只露一条弧——台板退后才腾出「盘在台前」的驾驶位纵深
+        mkBox(dashM, 3.72, 1.36, 0, 0.36, 0.3, 2.05);                // 仪表台上沿
         mkBox(dashM, 3.8, 0.95, 0, 0.42, 0.55, 2.1);                 // 仪表台立面
         mkBox(dashM, 3.56, 1.02, 0.35, 0.06, 0.42, 1.3);             // 立面前脸板（膝部面）
         // —— 仪表台轮17：凹槽/圆表盘/开关排/出风口/杂物槽——「灰块拼装」出局 ——
@@ -1172,73 +1174,116 @@ export function buildTown(scene, M) {
           mkBox(recessM, 3.575, 1.06, -0.2, 0.06, 0.26, 0.56);
           mkBox(recessM, 3.57, 1.22, 0.12, 0.05, 0.09, 0.3);
           mkBox(new THREE.MeshBasicMaterial({ color: 0xc08238 }), 3.545, 1.22, 0.02, 0.012, 0.02, 0.03);
-          // 司机正前仪表罩眉檐 + 两只圆表盘（表面/表圈/指针）
-          mkBox(dashM, 3.34, 1.5, 0.55, 0.24, 0.05, 0.5);
+          // 司机正前仪表罩眉檐 + 两只圆表盘（表面/表圈/指针）——随台面前脸(3.54)外挂，
+          // 盘面朝司机、从过道越肩机位能读到两只亮盘
+          mkBox(dashM, 3.55, 1.545, 0.55, 0.17, 0.05, 0.5);
           for (const [dz2, dr] of [[0.44, 0.062], [0.63, 0.05]]) {
             const rim = new THREE.Mesh(new THREE.CylinderGeometry(dr + 0.012, dr + 0.012, 0.03, 14), darkM);
             rim.rotation.z = Math.PI / 2;
-            rim.position.set(3.31, 1.42, dz2);
+            rim.position.set(3.5, 1.46, dz2);
             bus.add(rim);
             const face2 = new THREE.Mesh(new THREE.CylinderGeometry(dr, dr, 0.034, 14), dialFaceM);
             face2.rotation.z = Math.PI / 2;
-            face2.position.set(3.308, 1.42, dz2);
+            face2.position.set(3.498, 1.46, dz2);
             bus.add(face2);
             const needle = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.008, dr * 1.5), new THREE.MeshBasicMaterial({ color: 0xb03028 }));
-            needle.position.set(3.29, 1.42, dz2);
+            needle.position.set(3.48, 1.46, dz2);
             needle.rotation.x = 0.7;
             bus.add(needle);
           }
+          // 台面顶皮细节（从舱内看见的那一面不能是大空白板）：
+          // 除霜风栅两条 + 台面搪瓷缸 + 折叠抹布——2001 长途车台面的生活层
+          for (const gz of [-0.45, 0.45]) mkBox(recessM, 3.82, 1.514, gz, 0.14, 0.014, 0.34);
+          const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.033, 0.1, 10),
+            new THREE.MeshStandardMaterial({ color: 0x9ba394, roughness: 0.55 }));
+          mug.position.set(3.66, 1.562, 0.08);
+          bus.add(mug);
+          mkBox(new THREE.MeshStandardMaterial({ color: 0x5d5346, roughness: 0.98 }),
+            3.68, 1.52, -0.35, 0.16, 0.02, 0.2);
           // 拨杆开关排五枚（凸起 1.5cm）+ 两枚大琴键开关——手会去摸的那种台面
           for (let k2 = 0; k2 < 5; k2++) {
             mkBox(knobM, 3.56, 1.31, -0.08 - k2 * 0.09, 0.03, 0.03, 0.045);
             mkBox(M.ironDark, 3.545, 1.335, -0.08 - k2 * 0.09, 0.012, 0.05, 0.014);
           }
           for (const kz of [0.16, 0.26]) mkBox(knobM, 3.555, 1.135, kz, 0.035, 0.06, 0.07);
-          // 出风口两格（横栅三片）+ 台面杂物槽沿
+          // 出风口两格（横栅三片）+ 台面杂物槽沿——随新台面前脸(3.54)重挂
           for (const vz2 of [-0.72, 0.86]) {
-            mkBox(recessM, 3.48, 1.485, vz2, 0.05, 0.05, 0.2);
-            for (let g2 = 0; g2 < 3; g2++) mkBox(knobM, 3.465, 1.47 + g2 * 0.016, vz2, 0.02, 0.006, 0.19);
+            mkBox(recessM, 3.545, 1.485, vz2, 0.05, 0.05, 0.2);
+            for (let g2 = 0; g2 < 3; g2++) mkBox(knobM, 3.53, 1.47 + g2 * 0.016, vz2, 0.02, 0.006, 0.19);
           }
-          mkBox(knobM, 3.42, 1.525, -0.3, 0.02, 0.025, 0.7); // 台面槽沿条
+          mkBox(knobM, 3.555, 1.525, -0.3, 0.02, 0.025, 0.7); // 台面杂物槽沿条
         }
-        // 方向盘（轮17：抬高放大成大巴的大平盘——盘缘必须越过仪表台上沿，
-        // 舱内任何机位都读得到「有一只方向盘」）+ 三辐条 + 中毂
-        const wheelM = new THREE.MeshStandardMaterial({ color: 0x363c42, roughness: 0.5 });
-        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.024, 8, 20), wheelM);
-        wheel.position.set(3.16, 1.44, 0.55);
+        // 方向盘（轮17二稿：老配方盘心x3.16埋在司机胸腔(2.95-3.25)里，只露一条细弧——
+        // 盘整体外移到司机与台面之间(x3.32)，司机后撤，盘缘高过台面上沿8cm，
+        // 舱内任何机位都读得到「一只大平盘 + 扶着盘的两只手」）
+        const wheelM = new THREE.MeshStandardMaterial({ color: 0x454c54, roughness: 0.5 });
+        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.028, 8, 22), wheelM);
+        wheel.position.set(3.32, 1.4, 0.55);
         wheel.rotation.y = Math.PI / 2;
         wheel.rotateX(0.62);                                          // 盘面大平角（客车盘）
         bus.add(wheel);
         for (const sa of [0, 2.1, -2.1]) {
-          const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.22, 0.026), wheelM);
-          spoke.position.set(3.16, 1.44, 0.55);
+          const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.25, 0.028), wheelM);
+          spoke.position.set(3.32, 1.4, 0.55);
           spoke.rotation.y = Math.PI / 2;
           spoke.rotateX(0.62);
           spoke.rotateZ(sa);
-          spoke.translateY(0.11);
+          spoke.translateY(0.125);
           bus.add(spoke);
         }
-        const hubW = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 10), wheelM);
-        hubW.position.set(3.16, 1.44, 0.55);
+        const hubW = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.045, 10), wheelM);
+        hubW.position.set(3.32, 1.4, 0.55);
         hubW.rotation.z = Math.PI / 2 - 0.62;
         bus.add(hubW);
-        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.034, 0.46, 6), darkM);
-        col.position.set(3.32, 1.22, 0.55);
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.034, 0.5, 6), darkM);
+        col.position.set(3.42, 1.18, 0.55);
         col.rotation.z = 1.0;
         bus.add(col);
-        mkBox(seatM, 2.98, 1.14, 0.55, 0.13, 0.56, 0.5);             // 司机座矮背（90年代客车——越肩能读到盘）
-        mkBox(drvM, 3.1, 1.46, 0.55, 0.3, 0.6, 0.42);                // 司机背影躯干
+        mkBox(seatM, 2.88, 1.14, 0.55, 0.13, 0.56, 0.5);             // 司机座矮背（90年代客车——越肩能读到盘）
+        // 司机背影躯干（轮17三稿）：舱内近景里他不能是一块平板墙——
+        // 上收下阔的椭圆筒（肩斜）+ 两肩圆头 + 立领，背影读成「穿外套的人」
+        const dtorso = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.205, 0.62, 12), drvM);
+        dtorso.position.set(3.0, 1.45, 0.55);
+        dtorso.scale.set(0.72, 1, 1.18);
+        bus.add(dtorso);
+        for (const s of [-1, 1]) {
+          const sh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), drvM);
+          sh.position.set(3.0, 1.72, 0.55 + s * 0.155);
+          sh.scale.set(0.85, 0.75, 1);
+          bus.add(sh);
+        }
         const dhead = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), drvM);
-        dhead.position.set(3.12, 1.95, 0.55);
+        dhead.position.set(3.02, 1.95, 0.55);
         dhead.scale.set(0.92, 1.08, 0.98);
         bus.add(dhead);
         // 司机的旧解放帽（帽檐压着后颈线——不能是一颗光球）
         const dcap = new THREE.Mesh(new THREE.CylinderGeometry(0.118, 0.125, 0.07, 10), darkM);
-        dcap.position.set(3.12, 2.02, 0.55);
+        dcap.position.set(3.02, 2.02, 0.55);
         bus.add(dcap);
-        mkBox(darkM, 3.12, 1.7, 0.55, 0.1, 0.1, 0.1);                // 颈（领口立起）
-        // 轮17：椅背有缝线槽/包边，头枕罩白椅套（2001 长途车标配），坐垫有厚度与前缘滚边
-        const coverM = new THREE.MeshStandardMaterial({ color: 0xb0aca0, roughness: 0.92 });
+        const dneck = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.06, 0.14, 8), drvM);
+        dneck.position.set(3.02, 1.78, 0.55);
+        bus.add(dneck);
+        // 外套立领（环着颈根一圈厚边——背影的「衣领线」）
+        const dcol = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.022, 6, 12), darkM);
+        dcol.position.set(3.01, 1.76, 0.55);
+        dcol.rotation.x = Math.PI / 2;
+        bus.add(dcol);
+        // 司机双臂扶盘（「有人在开这台车」的最强证物）：小臂от肩头斜下探到盘缘十点/两点位
+        for (const az of [0.38, 0.72]) {
+          const arm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.062, 0.062), drvM);
+          arm.position.set(3.16, 1.53, az);
+          arm.rotation.z = -0.32;
+          arm.rotation.y = (az < 0.55 ? -1 : 1) * 0.22;
+          bus.add(arm);
+          const hand = new THREE.Mesh(new THREE.SphereGeometry(0.038, 8, 6),
+            new THREE.MeshStandardMaterial({ color: 0x8a6f56, roughness: 0.85 }));
+          hand.position.set(3.3, 1.485, az < 0.55 ? 0.345 : 0.755);
+          hand.scale.set(1.15, 0.8, 1);
+          bus.add(hand);
+        }
+        // 轮17：椅背有缝线槽/包边，头枕罩白椅套（2001 长途车标配·洗旧的灰白——
+        // 太白的布贴着舱灯会顶穿泛光阈值），坐垫有厚度与前缘滚边
+        const coverM = new THREE.MeshStandardMaterial({ color: 0x807d6e, roughness: 0.92 });
         const seamM = new THREE.MeshStandardMaterial({ color: 0x1a1d22, roughness: 0.98 });
         const pipeM = new THREE.MeshStandardMaterial({ color: 0x43484f, roughness: 0.85 });
         for (const [sx2, sz2] of [[0.5, 0.55], [0.5, -0.55], [1.35, 0.55], [1.35, -0.55], [2.2, -0.55]]) {
@@ -1253,7 +1298,7 @@ export function buildTown(scene, M) {
           mkBox(darkM, sx2 + 0.22, 0.87, sz2, 0.34, 0.16, 0.4);      // 座箱基座
           mkBox(pipeM, sx2 + 0.1, 1.2, sz2 + (sz2 > 0 ? -0.27 : 0.27), 0.3, 0.035, 0.04); // 过道侧扶手
         }
-        mkBox(coverM, 2.955, 1.36, 0.55, 0.125, 0.14, 0.36);         // 司机座背顶白椅套
+        mkBox(coverM, 2.855, 1.36, 0.55, 0.125, 0.14, 0.36);         // 司机座背顶白椅套
         const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 5.4, 6), M.steel);
         rail.rotation.z = Math.PI / 2;
         rail.position.set(0.5, 1.98, 0);
@@ -1270,7 +1315,9 @@ export function buildTown(scene, M) {
         // 车内视角的每个方向都得是「车」，不能从壳的背面剔除里看穿到世界；
         // 顶棚板必须压在弧顶圆柱下皮(y2.09)之下，否则弧顶下半面（法线朝下）从车内读成一只大灰球
         const innM = new THREE.MeshStandardMaterial({ color: 0x393e40, roughness: 0.92 });
-        const ceilM = new THREE.MeshStandardMaterial({ color: 0x87826f, roughness: 0.9 });
+        // 顶棚烟渍土黄压暗（albedo≈0.10）：顶棚是画面里最大的连续面，albedo 一高，
+        // 舱灯辐照乘上去整片顶穿泛光阈值——veil 的第一来源就是它
+        const ceilM = new THREE.MeshStandardMaterial({ color: 0x5c574a, roughness: 0.9 });
         const glsM = new THREE.MeshStandardMaterial({
           color: 0x121a1e, roughness: 0.07, metalness: 0.25, envMapIntensity: 1.5,
         });
@@ -1296,13 +1343,17 @@ export function buildTown(scene, M) {
         for (const lx3 of [1.2, 3.2]) {                              // 顶棚管灯两支（昏黄）
           mkBox(new THREE.MeshBasicMaterial({ color: 0x8f7a4c }), lx3, 2.015, 0, 0.68, 0.02, 0.1);
         }
-        // 车厢顶灯（真实光：夜车里那种昏黄——内饰能被读出来的底光）
-        const cab = new THREE.PointLight(0xffd9a2, 3.4, 5.2, 2);
-        cab.position.set(1.8, 1.95, 0);
+        // 车厢顶灯（真实光：夜车里那种昏黄——内饰能被读出来的底光）。
+        // 泛光铁律（阈值0.78按线性HDR算）：点光对任何大面的 辐照I/d²×面albedo 必须<0.78。
+        // 灯挂舱体中部(y1.5)离顶棚0.55m：1.3/0.3×顶棚0.10≈0.43——顶棚只被「照暖」不再溢光
+        const cab = new THREE.PointLight(0xffd9a2, 1.3, 5.2, 2);
+        cab.position.set(1.8, 1.5, 0);
         bus.add(cab);
-        // 驾驶区第二盏（仪表台/方向盘/司机背影从暗块里显形——舱内环境光铁律）
-        const cab2 = new THREE.PointLight(0xffe2b0, 2.4, 3.6, 2);
-        cab2.position.set(2.9, 1.88, -0.1);
+        // 驾驶区第二盏（仪表台/方向盘/司机背影从暗块里显形——舱内环境光铁律）。
+        // 同一条泛光铁律：离司机座椅套/线路牌箱/顶棚都≥0.5m且强度≤1.2——
+        // 贴面辐照按平方暴涨，任何一块浅色面顶穿0.78，开场广角就被泛光糊成白纱
+        const cab2 = new THREE.PointLight(0xffe2b0, 1.2, 3.8, 2);
+        cab2.position.set(2.78, 1.52, -0.15);
         bus.add(cab2);
         for (const s of [-1, 1]) mkBox(innM, 4.1, 1.86, s * 1.02, 0.14, 0.95, 0.18); // A柱
         mkBox(innM, 4.1, 2.26, 0, 0.16, 0.16, 2.2);                  // 前挡上横梁
@@ -1407,9 +1458,10 @@ export function buildTown(scene, M) {
       bus.add(hpl);
       // 车尾线路牌
       mkBox(plateMat('蚀湾 — 县城', { w: 256, h: 64, bg: '#1e2226', fg: '#e8e0c8', font: 0.42 }), -4.21, 1.95, 0, 0.05, 0.4, 1.4);
-      // 车内一盏昏黄的灯（跟着车走）
-      const inl = new THREE.PointLight(0xffe2b0, 5, 6, 2);
-      inl.position.set(0, 2.0, 0);
+      // 车内一盏昏黄的灯（跟着车走）——同泛光铁律：挂舱体中部，离顶棚/椅套≥0.55m，
+      // 1.4/0.3×顶棚0.10≈0.47<0.78，大面只暖不溢
+      const inl = new THREE.PointLight(0xffe2b0, 1.4, 6, 2);
+      inl.position.set(0, 1.5, 0);
       bus.add(inl);
       // 驶离轮迹水花：四轮后各一支加法混合的低锥「雾雨尾」——静止不可见，
       // story.updateBus 按车速点亮/撑大（湿沥青上开走的车必须带起水）
@@ -1429,6 +1481,15 @@ export function buildTown(scene, M) {
           dynamic.busSprays.push(sp);
         }
       }
+      // 铁皮壳投影+接影（FULLSPEC）：不设的话平行光（月色太阳,int1.7）直接穿透车顶
+      // 直射内饰全部上表面——开场车内帧被冷灰直射光+泛光洗成白纱的第二来源。
+      // 透明件（雨珠/轮后水雾/光锥/接地阴影片）除外，投影会画出实心黑块
+      bus.traverse((o) => {
+        if (o.isMesh && !o.material.transparent) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
+      });
       bus.position.set(64.5, g(64.5, -1.3) + 0.06, -1.3);
       scene.add(bus);
       dynamic.bus = bus;

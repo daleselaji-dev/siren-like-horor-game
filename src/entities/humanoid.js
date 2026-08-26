@@ -1295,13 +1295,14 @@ export class Humanoid {
         this.head.add(jr);
       }
       // 喉结（男性；2 米内的活人证据）——半埋进颈面的软鼓包，不是贴在管上的蛋
-      //（轮17：缩 4 成+后收 3mm；全福婆是女性——face:'old' 不再误挂喉结）
+      //（轮17二稿：射线证实旧参数仍整颗骑在领口上读成「贴上去的蛋」——
+      // 加宽压扁(z 0.28→0.13)+再后沉 5mm：只留一道皮下软起伏，轮廓不再有独立剪影）
       if ((D.face === 'm' || D.face === 'gaunt' || D.face === 'old') && role !== 'matron') {
         this.torso.add(mkMesh(G('adam', () => {
           const g2 = new THREE.SphereGeometry(0.012, 8, 6);
           g2.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g2.attributes.position.count * 3).fill(0.95), 3));
           return g2;
-        }), neckMat, 0, 0.669, 0.0385, 0.5, 0.8, 0.28));
+        }), neckMat, 0, 0.672, 0.0335, 0.66, 0.9, 0.13));
       }
     }
     // 锁骨（连衣裙领口露出）
