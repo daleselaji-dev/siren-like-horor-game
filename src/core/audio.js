@@ -926,6 +926,37 @@ export class AudioEngine {
 
     // 血潮
     this.oceanGain.gain.setTargetAtTime(0.34 + this.bloodTide * 0.2, now, 1.5);
+
+    // 巨影过顶低鸣（轮15）：那条 13m 的影子游近头顶时，一声从胸腔下面
+    // 顶上来的持续低鸣（31Hz 基频+失谐倍频，慢波动）——它没有出声，
+    // 是「深度」压过你头顶的那种响。giantK = 距离系数（正过顶=1）
+    const gk = st.giantK ?? 0;
+    if (gk > 0.001 && !this.giantHumGain) this.buildGiantHum();
+    if (this.giantHumGain) {
+      this.giantHumT = (this.giantHumT ?? 0) + dt;
+      const wob = 1 + Math.sin(this.giantHumT * 0.9) * 0.14;
+      this.giantHumGain.gain.setTargetAtTime(gk * 0.4 * wob, now, 0.45);
+      this.giantHumO1.frequency.setTargetAtTime(31 + gk * 4, now, 0.8);
+    }
+  }
+
+  buildGiantHum() {
+    const ctx = this.ctx;
+    this.giantHumGain = ctx.createGain();
+    this.giantHumGain.gain.value = 0;
+    const o1 = ctx.createOscillator(); o1.type = 'sine'; o1.frequency.value = 31;
+    const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = 62.7;
+    const o3 = ctx.createOscillator(); o3.type = 'triangle'; o3.frequency.value = 46.3;
+    const g1 = ctx.createGain(); g1.gain.value = 0.62;
+    const g2 = ctx.createGain(); g2.gain.value = 0.2;
+    const g3 = ctx.createGain(); g3.gain.value = 0.12;
+    o1.connect(g1).connect(this.giantHumGain);
+    o2.connect(g2).connect(this.giantHumGain);
+    o3.connect(g3).connect(this.giantHumGain);
+    this.giantHumGain.connect(this.master);
+    this.giantHumGain.connect(this.reverb);
+    o1.start(); o2.start(); o3.start();
+    this.giantHumO1 = o1;
   }
 
   setBloodTide(on) {

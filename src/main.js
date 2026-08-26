@@ -460,6 +460,15 @@ function loop() {
 
     // 音频：点名谣从酒店方向飘来；广播站转播实况
     const stageP = world.locations.stageMic;
+    // 巨影过顶低鸣（轮15）：幻潮显形后，那条 13m 的影子游到头顶附近时，
+    // 一声从胸腔下面顶上来的持续低鸣——26m 内渐起，平方衰减，正过顶=1
+    let giantK = 0;
+    const LT = world.dynamic.leakState?.applied ? world.dynamic.leakState.tide : null;
+    if (LT?.giantPos) {
+      const gd = Math.hypot(LT.giantPos.x - player.pos.x, LT.giantPos.z - player.pos.z);
+      giantK = Math.max(0, 1 - gd / 26);
+      giantK *= giantK;
+    }
     audio.update(dt, {
       playerPos: player.pos,
       playerYaw: player.yaw,
@@ -470,6 +479,7 @@ function loop() {
       singer: { x: stageP.x, z: stageP.z, on: agenda.silence <= 0 },
       radio: { x: world.locations.radio.x, z: world.locations.radio.z, on: story.flags.radioOn && agenda.silence <= 0 },
       resonance: stealth.vibrationActive ? stealth.vibration * 0.5 : 0,
+      giantK,
     });
 
     // 视奸心跳复位

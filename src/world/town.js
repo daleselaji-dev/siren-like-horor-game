@@ -327,7 +327,7 @@ export function buildTown(scene, M) {
     const winY = h * 0.62;
     const winAt = (side, lz) => {
       const wallX = side * (w / 2 - t / 2);
-      piece(GEO.box, M.ironDark, wallX, winY, lz, t + 0.04, 0.7, 0.9);
+      piece(GEO.box, M.winRoom, wallX, winY, lz, t + 0.04, 0.7, 0.9); // 假房间窗（interior mapping）
       const fx = side * (w / 2 + 0.005); // 墙外皮
       piece(GEO.box, M.concreteDark, fx, winY + 0.43, lz, 0.09, 0.12, 1.08);          // 窗楣（滴水出挑）
       piece(GEO.box, M.concreteDark, fx + side * 0.035, winY - 0.415, lz, 0.17, 0.07, 1.04); // 窗台板
@@ -1334,7 +1334,7 @@ export function buildTown(scene, M) {
       B.add(GEO.box, M.concreteDark, vx, base + h + 1.83, vz - d / 2 - 0.39, 0, 2.4, 0.08, 0.24);
       // 西墙高窗一对（带楣台与竖栅）——山墙面不再是一整面素灰
       for (const wz2 of [vz - 1.6, vz + 1.4]) {
-        B.add(GEO.box, M.ironDark, vx - w / 2 + t / 2, base + 2.5, wz2, 0, t + 0.04, 0.55, 0.75);
+        B.add(GEO.box, M.winRoom, vx - w / 2 + t / 2, base + 2.5, wz2, 0, t + 0.04, 0.55, 0.75); // 假房间窗
         B.add(GEO.box, M.concreteDark, vx - w / 2 - 0.01, base + 2.84, wz2, 0, 0.09, 0.1, 0.92);
         B.add(GEO.box, M.concreteDark, vx - w / 2 - 0.045, base + 2.17, wz2, 0, 0.16, 0.07, 0.88);
         for (let bi = -1; bi <= 1; bi++) {
@@ -1620,7 +1620,7 @@ export function buildTown(scene, M) {
       aabb(bx, bz + D / 2 - t / 2, W, t, roofY + 0.4);
       for (let f = 0; f < 2; f++) {
         for (let i = 0; i < 5; i++) {
-          B.add(GEO.box, M.ironDark, bx + bayXs[i] + 0.3, (f ? f2 : f1) + 1.5, bz + D / 2 + 0.02, 0, 1.0, 1.1, 0.08);
+          B.add(GEO.box, M.winRoom, bx + bayXs[i] + 0.3, (f ? f2 : f1) + 1.5, bz + D / 2 + 0.02, 0, 1.0, 1.1, 0.08); // 假房间窗
           // 窗台板 + 窗楣滴水线（北墙面唯一的凸凹节奏）
           B.add(GEO.box, M.concrete, bx + bayXs[i] + 0.3, (f ? f2 : f1) + 0.92, bz + D / 2 + 0.08, 0, 1.16, 0.07, 0.16);
           B.add(GEO.box, M.concrete, bx + bayXs[i] + 0.3, (f ? f2 : f1) + 2.1, bz + D / 2 + 0.06, 0, 1.1, 0.06, 0.12);
@@ -1697,8 +1697,8 @@ export function buildTown(scene, M) {
             B.add(GEO.box, M.woodDark, dcx, fy + doorH2 / 2, sz2, 0, 0.95, doorH2, t + 0.02);
             aabb(dcx, sz2, 1.0, t + 0.05, fy + doorH2 + 0.4);
             B.add(GEO.box, M.clothRed, dcx + 0.3, fy + 0.95, sz2 - t / 2 - 0.02, 0.2, 0.05, 0.09, 0.02);
-            // 暗窗
-            B.add(GEO.box, M.ironDark, wcx, fy + 1.4, sz2 - 0.03, 0, 0.96, 1.0, 0.06);
+            // 暗窗（interior mapping 假房间：锁着的户，窗后仍有黑漆漆的进深）
+            B.add(GEO.box, M.winRoom, wcx, fy + 1.4, sz2 - 0.03, 0, 0.96, 1.0, 0.06);
             aabb(wcx, sz2, 1.05, t, fy + 2.4);
           }
           // 洞口两侧墙的碰撞（细分而非整面，门洞可通行）
@@ -2381,6 +2381,90 @@ export function buildTown(scene, M) {
     scene.add(inst);
   }
 
+  // ================= ⑤' 街面散布：杂草 + 垃圾（轮15·密度层） =================
+  // 2001 年的县镇街道不是扫干净的舞台：墙脚缝里的草、路缘的纸屑塑料袋、
+  // 蹲在排水口的绿瓶——雨夜里这些「没人管的小东西」才是街的年龄。
+  // 杂草=7 支细锥合并的草簇（合批入 weedMat 一个 draw call）；
+  // 垃圾走既有材质（纸/深木/灰布/绿玻璃），全部进静态合批
+  {
+    const weedMat = new THREE.MeshStandardMaterial({ color: 0x39422a, roughness: 0.95, envMapIntensity: 0.5 });
+    const tuftGeo = (() => {
+      const blades = [];
+      let s = 733;
+      const wr = () => (s = (s * 16807) % 2147483647) / 2147483647;
+      for (let i = 0; i < 7; i++) {
+        const h2 = 0.16 + wr() * 0.3;
+        const b2 = new THREE.ConeGeometry(0.016 + wr() * 0.014, h2, 3);
+        b2.translate(0, h2 / 2, 0);
+        const lean = 0.25 + wr() * 0.5, az = wr() * 6.28;
+        b2.rotateX(Math.cos(az) * lean);
+        b2.rotateZ(Math.sin(az) * lean);
+        b2.translate((wr() - 0.5) * 0.14, 0, (wr() - 0.5) * 0.14);
+        blades.push(b2);
+      }
+      return BufferGeometryUtils.mergeGeometries(blades);
+    })();
+    // 散布线：街缘（中线两侧 2.5-4.5m 的边沟带）+ 院角
+    const runs = [
+      { x0: 44, z0: 0, x1: 14, z1: -6, n: 34 },     // 镇前街
+      { x0: 12, z0: -8, x1: -2, z1: -20, n: 26 },   // 主街上段
+      { x0: -2, z0: -22, x1: -4, z1: -38, n: 22 },  // 主街下段（往酒店）
+      { x0: -8, z0: 4, x1: -26, z1: 12, n: 24 },    // 西街
+      { x0: 50, z0: 2, x1: 62, z1: 4, n: 18 },      // 车站段
+      { x0: -24, z0: 16, x1: -36, z1: 20, n: 18 },  // 家属楼院前
+      { x0: 4, z0: 12, x1: 16, z1: 30, n: 16 },     // 村巷
+    ];
+    for (const rn of runs) {
+      const dx = rn.x1 - rn.x0, dz = rn.z1 - rn.z0;
+      const L = Math.hypot(dx, dz) || 1;
+      const px = -dz / L, pz = dx / L; // 垂线（街缘方向）
+      for (let i = 0; i < rn.n; i++) {
+        const t2 = rand();
+        const side = rand() < 0.5 ? -1 : 1;
+        const off = 2.5 + rand() * 2.0;
+        const x = rn.x0 + dx * t2 + px * off * side + (rand() - 0.5) * 0.8;
+        const z = rn.z0 + dz * t2 + pz * off * side + (rand() - 0.5) * 0.8;
+        const sc = 0.7 + rand() * 0.9;
+        B.add(tuftGeo, weedMat, x, g(x, z) + 0.01, z, rand() * 6.28, sc, sc * (0.8 + rand() * 0.5), sc);
+        // 草簇边上偶发一件垃圾（纸屑/深色碎物）
+        if (rand() < 0.42) {
+          const jx = x + (rand() - 0.5) * 1.6, jz = z + (rand() - 0.5) * 1.6;
+          if (rand() < 0.6) {
+            B.add(GEO.box, M.paper, jx, g(jx, jz) + 0.012, jz, rand() * 6.28, 0.15, 0.014, 0.11, 0, (rand() - 0.5) * 0.2);
+          } else {
+            B.add(GEO.box, M.woodDark, jx, g(jx, jz) + 0.02, jz, rand() * 6.28, 0.12 + rand() * 0.1, 0.04, 0.08);
+          }
+        }
+      }
+      // 街心的散页与塑料袋（被雨拍在路面上）
+      for (let i = 0; i < Math.round(rn.n * 0.35); i++) {
+        const t2 = rand();
+        const x = rn.x0 + dx * t2 + (rand() - 0.5) * 3.4;
+        const z = rn.z0 + dz * t2 + (rand() - 0.5) * 3.4;
+        if (rand() < 0.7) {
+          B.add(GEO.box, M.paper, x, g(x, z) + 0.011, z, rand() * 6.28, 0.16, 0.012, 0.12);
+        } else {
+          B.add(GEO.sphere, M.clothGrey, x, g(x, z) + 0.035, z, rand() * 6.28, 0.16 + rand() * 0.1, 0.07, 0.13 + rand() * 0.08);
+        }
+      }
+    }
+    // 排水口/墙根的绿瓶（立倒各半）与堆角
+    const bottleSpots = [
+      [57.4, 3.2], [45.2, 1.8], [30.8, 2.6], [25.4, -3.8], [8.6, -9.4],
+      [-3.4, -24.6], [-10.2, 6.4], [-27.6, 13.8], [-31.4, 18.8], [3.2, 14.6],
+    ];
+    for (const [bx2, bz2] of bottleSpots) {
+      if (rand() < 0.5) {
+        B.add(GEO.cyl, M.glassGreen, bx2, g(bx2, bz2) + 0.11, bz2, 0, 0.07, 0.22, 0.07);
+      } else {
+        B.add(GEO.cyl, M.glassGreen, bx2, g(bx2, bz2) + 0.045, bz2, rand() * 6.28, 0.07, 0.22, 0.07, Math.PI / 2, 0);
+      }
+      if (rand() < 0.6) {
+        B.add(GEO.box, M.paper, bx2 + 0.3, g(bx2 + 0.3, bz2 + 0.2) + 0.012, bz2 + 0.2, rand() * 6.28, 0.14, 0.012, 0.1);
+      }
+    }
+  }
+
   // ================= ⑥ 南方大酒店 + 蚀湾海洋馆 =================
   buildHotel({
     B, M, scene, colliders, addPatch, locations, patrols, dynamic, lights,
@@ -2718,7 +2802,12 @@ export function buildTown(scene, M) {
       }
 
       Object.assign(dynamic.leakState, {
-        tide: { mats: [mat0, mat1], op: [0.34, 0.2], fish, fishParams, giant, y: TIDE_Y, mirFish, mirY: MIRROR_Y },
+        tide: {
+          mats: [mat0, mat1], op: [0.34, 0.2], fish, fishParams, giant, y: TIDE_Y,
+          mirFish, mirY: MIRROR_Y,
+          mirNetM, mirOp: 0.34,          // 轮15：镜洼潮网跟真网同一口潮息
+          giantPos: { x: 0, z: 0 },      // 轮15：巨影当前位（主循环取用→过顶低鸣）
+        },
       });
     }
 
@@ -2920,6 +3009,12 @@ export function buildTown(scene, M) {
         const breathe = 0.82 + Math.sin(time * 0.22) * 0.18;   // 没有水的潮仍在涨落
         td.mats[0].opacity = td.op[0] * breathe;
         td.mats[1].opacity = td.op[1] * (1.64 - breathe * 0.64);
+        // 轮15：洼里那层潮与头顶这层同一口呼吸——镜洼潮网透明度走同一个 breathe，
+        // 贴图偏移也同步（低头看洼、抬头看天，涨落是同一拍）
+        if (td.mirNetM) {
+          td.mirNetM.opacity = td.mirOp * breathe;
+          td.mirNetM.map.offset.copy(td.mats[0].map.offset);
+        }
         for (let i = 0; i < td.fishParams.length; i++) {
           const f = td.fishParams[i];
           const a = f.phase + time * f.speed;
@@ -2933,6 +3028,7 @@ export function buildTown(scene, M) {
           _s.set(f.len, f.len * 0.9, f.len);
           _m4.compose(_v3.set(x, f.y, z), _q, _s);
           td.fish.setMatrixAt(i, _m4);
+          if (f === td.giant) { td.giantPos.x = x; td.giantPos.z = z; } // 巨影现在游到哪
           // 镜像副本：关于街面对折（滚转随镜像取反）——洼里那条与头顶这条同步游
           if (td.mirFish) {
             _e.set(0, ry, -roll);

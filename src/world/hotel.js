@@ -236,9 +236,11 @@ export function buildHotel(ctx) {
     ]);
   };
   winRow(F2); winRow(F3);
-  // 窗玻璃（整排一次性，暗色，藏进墙厚中缝——只在窗洞处露出，不能贴到内墙面）
+  // 窗玻璃（整排一次性，藏进墙厚中缝——只在窗洞处露出，不能贴到内墙面）
+  // 轮15：换 interior-mapping 假房间——16 樘客房窗后各自长出带视差的进深，
+  // 两成亮着暖灯（住着人的楼），临街立面不再是一条黑玻璃带
   for (const y0 of [F2, F3]) {
-    box(M.crtGlass, 0, y0 + 1.7, 11.02, 33.4, 1.35, 0.04);
+    box(M.winRoom, 0, y0 + 1.7, 11.02, 33.4, 1.35, 0.04);
   }
   // 南立面 z=-11：厨房后门 + 窗
   wallX(TILE, -17, 17, -11, 0, F2, [
@@ -249,7 +251,7 @@ export function buildHotel(ctx) {
     { from: -14, to: -12, top: 5.8, sill: 4.4 }, { from: -8, to: -6, top: 5.8, sill: 4.4 },
     { from: -2, to: 0, top: 5.8, sill: 4.4 }, { from: 4, to: 6, top: 5.8, sill: 4.4 }, { from: 10, to: 12, top: 5.8, sill: 4.4 },
   ]);
-  box(M.crtGlass, -1, F3 + 1.7, -11.02, 27, 1.35, 0.04); // 3F 南窗玻璃带（藏墙缝）
+  box(M.winRoom, -1, F3 + 1.7, -11.02, 27, 1.35, 0.04); // 3F 南窗假房间带（藏墙缝）
   // 西立面 x=-17
   wallZ(TILE, -11, 11, -17, 0, ROOF, [
     { from: -6, to: -4, top: 2.4, sill: 1.0 }, { from: 1, to: 3, top: 2.4, sill: 1.0 }, { from: 6, to: 8, top: 2.4, sill: 1.0 },
@@ -262,7 +264,7 @@ export function buildHotel(ctx) {
   wallZ(TILE, -11, 11, 17, F2, ROOF, [
     { from: -6, to: -4, top: 5.8, sill: 4.4 }, { from: 0, to: 2, top: 5.8, sill: 4.4 }, { from: 5, to: 7, top: 5.8, sill: 4.4 },
   ]);
-  box(M.crtGlass, 17.02, F3 + 1.7, 0.5, 0.04, 1.35, 13.5); // 3F 东窗玻璃带（藏墙缝）
+  box(M.winRoom, 17.02, F3 + 1.7, 0.5, 0.04, 1.35, 13.5); // 3F 东窗假房间带（藏墙缝）
   // 屋顶
   slabRect(-17, -11, 17, 11, ROOF, null, { walk: false });
   // 女儿墙

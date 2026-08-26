@@ -197,6 +197,57 @@ export function buildMaterials(lowspec = false) {
   M.talisman = new THREE.MeshStandardMaterial({ map: T.talisman, roughness: 0.9, side: THREE.DoubleSide });
 
   M.ironDark = new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.42, metalness: 0.78, envMapIntensity: 1.2 });
+  // 远景窗内假房间（interior mapping）：窗洞填充不再是一块涂黑的铁皮——
+  // 片元里按视线与「虚拟房间盒」求交（后墙/地板/天花/侧墙），窗后长出带真视差的进深；
+  // 逐房哈希决定亮灯（约两成暖光）/黑屋，后墙下半截压出家具暗带、竖条明暗当柜帘。
+  // 走 onBeforeCompile 注在 opaque_fragment 前：世界空间取切线架，合批后依然成立；
+  // 玻璃膜保留 45% 原 PBR 出射——房间是从一层反着夜色的玻璃后面看进去的
+  M.winRoom = new THREE.MeshStandardMaterial({ color: 0x11161a, roughness: 0.14, metalness: 0.55, envMapIntensity: 1.3 });
+  M.winRoom.onBeforeCompile = (sh) => {
+    sh.vertexShader = ('varying vec3 vWrPos; varying vec3 vWrN;\n' + sh.vertexShader).replace(
+      '#include <worldpos_vertex>',
+      `#include <worldpos_vertex>
+      vWrPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      vWrN = normalize(mat3(modelMatrix) * objectNormal);`);
+    sh.fragmentShader = (
+      'varying vec3 vWrPos; varying vec3 vWrN;\n'
+      + 'float wrHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n'
+      + sh.fragmentShader
+    ).replace(
+      '#include <opaque_fragment>',
+      `{
+        vec3 wrn = normalize(vWrN);
+        if (abs(wrn.y) < 0.6) {
+          vec3 vd = normalize(vWrPos - cameraPosition);
+          vec3 wtx = normalize(vec3(-wrn.z, 0.0, wrn.x));
+          // 房间盒：宽1.4 × 高1.5 × 深2.2（米），沿墙面周期平铺
+          vec3 ro = vec3(dot(vWrPos, wtx) / 1.4, vWrPos.y / 1.5, 0.0);
+          vec3 rd = vec3(dot(vd, wtx) / 1.4, vd.y / 1.5, max(1e-4, -dot(vd, wrn)) / 2.2);
+          vec2 cell = floor(ro.xy);
+          vec3 cpos = vec3(fract(ro.x), fract(ro.y), 0.0);
+          vec3 kk = (step(0.0, rd) - cpos) / rd;
+          float hitT = min(min(kk.x, kk.y), kk.z);
+          vec3 hp = cpos + rd * hitT;
+          float h1 = wrHash(cell);
+          float lit = step(0.78, h1);
+          vec3 warm = vec3(0.5, 0.33, 0.14) * (0.55 + 0.45 * wrHash(cell + 7.0));
+          vec3 base = mix(vec3(0.045, 0.058, 0.07), warm, lit);
+          vec3 rc;
+          if (hitT == kk.z) {
+            rc = base * (0.95 - 0.4 * step(hp.y, 0.42));         // 后墙（下半截家具暗带）
+            rc *= 0.78 + 0.22 * sin(hp.x * 21.0 + h1 * 40.0);    // 柜帘竖条明暗
+          } else if (hitT == kk.y) {
+            rc = base * (rd.y > 0.0 ? 0.3 : 0.6);                // 天花暗 / 地板略亮
+          } else {
+            rc = base * 0.48;                                    // 侧墙
+          }
+          rc *= 1.0 - hp.z * 0.42;                               // 越深越暗
+          outgoingLight = outgoingLight * 0.45 + rc;
+        }
+      }
+      #include <opaque_fragment>`);
+  };
+  M.winRoom.customProgramCacheKey = () => 'winRoom';
   M.candleFlame = new THREE.MeshBasicMaterial({ color: 0xffc266 });
   M.eyeGlow = new THREE.MeshBasicMaterial({ color: 0x9fd8e8 });
   M.paper = new THREE.MeshStandardMaterial({ color: 0xcfc4a4, roughness: 0.95, side: THREE.DoubleSide });
