@@ -28,6 +28,57 @@ const _m4 = new THREE.Matrix4();
 const _lodV = new THREE.Vector3();
 const _gzV = new THREE.Vector3();
 
+/** 虹膜贴图（轮17·黑珠眼根治）：限缘暗环 + 虹膜色环（放射纤维纹）+ 瞳孔——
+ *  眼睛从此有「层」：巩膜(独立球) > 虹膜盘(本贴图) > 角膜凸(高光) > 睑缘。
+ *  base: 虹膜主色（深褐/暖褐两档，2001 县镇的眼睛不需要更多花色） */
+const _irisTexCache = new Map();
+function irisTexture(base = 0x5a3a22) {
+  if (_irisTexCache.has(base)) return _irisTexCache.get(base);
+  const S = 128, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const x = c.getContext('2d');
+  const cxy = S / 2, R = S * 0.485;
+  const br = (base >> 16) & 255, bg = (base >> 8) & 255, bb = base & 255;
+  // 底：虹膜体径向渐变（瞳缘略亮的琥珀内圈 → 主色 → 限缘前变深）
+  const g0 = x.createRadialGradient(cxy, cxy, S * 0.1, cxy, cxy, R);
+  g0.addColorStop(0, `rgb(${Math.min(255, br + 30)},${Math.min(255, bg + 20)},${bb + 6})`);
+  g0.addColorStop(0.55, `rgb(${br},${bg},${bb})`);
+  g0.addColorStop(0.85, `rgb(${(br * 0.55) | 0},${(bg * 0.55) | 0},${(bb * 0.55) | 0})`);
+  g0.addColorStop(1, 'rgb(18,12,8)');
+  x.fillStyle = g0;
+  x.beginPath(); x.arc(cxy, cxy, R, 0, Math.PI * 2); x.fill();
+  // 放射纤维纹：明暗交替细楔（活人虹膜的「丝」）
+  let s = 77;
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 72; i++) {
+    const a = (i / 72) * Math.PI * 2 + rnd() * 0.06;
+    const lite = i % 2 === 0;
+    x.strokeStyle = lite ? `rgba(${Math.min(255, br + 66)},${Math.min(255, bg + 44)},${bb + 18},0.22)`
+      : 'rgba(14,9,6,0.25)';
+    x.lineWidth = 1 + rnd() * 1.2;
+    x.beginPath();
+    x.moveTo(cxy + Math.cos(a) * S * 0.16, cxy + Math.sin(a) * S * 0.16);
+    x.lineTo(cxy + Math.cos(a + 0.05) * R * 0.94, cxy + Math.sin(a + 0.05) * R * 0.94);
+    x.stroke();
+  }
+  // 瞳孔（软边黑）：占虹膜直径 ~0.5——室内暗光下的散瞳（0.5m 近景必须一眼读出黑瞳）
+  const gp = x.createRadialGradient(cxy, cxy, S * 0.17, cxy, cxy, S * 0.26);
+  gp.addColorStop(0, 'rgb(4,3,3)');
+  gp.addColorStop(0.85, 'rgb(6,4,4)');
+  gp.addColorStop(1, 'rgba(6,4,4,0)');
+  x.fillStyle = gp;
+  x.beginPath(); x.arc(cxy, cxy, S * 0.26, 0, Math.PI * 2); x.fill();
+  // 限缘环：虹膜外缘一道更深的环（虹膜「嵌」在巩膜里的读法）
+  x.strokeStyle = 'rgba(10,7,5,0.9)';
+  x.lineWidth = S * 0.05;
+  x.beginPath(); x.arc(cxy, cxy, R - S * 0.02, 0, Math.PI * 2); x.stroke();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  _irisTexCache.set(base, t);
+  return t;
+}
+
 /** 近距皮肤材质：底法线加深 + 毛孔第二法线更密更立——2m 内的「法线细节层」 */
 function hdSkinVariant(base) {
   return Mtl('hdskin_' + base.uuid, () => {
@@ -143,9 +194,10 @@ function makeSkullField(variant, P, o = {}) {
   const R = SKULL_R;
   const old = variant === 'old' || variant === 'gaunt';
   const fem = variant === 'f';
-  const headW = (fem ? 0.845 : 0.83) + P.headW * 0.05;
-  const faceLen = 0.96 + P.faceLen * 0.06;
-  const jawT = (fem ? 0.30 : 0.26) + P.jaw * 0.10;
+  // 轮17：头宽上限收 3%、颌收拢上限收 3 成——「头宽下颌尖」的倒三角脸出局
+  const headW = (fem ? 0.835 : 0.82) + P.headW * 0.04;
+  const faceLen = 0.985 + P.faceLen * 0.03; // 抖动收半：头身比 1/7.2-7.5 必须全种子成立
+  const jawT = (fem ? 0.29 : 0.25) + P.jaw * 0.07;
   const chinZ = 0.02 + P.chin * 0.017;
   const cheekAmp = 0.0035 + P.cheek * 0.007 + (old ? 0.0035 : 0);
   const hollowAmp = (old ? 0.009 : 0.002) + P.hollow * 0.007;
@@ -656,18 +708,18 @@ function torsoProfile(kind) {
   // [r, y] 自腰际(0 附近)到肩颈；躯干组局部 y: 0 → 0.62
   // 半径给窄——肩宽由 torsoGeo 的肩部高斯加宽提供，手臂必须落在躯干轮廓之外
   switch (kind) {
-    case 'suit': // 西装：垫肩、下摆过臀
+    case 'suit': // 西装：垫肩、下摆过臀（顶圈收进领筒之内——领由 mkCollar 出真几何）
       return [[0.175, -0.14], [0.163, -0.04], [0.148, 0.06], [0.145, 0.16], [0.152, 0.28],
-        [0.162, 0.4], [0.168, 0.48], [0.158, 0.53], [0.125, 0.575], [0.062, 0.615]];
-    case 'vest': // 马甲+衬衫：收身
-      return [[0.148, -0.06], [0.14, 0.02], [0.134, 0.12], [0.142, 0.26], [0.152, 0.4],
-        [0.157, 0.48], [0.147, 0.53], [0.118, 0.575], [0.058, 0.615]];
+        [0.162, 0.4], [0.168, 0.48], [0.158, 0.53], [0.125, 0.575], [0.055, 0.605]];
+    case 'vest': // 马甲+衬衫：收身（肩段加宽——衬衫肩线仍是成人男 0.40m+ 的肩，收身收在腰）
+      return [[0.148, -0.06], [0.14, 0.02], [0.134, 0.12], [0.142, 0.26], [0.156, 0.4],
+        [0.166, 0.48], [0.153, 0.53], [0.12, 0.575], [0.053, 0.605]];
     case 'satin': // 缎袄：宽厚、直筒、下摆长
       return [[0.19, -0.24], [0.186, -0.1], [0.178, 0.04], [0.174, 0.2], [0.178, 0.36],
-        [0.182, 0.46], [0.168, 0.52], [0.132, 0.57], [0.068, 0.615]];
+        [0.182, 0.46], [0.168, 0.52], [0.132, 0.57], [0.056, 0.605]];
     case 'work': // 工装夹克：微鼓腹
       return [[0.168, -0.1], [0.16, -0.02], [0.154, 0.08], [0.16, 0.2], [0.163, 0.34],
-        [0.166, 0.44], [0.157, 0.51], [0.122, 0.565], [0.06, 0.615]];
+        [0.166, 0.44], [0.157, 0.51], [0.122, 0.565], [0.054, 0.605]];
     case 'dress': // 连衣裙上身
       return [[0.15, -0.06], [0.135, 0.04], [0.126, 0.14], [0.134, 0.28], [0.146, 0.4],
         [0.15, 0.47], [0.14, 0.52], [0.11, 0.57], [0.054, 0.615]];
@@ -693,7 +745,7 @@ function torsoGeo(kind) {
     const v = new THREE.Vector3();
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i);
-      const sh = Math.exp(-(((v.y - 0.48) / 0.09) ** 2));
+      const sh = Math.exp(-(((v.y - 0.49) / 0.10) ** 2));
       v.x *= 1 + sh * 0.3;
       v.z *= 0.7;
       // 布身垂坠褶（去人偶感）：胸线以下沿方位角低频起伏——
@@ -828,29 +880,31 @@ function driftLimbGeo(r, len, key) {
  *  指节严格首尾相接（上一节终点=下一节起点），指尖向掌心(+z)侧蜷 */
 function handGeo(curl = 'relax') {
   return G('hand_' + curl, () => {
+    // 轮17：整手瘦身——旧香肠指（r8mm）在近景里是「充气手套」；
+    // 指径回到真人（近节 ~7mm 半径以下），掌薄一档
     const parts = [];
-    parts.push(xform(new THREE.SphereGeometry(0.042, 12, 10), 0, -0.048, 0.004, 0.12, 0, 0, 0.85, 1.2, 0.45));
+    parts.push(xform(new THREE.SphereGeometry(0.04, 12, 10), 0, -0.048, 0.004, 0.12, 0, 0, 0.82, 1.18, 0.4));
     const c1 = curl === 'open' ? 0.2 : curl === 'flat' ? 0.06 : 0.55;  // 第一节屈
     const c2 = curl === 'open' ? 0.25 : curl === 'flat' ? 0.08 : 0.7;  // 第二节屈
     for (let i = 0; i < 4; i++) {
-      const x = -0.026 + i * 0.0175;
-      const l1 = 0.038 - Math.abs(i - 1.4) * 0.006, l2 = 0.028;
+      const x = -0.0245 + i * 0.0165;
+      const l1 = 0.037 - Math.abs(i - 1.4) * 0.006, l2 = 0.027;
       // 基节起点（掌缘）
-      let py = -0.09, pz = 0.008;
-      parts.push(xform(new THREE.SphereGeometry(0.0085, 6, 5), x, py, pz)); // 掌指指节
+      let py = -0.088, pz = 0.008;
+      parts.push(xform(new THREE.SphereGeometry(0.0073, 6, 5), x, py, pz)); // 掌指指节
       // 第一节：方向 (0,-cos c1, sin c1)
       const d1y = -Math.cos(c1), d1z = Math.sin(c1);
-      parts.push(xform(new THREE.CapsuleGeometry(0.008, l1, 4, 8), x, py + d1y * (l1 * 0.5 + 0.004), pz + d1z * (l1 * 0.5 + 0.004), -c1));
-      py += d1y * (l1 + 0.008); pz += d1z * (l1 + 0.008);
-      parts.push(xform(new THREE.SphereGeometry(0.0075, 6, 5), x, py, pz)); // 近节间关节
+      parts.push(xform(new THREE.CapsuleGeometry(0.0068, l1, 4, 8), x, py + d1y * (l1 * 0.5 + 0.004), pz + d1z * (l1 * 0.5 + 0.004), -c1));
+      py += d1y * (l1 + 0.007); pz += d1z * (l1 + 0.007);
+      parts.push(xform(new THREE.SphereGeometry(0.0063, 6, 5), x, py, pz)); // 近节间关节
       // 第二节：累计屈曲
       const a2 = c1 + c2;
       const d2y = -Math.cos(a2), d2z = Math.sin(a2);
-      parts.push(xform(new THREE.CapsuleGeometry(0.007, l2, 4, 8), x, py + d2y * (l2 * 0.5 + 0.003), pz + d2z * (l2 * 0.5 + 0.003), -a2));
+      parts.push(xform(new THREE.CapsuleGeometry(0.0058, l2, 4, 8), x, py + d2y * (l2 * 0.5 + 0.003), pz + d2z * (l2 * 0.5 + 0.003), -a2));
     }
     // 拇指：从掌侧斜出
-    parts.push(xform(new THREE.SphereGeometry(0.0095, 6, 5), 0.038, -0.05, 0.014));
-    parts.push(xform(new THREE.CapsuleGeometry(0.0088, 0.036, 4, 8), 0.047, -0.072, 0.024, -0.5, 0, -0.55));
+    parts.push(xform(new THREE.SphereGeometry(0.0082, 6, 5), 0.036, -0.05, 0.013));
+    parts.push(xform(new THREE.CapsuleGeometry(0.0074, 0.034, 4, 8), 0.044, -0.07, 0.022, -0.5, 0, -0.55));
     return merged(parts);
   });
 }
@@ -880,18 +934,38 @@ function bootGeo() {
 }
 
 // ================= 工位异常部件 =================
-/** 报数员：口部鱼籽状钙化封死（成串小球覆住下半脸） */
+/** 报数员：口部鱼籽状钙化（轮17 重做）——旧版 22 颗 6-13mm 大球糊住半张脸，
+ *  0.5m 读成「粘上去的乒乓球」；现在是沿口裂缝挤出的一串 2-4mm 细籽：
+ *  半埋进唇床皮面（球心压到皮下 40%），主串走口缝、两撮垂在下唇缘与嘴角——
+ *  远看只是嘴上一块痂，近看才读出每一粒都是「从缝里长出来的」 */
 function roeSealGeo() {
   return G('roeSeal', () => {
     const parts = [];
     let s = 12345;
     const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-    for (let i = 0; i < 22; i++) {
-      const ang = rnd() * Math.PI * 2, rad = Math.sqrt(rnd());
-      const x = Math.cos(ang) * rad * 0.038;
-      const y = -0.052 + Math.sin(ang) * rad * 0.03;
-      const z = 0.083 + (1 - rad) * 0.012;
-      parts.push(xform(new THREE.SphereGeometry(0.006 + rnd() * 0.007, 8, 6), x, y, z));
+    // 皮面深度（口周局部近似）：越偏离口心越靠后
+    const zSurf = (x, y) => 0.0888 - x * x * 2.6 - (y + 0.043) * (y + 0.043) * 1.9;
+    // 主串：沿口裂弧线密排（籽从缝里挤出来）
+    for (let i = 0; i < 14; i++) {
+      const t = i / 13 - 0.5;
+      const x = t * 0.05 + (rnd() - 0.5) * 0.002;
+      const y = -0.0405 - Math.cos(t * Math.PI) * 0.0015 + (rnd() - 0.5) * 0.0018;
+      const r = 0.0018 + rnd() * 0.0011;
+      parts.push(xform(new THREE.SphereGeometry(r, 7, 5), x, y, zSurf(x, y) - r * 0.58));
+    }
+    // 下唇缘垂串：两撮（左密右疏——蔓延是不对称的）
+    for (let i = 0; i < 9; i++) {
+      const x = (i < 5 ? -0.013 : 0.011) + (rnd() - 0.5) * 0.011;
+      const y = -0.048 - rnd() * 0.007;
+      const r = 0.0015 + rnd() * 0.0012;
+      parts.push(xform(new THREE.SphereGeometry(r, 7, 5), x, y, zSurf(x, y) - r * 0.6));
+    }
+    // 左嘴角一小丛（最先钙化的地方，粒径略大但仍在 4mm 内）
+    for (let i = 0; i < 6; i++) {
+      const x = -0.026 - rnd() * 0.006;
+      const y = -0.040 + (rnd() - 0.5) * 0.007;
+      const r = 0.0019 + rnd() * 0.0013;
+      parts.push(xform(new THREE.SphereGeometry(r, 7, 5), x, y, zSurf(x, y) - r * 0.55));
     }
     return merged(parts);
   });
@@ -1111,16 +1185,19 @@ export class Humanoid {
     if (role === 'osteo') this.conveyor = true;            // 理骨员也不眨眼——它在听，不在看
 
     this.group = new THREE.Group();
-    const hScale = (D.face === 'f' || role === 'matron' ? 0.93 : 0.97) + rnd() * 0.09;
+    // 轮17·比例铁律：整套骨架按真人人体测量重标——
+    //   头高 ≈ 身高 1/7.2-7.5（旧 1/8.8 的时装人台比是人偶感的骨相根源）
+    //   颏底→锁骨 ≈ 0.10-0.13m；男身高均值 ~1.74m / 女 ~1.63m
+    const hScale = (D.face === 'f' || role === 'matron' ? 0.87 : 0.91) + rnd() * 0.07;
     this.group.scale.setScalar(hScale);
 
     // ---- 骨架枢轴（与 v2 兼容：pelvis/torso/neck/head + 肩肘髋膝）----
-    this.pelvis = new THREE.Group(); this.pelvis.position.y = 0.96; this.group.add(this.pelvis);
-    this.torso = new THREE.Group(); this.torso.position.y = 0.12; this.pelvis.add(this.torso);
-    const neckLen = D.drift ? 0.115 : 0.08; // 侍应的浮木颈比常人长——2 米内才会意识到
+    this.pelvis = new THREE.Group(); this.pelvis.position.y = 0.82; this.group.add(this.pelvis);
+    this.torso = new THREE.Group(); this.torso.position.y = 0.10; this.pelvis.add(this.torso);
+    const neckLen = 0.108; // 头组挂点（浮木长颈废除——颈长必须是真人的颈长）
     this.neck = new THREE.Group(); this.neck.position.y = 0.58; this.torso.add(this.neck);
     this.head = new THREE.Group(); this.head.position.y = neckLen; this.neck.add(this.head);
-    this.head.scale.setScalar(1.08); // 真人头身比 ~1/7.3，头偏小会读成人偶
+    this.head.scale.setScalar(1.16); // 头高 0.25-0.257m 档：1.87m 骨架 ÷ 7.28-7.48 头
 
     const mkMesh = (geo, mat, px = 0, py = 0, pz = 0, sx = 1, sy = 1, sz = 1) => {
       const m = new THREE.Mesh(geo, mat);
@@ -1130,37 +1207,30 @@ export class Humanoid {
     };
 
     // ---- 躯干（逐种子肩宽/胸厚） ----
-    const shW = 0.96 + rnd() * 0.1;   // 肩宽系数
+    const shW = 1.02 + rnd() * 0.05;  // 肩宽系数（成人男全肩宽落在 0.40-0.46m，下限抬进铁律区）
     const chD = 0.94 + rnd() * 0.14;  // 胸厚系数
     this.torsoScl = { x: shW, z: chD };
+    // 数值化比例（轮17 铁律，供 charshot 断言）：颅心 = torso 局部 0.688 + 0.115·1.16
+    {
+      const fl = 0.985 + P.faceLen * 0.03;
+      const base = 0.82 + 0.10;
+      const crown = base + 0.688 + (0.115 + 0.105 * fl) * 1.16 + 0.006;   // 颅顶+发壳厚
+      const chin = base + 0.688 + (0.115 - 0.105 * fl * 1.03) * 1.16;
+      const clav = base + 0.578;
+      const shR = torsoProfile(D.torso).reduce((m2, [r, y2]) => (Math.abs(y2 - 0.48) < 0.06 ? Math.max(m2, r) : m2), 0.14);
+      this.metrics = {
+        height: crown * hScale,
+        headH: (crown - chin) * hScale,
+        neckLen: (chin - clav) * hScale,
+        shoulderW: 2 * shR * 1.3 * shW * hScale,
+      };
+      this.metrics.headRatio = this.metrics.height / this.metrics.headH;
+    }
     this.torsoMesh = mkMesh(torsoGeo(D.torso), torsoMat, 0, 0, 0, shW, 1, chD);
     this.torso.add(this.torsoMesh);
-    // 颈
-    if (D.drift) {
-      this.torso.add(mkMesh(driftLimbGeo(0.05, neckLen + 0.08, 'neck_drift'), drift, 0, 0.62 + neckLen, 0));
-      // 2m 细节：皮肉包木的「肉唇」环（木头不是接上去的，是从肉里长出来的）
-      this.torso.add((() => {
-        const ring = mkMesh(G('driftLip', () => {
-          const g = new THREE.TorusGeometry(0.049, 0.0095, 8, 16);
-          g.rotateX(Math.PI / 2);
-          return g;
-        }), skin, 0, 0.578, 0.004, 1.06, 1, 0.9);
-        return ring;
-      })());
-      // 藤壶附居 + 盐霜粒：浪蚀木在活人体温上继续养着它的住户
-      const bnM = pick(M.saltFrost ?? Mtl('driftBn', () => new THREE.MeshStandardMaterial({ color: 0xe8e2d0, roughness: 0.6 })));
-      let bs = (seed ^ 0x5f3) >>> 0;
-      const brnd = () => { bs = (bs * 1664525 + 1013904223) >>> 0; return bs / 4294967296; };
-      for (let i = 0; i < 5; i++) {
-        const az = brnd() * Math.PI * 1.6 - Math.PI * 0.3; // 偏前侧——看得见的那面
-        const ny2 = 0.6 + brnd() * (neckLen + 0.05);
-        const rr = 0.047;
-        const cone = mkMesh(G('driftBnG' + (i % 2), () => new THREE.ConeGeometry(0.005 + (i % 2) * 0.002, 0.008, 7)), bnM,
-          Math.sin(az) * rr, ny2, Math.cos(az) * rr);
-        cone.rotation.set(Math.PI / 2 - 0.2, az, 0);
-        this.torso.add(cone);
-      }
-    } else {
+    // 颈（轮17：浮木长颈废除——侍应的异常收敛到前臂/托盘，颈必须读成人的颈；
+    // 「导管颈」的竖拉伸浮木贴图从此不可能出现在颈上）
+    {
       // 颈裙：车削喉颈替代胶囊——上缘细、整圈藏进下颌腔内，向下外扩铺进领口/斜方肌；
       // 顶点色把上缘压暗成「下颌接触阴影」，胶囊颈的横向接缝就此消失
       const neckMat = (D.photo && M.faceNecks?.[D.photo]) ? pick(M.faceNecks[D.photo])
@@ -1198,10 +1268,11 @@ export class Humanoid {
       // 同频（同一张颈皮调频贴图）——颌缘不再是「头壳切口 vs 颈筒」的明暗断面
       {
         const jrG = G('jawRing', () => {
-          // 头组局部（head.scale=1.08 已含）：r=躯干值/1.08，y=(躯干y-0.66)/1.08
+          // 头组局部（按 head.scale=1.16 重标——轮16 的 1.08 标定在 1.18 头上超径 9%，
+          // 整圈垂到领口上方读成「导管颈后的灰板」；现在环径只比颈裙宽 2mm=颌影圈）
           const prof = [
-            [0.0433, 0.0389], [0.0444, 0.0241], [0.0447, 0.0046],
-            [0.0443, -0.0093], [0.0431, -0.0176],
+            [0.0403, 0.0362], [0.0413, 0.0224], [0.0416, 0.0043],
+            [0.0412, -0.0087], [0.0401, -0.0164],
           ].map(([r, y2]) => new THREE.Vector2(r, y2));
           const g2 = new THREE.LatheGeometry(prof, 18);
           g2.scale(1, 1, 0.86);
@@ -1210,7 +1281,7 @@ export class Humanoid {
           for (let i = 0; i < pos2.count; i++) {
             // 下颌接触阴影烘在环自己身上：越往上钻进颌腔越暗（0.14），
             // 露出的下摆归一亮——与其下方的颈裙同色衔接
-            const t = Math.min(1, Math.max(0, (pos2.getY(i) - 0.002) / 0.034));
+            const t = Math.min(1, Math.max(0, (pos2.getY(i) - 0.0019) / 0.0322));
             const s2 = t * t * (3 - 2 * t);
             const sh = 1 - s2 * 0.14;
             col[i * 3] = sh; col[i * 3 + 1] = sh; col[i * 3 + 2] = sh;
@@ -1223,13 +1294,14 @@ export class Humanoid {
         jr.name = 'jawRing';
         this.head.add(jr);
       }
-      // 喉结（男性；2 米内的活人证据）——补白顶点色，否则顶点色材质把它染黑
-      if (D.face === 'm' || D.face === 'gaunt' || D.face === 'old') {
+      // 喉结（男性；2 米内的活人证据）——半埋进颈面的软鼓包，不是贴在管上的蛋
+      //（轮17：缩 4 成+后收 3mm；全福婆是女性——face:'old' 不再误挂喉结）
+      if ((D.face === 'm' || D.face === 'gaunt' || D.face === 'old') && role !== 'matron') {
         this.torso.add(mkMesh(G('adam', () => {
           const g2 = new THREE.SphereGeometry(0.012, 8, 6);
-          g2.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g2.attributes.position.count * 3).fill(0.92), 3));
+          g2.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g2.attributes.position.count * 3).fill(0.95), 3));
           return g2;
-        }), neckMat, 0, 0.635, 0.048, 0.8, 1.35, 0.7));
+        }), neckMat, 0, 0.669, 0.0385, 0.5, 0.8, 0.28));
       }
     }
     // 锁骨（连衣裙领口露出）
@@ -1241,21 +1313,39 @@ export class Humanoid {
       this.torso.add(cl, cr);
     }
     // 服装细件
+    // —— 领体系（轮17）：领筒贴颈 + 领口 4mm 厚度圆缘 + 可选外翻领面 ——
+    // 「颈过长」的一半是错觉：真人锁骨以下的颈都埋在领子里。领筒上缘压到
+    // 颏下 5cm（露肤仅一段喉），领口是一圈有厚度的布缘，不是零厚布纸筒
+    const mkCollar = (mat, style = 'fold') => {
+      this.torso.add(mkMesh(G('collarBand', () => new THREE.CylinderGeometry(0.0505, 0.068, 0.088, 16, 1, true)), mat, 0, 0.614, 0.004));
+      this.torso.add(mkMesh(G('collarRim', () => {
+        const t = new THREE.TorusGeometry(0.0505, 0.0042, 6, 18);
+        t.rotateX(Math.PI / 2);
+        return t;
+      }), mat, 0, 0.658, 0.004));
+      if (style === 'fold') {
+        // 翻领面：领筒外翻出的一圈坡面（2001 工装/衬衫的软翻领）
+        this.torso.add(mkMesh(G('collarFold', () => new THREE.CylinderGeometry(0.0585, 0.086, 0.058, 16, 1, true)), mat, 0, 0.604, 0.004));
+      }
+    };
     if (D.lapel) {
       const lp = mkMesh(lapelGeo(), torsoMat, -0.012, 0.28, 0.112, 1, 1, 1); lp.rotation.set(0.12, 0.25, 0.06); this.torso.add(lp);
       const rp = mkMesh(lapelGeo(), torsoMat, 0.012, 0.28, 0.112, -1, 1, 1); rp.rotation.set(0.12, -0.25, -0.06); this.torso.add(rp);
       const sv = mkMesh(shirtVGeo(), shirtMat, 0, 0.27, 0.104); sv.rotation.x = 0.1; this.torso.add(sv);
+      mkCollar(shirtMat, 'band');       // 白衬衫领贴颈（领口厚度环=衬衫布缘）
+      // 西装外领面：披在衬衫领外的一圈坡面（前低后高的驳领根）
+      this.torso.add(mkMesh(G('collarFoldSuit', () => new THREE.CylinderGeometry(0.062, 0.092, 0.06, 16, 1, true)), torsoMat, 0, 0.598, 0.002));
     }
     if (D.shirtV) {
       const sv = mkMesh(shirtVGeo(), shirtMat, 0, 0.27, 0.102); sv.rotation.x = 0.1; this.torso.add(sv);
-      // 衬衫领
-      this.torso.add(mkMesh(G('collarW', () => new THREE.CylinderGeometry(0.062, 0.075, 0.05, 14, 1, true)), shirtMat, 0, 0.57, 0.005));
+      mkCollar(shirtMat, 'fold');       // 衬衫翻领（侍应）
     }
-    if (D.tie) this.torso.add(mkMesh(tieGeo(), pick(Mtl('tieRed', () => new THREE.MeshStandardMaterial({ color: 0x6e1414, roughness: 0.55 }))), 0, 0.52, 0.112));
-    if (D.bowtie) this.torso.add(mkMesh(bowtieGeo(), pick(Mtl('bowtieBlk', () => new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.6 }))), 0, 0.535, 0.106));
+    if (D.torso === 'work' && !D.epaulet) mkCollar(torsoMat, 'fold'); // 工装夹克翻领（镇民/渔民/湿客/理骨员）
+    if (D.tie) this.torso.add(mkMesh(tieGeo(), pick(Mtl('tieRed', () => new THREE.MeshStandardMaterial({ color: 0x6e1414, roughness: 0.55 }))), 0, 0.556, 0.104));
+    if (D.bowtie) this.torso.add(mkMesh(bowtieGeo(), pick(Mtl('bowtieBlk', () => new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.6 }))), 0, 0.612, 0.062));
     if (D.knots) {
       this.torso.add(mkMesh(knotButtonsGeo(), pick(Mtl('knotGold', () => new THREE.MeshStandardMaterial({ color: 0xb8923e, roughness: 0.45, metalness: 0.4 }))), 0, 0, 0));
-      this.torso.add(mkMesh(G('collarStand', () => new THREE.CylinderGeometry(0.06, 0.068, 0.06, 14, 1, true)), torsoMat, 0, 0.585, 0.004));
+      mkCollar(torsoMat, 'band');       // 缎袄立领（盘扣领）
     }
     if (D.epaulet) {
       // 制服肩章 + 铜扣列
@@ -1270,8 +1360,8 @@ export class Humanoid {
         const by = 0.46 - i * 0.11;
         this.torso.add(mkMesh(G('uBtn' + i, () => new THREE.SphereGeometry(0.008, 6, 5)), brassM, 0.012, by, (torsoRadiusAt('work', by) * 0.7 + 0.008) * chD));
       }
-      // 立领
-      this.torso.add(mkMesh(G('uCollar', () => new THREE.CylinderGeometry(0.058, 0.066, 0.05, 14, 1, true)), torsoMat, 0, 0.585, 0.004));
+      // 制服领（领筒+领口厚度环+外翻领面）
+      mkCollar(torsoMat, 'fold');
     }
     if (D.apron) {
       this.torso.add(mkMesh(apronGeo(), rubber, 0, 0, 0, 1, 1, 1));
@@ -1292,24 +1382,51 @@ export class Humanoid {
     this.headHD = null;   // 2m 内惰性构建的高段数头模
     this._hd = false;
     this._lodT = Math.random() * 0.3;
-    // 眼（湿润巩膜+瞳，可发潮光）：装进眼球枢轴组——扫视微动转的是「球」不是贴片
-    // 巩膜压暗压哑（活人的眼白从来不是白的），虹膜放大到接近睑裂高——东亚成人露白极少
+    // 眼（轮17·黑珠眼根治）：巩膜球 + 虹膜纹理盘（色环/纤维/瞳孔）+ 角膜凸透高光
+    // + 角膜定位捕捉光点——任何光照下眼里都有一粒「活」的高光；虹膜直径回到
+    // 解剖比（≈眼球一半），巩膜在两眦真的露出来——纯黑玻璃珠从此非法
     const scleraMat = pick(Mtl('scleraWet', () => new THREE.MeshPhysicalMaterial({
-      color: 0xe6dcc9, roughness: 0.2, envMapIntensity: 1.55,
-      clearcoat: 1.0, clearcoatRoughness: 0.07, // 泪膜：巩膜上真正的水层
+      color: 0xd7ccbd, roughness: 0.34, envMapIntensity: 0.55, // 骨白非瓷白：环反射压半——「发光白珠」非法
+      clearcoat: 0.5, clearcoatRoughness: 0.2, // 泪膜：巩膜上真正的水层
     })));
-    this.eyeMat = Mtl('irisBase', () => new THREE.MeshStandardMaterial({
-      color: 0x1d1712, roughness: 0.06, envMapIntensity: 2.4,
-      emissive: 0x4a6a70, emissiveIntensity: 0,
+    // 虹膜盘材质：贴图带色环+瞳孔；emissive 通道保留给潮光（sightjack 发光）
+    const irisTint = (seed % 3 === 0) ? 0x6a4526 : 0x53341e; // 深褐/暖褐两档
+    this.eyeMat = Mtl('irisTex_' + irisTint.toString(16), () => new THREE.MeshStandardMaterial({
+      map: irisTexture(irisTint), transparent: true, roughness: 0.6,
+      envMapIntensity: 0.3, emissive: 0x4a6a70, emissiveIntensity: 0,
+      // 虹膜盘是正对相机的平面：镜面反射一大就整盘糊白（白珠眼回魂）——
+      // 湿光交给角膜壳与捕捉光点，虹膜自己只出「色」
+      depthWrite: false,
     })).clone();
-    if (ghost) { this.eyeMat.transparent = true; this.eyeMat.opacity = 0.5; }
-    const eyeG = G('eyeball', () => new THREE.SphereGeometry(0.0125, 12, 10));
-    // 虹膜放大到近满睑裂（东亚成人露白极少）：小瞳大白是「洋娃娃」的读法
-    const irisG = G('iris', () => new THREE.SphereGeometry(0.0095, 12, 9));
-    // 虹膜环：瞳孔外一圈深褐（近景里眼睛有了「层」；照片眼已从头皮蒙掉——湿眼球是唯一的眼）
-    const irisRingG = G('irisRing', () => new THREE.SphereGeometry(0.0102, 12, 9));
-    const irisRingMat = pick(Mtl('irisRing', () => new THREE.MeshStandardMaterial({
-      color: 0x3d2a1a, roughness: 0.28, envMapIntensity: 1.5,
+    if (ghost) this.eyeMat.opacity = 0.5;
+    const eyeG = G('eyeball', () => new THREE.SphereGeometry(0.0125, 14, 11));
+    // 虹膜壳：0.5m 近景里虹膜必须「占住」睑裂——直径提到眼球 62%。
+    // 关键：不能是平面盘！球面前极比平面盘心凸 2.3mm，深度测试会把盘心裁掉、
+    // 只剩外缘一圈细环（历轮「白珠眼上一粒点」的真正根因）。改为贴球曲面壳：
+    // 平面 UV 不动，顶点 z 压到略大于巩膜半径的球面上——虹膜整面浮出巩膜 0.1mm
+    const irisG = G('irisDisc', () => {
+      // 球冠段（20×8 细分）而非三角扇：单圈扇的平面片中段塌进巩膜面片里，
+      // 渲成一圈黑白交替楔（虹膜被巩膜条纹状咬穿）；细分球冠全程贴合有余量
+      const g = new THREE.SphereGeometry(0.0126, 20, 8, 0, Math.PI * 2, 0, 0.675);
+      g.rotateX(Math.PI / 2); // 冠顶转向 +z（面前方）
+      const p2 = g.attributes.position, uv2 = g.attributes.uv;
+      for (let i = 0; i < p2.count; i++) {
+        // 平面投影 UV：贴图按弦盘展开（与旧平面盘同一坐标约定）
+        uv2.setXY(i, p2.getX(i) / 0.0156 + 0.5, p2.getY(i) / 0.0156 + 0.5);
+      }
+      return g;
+    });
+    // 角膜凸：罩在虹膜上的一层湿透壳（高光走在这层上，虹膜纹理在壳下）
+    const corneaG = G('cornea', () => new THREE.SphereGeometry(0.008, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5));
+    const corneaMat = pick(Mtl('corneaWet', () => new THREE.MeshPhysicalMaterial({
+      color: 0xffffff, transparent: true, opacity: 0.1, roughness: 0.05,
+      envMapIntensity: 1.1, clearcoat: 1.0, clearcoatRoughness: 0.06, // 环反射 2.6→1.1：奶白雾膜糊掉虹膜的元凶
+      depthWrite: false,
+    })));
+    // 捕捉光点：角膜上永远亮着的一粒（暗厅里眼睛也得是「湿」的——活人证据第一条）
+    const glintG = G('eyeGlint', () => new THREE.CircleGeometry(0.0015, 8));
+    const glintMat = pick(Mtl('eyeGlintM', () => new THREE.MeshBasicMaterial({
+      color: 0xd8e4e8, transparent: true, opacity: 0.85, depthWrite: false,
     })));
     const eyeXoff = 0.028 + P.eyeX * 0.009;
     const eyeYoff = 0.113 + (P.eyeH - 0.5) * 0.006; // 眼睛在头高一半处（婴儿化=眼太高）
@@ -1321,10 +1438,24 @@ export class Humanoid {
     this.eyeGR = new THREE.Group(); this.eyeGR.position.set(eyeXoff, eyeYoff, 0.0726);
     this.eyeL = mkMesh(eyeG, scleraMat, 0, 0, 0, eyeScl, eyeScl, eyeScl);
     this.eyeR = mkMesh(eyeG, scleraMat, 0, 0, 0, eyeScl, eyeScl, eyeScl);
-    this.irisL = mkMesh(irisG, this.eyeMat, 0, 0, 0.0085 * eyeScl, eyeScl, eyeScl, 0.5 * eyeScl);
-    this.irisR = mkMesh(irisG, this.eyeMat, 0, 0, 0.0085 * eyeScl, eyeScl, eyeScl, 0.5 * eyeScl);
-    this.eyeGL.add(this.eyeL, this.irisL, mkMesh(irisRingG, irisRingMat, 0, 0, 0.0042 * eyeScl, eyeScl, eyeScl, 0.4 * eyeScl));
-    this.eyeGR.add(this.eyeR, this.irisR, mkMesh(irisRingG, irisRingMat, 0, 0, 0.0042 * eyeScl, eyeScl, eyeScl, 0.4 * eyeScl));
+    // 虹膜壳几何自带球面 z（0.0126 球）——网格只加 0.2mm 前浮防 z-fight
+    this.irisL = mkMesh(irisG, this.eyeMat, 0, 0, 0.0002 * eyeScl, eyeScl, eyeScl, eyeScl);
+    this.irisR = mkMesh(irisG, this.eyeMat, 0, 0, 0.0002 * eyeScl, eyeScl, eyeScl, eyeScl);
+    this.irisL.renderOrder = 1; this.irisR.renderOrder = 1;
+    for (const [grp, iris] of [[this.eyeGL, this.irisL], [this.eyeGR, this.irisR]]) {
+      grp.add(iris);
+      const cor = mkMesh(corneaG, corneaMat, 0, 0, 0.0085 * eyeScl, eyeScl, eyeScl, 0.62 * eyeScl);
+      cor.rotation.x = Math.PI / 2; // 壳顶朝前
+      cor.renderOrder = 2;
+      cor.userData.noShadow = true;
+      grp.add(cor);
+      const gl = mkMesh(glintG, glintMat, -0.0021 * eyeScl, 0.0023 * eyeScl, 0.0129 * eyeScl, 1, 1, 1);
+      gl.renderOrder = 3;
+      gl.userData.noShadow = true;
+      grp.add(gl);
+    }
+    this.eyeGL.add(this.eyeL);
+    this.eyeGR.add(this.eyeR);
     this.head.add(this.eyeGL, this.eyeGR);
     // 上睑接触阴影：罩在眼球前上缘的一圈软影带——眼球「压」在眼睑下面，不是并排摆着
     {
@@ -1342,12 +1473,30 @@ export class Humanoid {
     }
     // 眼睑：左右独立下垂量——「哪只眼皮更沉」是每个人自己的事；眨眼转的就是这两片
     // 默认更沉一档（-0.84→-0.76）：上睑压住眼球上缘，球顶不许亮出来
-    this.lidBaseL = -0.76 + P.droopL * 0.24;
-    this.lidBaseR = -0.76 + P.droopR * 0.24;
+    this.lidBaseL = -0.72 + P.droopL * 0.22;
+    this.lidBaseR = -0.72 + P.droopR * 0.22;
     this.lidL = mkMesh(lidGeo(), lidSkin, -eyeXoff, eyeYoff + 0.002, 0.0735, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
     this.lidL.rotation.x = this.lidBaseL;
     this.lidR = mkMesh(lidGeo(), lidSkin, eyeXoff, eyeYoff + 0.002, 0.0735, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
     this.lidR.rotation.x = this.lidBaseR;
+    // 睑缘厚度带（轮17）：上睑壳口一圈 1mm 圆环——眼皮是有「厚度」的皮盖，
+    // 不是零厚度蛋壳切口；随睑一起眨（挂在睑网格下），色比睑面深半档=睑缘线
+    {
+      const rimG = G('lidRimBand', () => {
+        const t = new THREE.TorusGeometry(0.0131, 0.001, 5, 20);
+        t.rotateX(Math.PI / 2);           // 环面绕 y 轴（壳口纬线）
+        t.translate(0, 0.0033, 0);        // 落到 0.42π 壳口纬度
+        return t;
+      });
+      const rimM = pick(Mtl('lidRimM', () => new THREE.MeshStandardMaterial({
+        color: 0x8d6a56, roughness: 0.72, envMapIntensity: 0.5,
+      })));
+      for (const lid of [this.lidL, this.lidR]) {
+        const rim = new THREE.Mesh(rimG, rimM);
+        rim.userData.noShadow = true;
+        lid.add(rim);
+      }
+    }
     this.head.add(this.lidL, this.lidR);
     // 下睑：窄睑缘带从下前方贴住眼球（几乎不动——眨眼是上睑的事；眯眼时上抬）
     // 位置整体后收（z 0.0738→0.0720）：带体埋进眶腔，只露睑缘线
@@ -1611,10 +1760,11 @@ export class Humanoid {
 
     // ---- 工位主异常 ----
     if (D.roeSeal) {
-      // 鱼籽钙化：湿滑的卵膜清漆——2m 内每一粒都在灯下各自亮
+      // 鱼籽钙化：半透卵膜微光——粒小（≤4mm）、半埋，痂色压到干痂档
+      //（0xc2b28c 亮米色在肤色上读成「粘上去的珍珠」——痂必须比皮暗）
       this.head.add(mkMesh(roeSealGeo(), pick(Mtl('roe', () => new THREE.MeshPhysicalMaterial({
-        color: 0xd8c9a2, roughness: 0.3, envMapIntensity: 1.5,
-        clearcoat: 0.9, clearcoatRoughness: 0.12,
+        color: 0x84684a, roughness: 0.55, envMapIntensity: 0.7,
+        clearcoat: 0.3, clearcoatRoughness: 0.3,
       }))), 0, 0.115, 0));
     }
     if (D.poreplate) {
@@ -1622,8 +1772,8 @@ export class Humanoid {
     }
     if (D.saltFrost || opts.saltFrost) {
       // 盐霜附居痕迹：按头形参数缩放贴面（晶壳长在皮上，不悬空）
-      const hw = (faceVariant === 'f' ? 0.845 : 0.83) + P.headW * 0.05;
-      const fl = 0.96 + P.faceLen * 0.06;
+      const hw = (faceVariant === 'f' ? 0.835 : 0.82) + P.headW * 0.04;
+      const fl = 0.985 + P.faceLen * 0.03;
       const saltM = mkMesh(saltFrostGeo(seed),
         pick(M.saltFrost ?? Mtl('saltFrostFb', () => new THREE.MeshStandardMaterial({ color: 0xf2efe2, roughness: 0.55, envMapIntensity: 1.5 }))),
         0, 0.115, 0);
@@ -1663,8 +1813,8 @@ export class Humanoid {
             ? limbGeo(0.041, 0.029, 0.22, 'foreArmSkin', 0.13, { peak: 0.3 })
             : limbGeo(0.041, 0.035, 0.226, 'foreArmCuff', 0.1, { peak: 0.3, cuff: 0.007, wrinkle: 0.0016 }),
           foreMat, 0, 0.008, 0, limbScl, 1, limbScl));
-        // 袖口露腕（手套角色腕部也是胶皮）
-        elbow.add(mkMesh(G('wrist', () => new THREE.CapsuleGeometry(0.028, 0.05, 4, 10)), D.gloves ? rubber : skin, 0, -0.24, 0));
+        // 袖口露腕（手套角色腕部也是胶皮）——腕径回到真人 (r 24mm)
+        elbow.add(mkMesh(G('wrist', () => new THREE.CapsuleGeometry(0.0245, 0.05, 4, 10)), D.gloves ? rubber : skin, 0, -0.24, 0));
       }
       const handMat = D.drift ? drift : D.gloves ? rubber : skin;
       const flat = D.tray && side < 0;
@@ -1692,24 +1842,25 @@ export class Humanoid {
       const thighMat = D.skirt ? skin : pantsMat;
       hip.add(mkMesh(G('hipCap', () => new THREE.SphereGeometry(0.074, 12, 10)), thighMat, 0, 0.012, 0, limbScl, 0.72, 0.85 * limbScl));
       // 裤管过膝 15mm：管-管重叠盖住缝球，行走屈膝不再亮出球节
+      //（轮17：大腿/小腿各缩 7cm——腿长回到真人比，头身 1/7.4）
       hip.add(mkMesh(
-        D.skirt ? limbGeo(0.074, 0.052, 0.4, 'thighSkin', 0.06, { peak: 0.35 })
-          : limbGeo(0.074, 0.0515, 0.415, 'thighPants', 0.06, { peak: 0.35, wrinkle: 0.0013 }),
+        D.skirt ? limbGeo(0.074, 0.052, 0.33, 'thighSkin', 0.06, { peak: 0.35 })
+          : limbGeo(0.074, 0.0515, 0.345, 'thighPants', 0.06, { peak: 0.35, wrinkle: 0.0013 }),
         thighMat, 0, 0, 0, limbScl, 1, limbScl));
       const knee = new THREE.Group();
-      knee.position.y = -0.42;
+      knee.position.y = -0.35;
       hip.add(knee);
       // 膝缝球压扁收窄——藏进裤管剪影之内
       knee.add(mkMesh(G('kneeCap', () => new THREE.SphereGeometry(0.052, 11, 9)), D.skirt ? skin : pantsMat, 0, 0.004, 0, 0.96 * limbScl, 0.72, 0.96 * limbScl));
       // 小腿三型：裸腿(腓肠肌肌腹+细踝)/胶靴筒(近直)/裤管(微锥+裤脚外扩盖住鞋口)
       knee.add(mkMesh(
-        D.skirt ? limbGeo(0.052, 0.03, 0.38, 'shinSkin', 0.18, { peak: 0.3 })
-          : D.shoe === 'boot' ? limbGeo(0.052, 0.049, 0.38, 'shinBoot', 0.05, { peak: 0.3 })
-            : limbGeo(0.052, 0.041, 0.39, 'shinPants', 0.08, { peak: 0.3, cuff: 0.006, wrinkle: 0.0015 }),
+        D.skirt ? limbGeo(0.052, 0.03, 0.31, 'shinSkin', 0.18, { peak: 0.3 })
+          : D.shoe === 'boot' ? limbGeo(0.052, 0.049, 0.31, 'shinBoot', 0.05, { peak: 0.3 })
+            : limbGeo(0.052, 0.041, 0.32, 'shinPants', 0.08, { peak: 0.3, cuff: 0.006, wrinkle: 0.0015 }),
         D.skirt ? skin : (D.shoe === 'boot' ? rubber : pantsMat), 0, 0.01, 0, limbScl, 1, limbScl));
       const shoeMat = D.shoe === 'leather' ? leather : D.shoe === 'boot' ? rubber : clothShoe;
       const shoeG = D.shoe === 'leather' ? shoeGeo() : D.shoe === 'boot' ? bootGeo() : clothShoeGeo();
-      const shoe = mkMesh(shoeG, shoeMat, 0, -0.4, 0.02);
+      const shoe = mkMesh(shoeG, shoeMat, 0, -0.33, 0.02);
       knee.add(shoe);
       return { hip, knee, shoe };
     };
@@ -2031,7 +2182,7 @@ export class Humanoid {
         const lampR = 1 - Gt.limp * 0.25 * Gt.limpSide;
         lerp(this.torso.rotation, 'x', 0.08);
         lerp(this.neck.rotation, 'x', 0.06);
-        lerp(this.pelvis.position, 'y', 0.96 + Math.abs(Math.cos(this.phase)) * 0.022 - Gt.limp * 0.02);
+        lerp(this.pelvis.position, 'y', 0.815 + Math.abs(Math.cos(this.phase)) * 0.022 - Gt.limp * 0.02);
         lerp(this.legL.hip.rotation, 'x', sw * 0.48 * lampL, 12);
         lerp(this.legR.hip.rotation, 'x', -sw * 0.48 * lampR, 12);
         lerp(this.legL.knee.rotation, 'x', Math.max(0, -sw) * 0.65 * lampL + 0.08, 12);
@@ -2061,7 +2212,7 @@ export class Humanoid {
         lerp(this.armR.shoulder.rotation, 'x', -1.1 - sw * 0.18, 10);
         lerp(this.armL.elbow.rotation, 'x', -0.4, 10);
         lerp(this.armR.elbow.rotation, 'x', -0.4, 10);
-        lerp(this.pelvis.position, 'y', 0.94 + Math.abs(Math.cos(this.phase)) * 0.045 - stmb * 0.25);
+        lerp(this.pelvis.position, 'y', 0.795 + Math.abs(Math.cos(this.phase)) * 0.045 - stmb * 0.25);
         lerp(this.torso.rotation, 'z', sw * 0.07, 10);
         break;
       }
@@ -2073,7 +2224,7 @@ export class Humanoid {
         lerp(this.armR.shoulder.rotation, 'x', -0.12, 10);
         lerp(this.legL.hip.rotation, 'x', 0, 10);
         lerp(this.legR.hip.rotation, 'x', 0, 10);
-        lerp(this.pelvis.position, 'y', 0.985, 10);
+        lerp(this.pelvis.position, 'y', 0.84, 10);
         break;
       }
       case 'grab': {
@@ -2087,7 +2238,7 @@ export class Humanoid {
           lerp(this.armR.elbow.rotation, 'x', -0.25, 12);
           lerp(this.armL.shoulder.rotation, 'x', -0.25, 12); // 托盘手仍端着（水平不洒）
           lerp(this.armL.elbow.rotation, 'x', -1.62, 12);
-          lerp(this.pelvis.position, 'y', 0.95, 10);
+          lerp(this.pelvis.position, 'y', 0.805, 10);
         } else {
           lerp(this.torso.rotation, 'x', 0.5, 12);
           lerp(this.neck.rotation, 'x', -0.5, 12);
@@ -2097,7 +2248,7 @@ export class Humanoid {
           lerp(this.armR.shoulder.rotation, 'z', -0.24, 12);
           lerp(this.armL.elbow.rotation, 'x', -0.4, 14);
           lerp(this.armR.elbow.rotation, 'x', -0.4, 14);
-          lerp(this.pelvis.position, 'y', 1.0, 10);
+          lerp(this.pelvis.position, 'y', 0.855, 10);
         }
         break;
       }
@@ -2120,7 +2271,7 @@ export class Humanoid {
         lerp(this.armR.elbow.rotation, 'x', -0.9, 5);
         lerp(this.legL.hip.rotation, 'x', 0, 5);
         lerp(this.legR.hip.rotation, 'x', 0, 5);
-        lerp(this.pelvis.position, 'y', 1.0, 5);
+        lerp(this.pelvis.position, 'y', 0.855, 5);
         break;
       }
       case 'serve': {
@@ -2140,7 +2291,7 @@ export class Humanoid {
         lerp(this.armL.elbow.rotation, 'x', -0.2 - announce * 0.2, 5);
         lerp(this.legL.hip.rotation, 'x', 0, 4);
         lerp(this.legR.hip.rotation, 'x', 0, 4);
-        lerp(this.pelvis.position, 'y', 1.0, 4);
+        lerp(this.pelvis.position, 'y', 0.855, 4);
         break;
       }
       case 'float': {
@@ -2155,7 +2306,7 @@ export class Humanoid {
         lerp(this.legR.hip.rotation, 'x', -0.02, 3);
         lerp(this.legL.shoe.rotation, 'x', 0.55, 3);
         lerp(this.legR.shoe.rotation, 'x', 0.55, 3);
-        lerp(this.pelvis.position, 'y', 0.985 + Math.sin(P * 1.7) * 0.012, 3);
+        lerp(this.pelvis.position, 'y', 0.855 + Math.sin(P * 1.7) * 0.012, 3);
         break;
       }
       case 'sit': {
@@ -2185,7 +2336,7 @@ export class Humanoid {
         lerp(this.legR.knee.rotation, 'x', Math.max(0, -sw) * 0.5 + 0.06, 10);
         lerp(this.armL.shoulder.rotation, 'x', -0.1, 6);
         lerp(this.armR.shoulder.rotation, 'x', -0.1, 6);
-        lerp(this.pelvis.position, 'y', 0.965, 8);
+        lerp(this.pelvis.position, 'y', 0.82, 8);
         break;
       }
       case 'work_net': {
@@ -2199,7 +2350,7 @@ export class Humanoid {
         lerp(this.armR.elbow.rotation, 'x', -1.1 + pull * 0.3, 10);
         lerp(this.legL.hip.rotation, 'x', -0.1);
         lerp(this.legR.hip.rotation, 'x', 0.08);
-        lerp(this.pelvis.position, 'y', 0.9);
+        lerp(this.pelvis.position, 'y', 0.755);
         break;
       }
       case 'work_rake': {
@@ -2213,7 +2364,7 @@ export class Humanoid {
         lerp(this.armL.elbow.rotation, 'x', -0.5, 10);
         lerp(this.legL.hip.rotation, 'x', push * 0.12);
         lerp(this.legR.hip.rotation, 'x', -push * 0.12);
-        lerp(this.pelvis.position, 'y', 0.93);
+        lerp(this.pelvis.position, 'y', 0.785);
         break;
       }
       case 'work_brush': {
@@ -2228,7 +2379,7 @@ export class Humanoid {
         lerp(this.armL.elbow.rotation, 'x', -0.15, 5);
         lerp(this.legL.hip.rotation, 'x', 0, 5);
         lerp(this.legR.hip.rotation, 'x', 0, 5);
-        lerp(this.pelvis.position, 'y', 0.94, 5);
+        lerp(this.pelvis.position, 'y', 0.795, 5);
         break;
       }
       case 'work_pray': {
@@ -2240,7 +2391,7 @@ export class Humanoid {
         lerp(this.armR.shoulder.rotation, 'x', -1.2 - bow * 0.3, 6);
         lerp(this.armL.elbow.rotation, 'x', -0.9, 6);
         lerp(this.armR.elbow.rotation, 'x', -0.9, 6);
-        lerp(this.pelvis.position, 'y', 0.72, 5);
+        lerp(this.pelvis.position, 'y', 0.575, 5);
         lerp(this.legL.hip.rotation, 'x', -1.2, 5);
         lerp(this.legR.hip.rotation, 'x', -1.2, 5);
         lerp(this.legL.knee.rotation, 'x', 1.9, 5);
@@ -2258,7 +2409,7 @@ export class Humanoid {
         lerp(this.armR.shoulder.rotation, 'z', -0.3 - Math.sin(P * 0.8) * 0.07, 4);
         lerp(this.legL.hip.rotation, 'x', 0, 4);
         lerp(this.legR.hip.rotation, 'x', 0, 4);
-        lerp(this.pelvis.position, 'y', 1.0, 4);
+        lerp(this.pelvis.position, 'y', 0.855, 4);
         break;
       }
       case 'watch': {
@@ -2270,7 +2421,7 @@ export class Humanoid {
         lerp(this.armR.shoulder.rotation, 'x', 0.02, 3);
         lerp(this.legL.hip.rotation, 'x', 0, 3);
         lerp(this.legR.hip.rotation, 'x', 0, 3);
-        lerp(this.pelvis.position, 'y', 1.0, 3);
+        lerp(this.pelvis.position, 'y', 0.855, 3);
         break;
       }
       default: { // idle：站姿，重心慢移
@@ -2284,7 +2435,7 @@ export class Humanoid {
         lerp(this.legL.hip.rotation, 'x', 0);
         lerp(this.legR.hip.rotation, 'x', 0);
         lerp(this.torso.rotation, 'z', Math.sin(P * 0.5) * 0.015 + Gt.droop * 0.04);
-        lerp(this.pelvis.position, 'y', 0.97);
+        lerp(this.pelvis.position, 'y', 0.825);
       }
     }
   }
@@ -2294,7 +2445,7 @@ export class Humanoid {
     const lerp = (o, k, v, r = 10) => { o[k] += (v - o[k]) * Math.min(1, dt * r); };
     this.phase += dt * 7.2 * speed;
     const sw = Math.sin(this.phase);
-    lerp(this.pelvis.position, 'y', 0.965, 20);        // 无起伏
+    lerp(this.pelvis.position, 'y', 0.82, 20);         // 无起伏
     lerp(this.torso.rotation, 'x', lean, 8);
     lerp(this.neck.rotation, 'x', -lean * 0.9, 8);      // 头保持水平锁定
     lerp(this.legL.hip.rotation, 'x', sw * 0.3, 16);

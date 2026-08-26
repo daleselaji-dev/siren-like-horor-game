@@ -52,7 +52,8 @@ const FACE_DEFS = {
     url: urlPale, base: 'skin',
     eyeY: 0.400, eyeLX: 0.407, eyeRX: 0.598, mouthY: 0.635, chinY: 0.714,
     browY: 0.352, noseY: 0.545, hairY: 0.295, hairSag: 0.13,
-    mat: { envInt: 0.9, cc: 0.48, ccRough: 0.24, normalScale: 0.9, poreScale: 0.8 },
+    // 轮17：失血员工脸清漆再减档（0.26→0.16）+ 环反射 0.42——「蜡像壳」高光出局
+    mat: { envInt: 0.42, cc: 0.16, ccRough: 0.44, normalScale: 0.9, poreScale: 0.8 },
   },
   chalk: {
     url: urlChalk, base: 'skinOld',

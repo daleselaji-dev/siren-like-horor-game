@@ -89,6 +89,8 @@ function tick() {
 tick();
 
 window.__names = figures.map((f) => f.name);
+// 轮17 比例铁律断言口：每个活体角色的数值化人体测量（米）
+window.__metrics = figures.map((f) => (f.h ? { name: f.name, ...f.h.metrics } : null));
 const moveLights = (x) => {
   key.position.set(x + 2.5, 3.5, 3.5);
   key.target.position.set(x, 1.2, 0);
