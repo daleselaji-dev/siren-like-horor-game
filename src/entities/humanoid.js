@@ -313,7 +313,12 @@ function craniumGeo(variant, P, hd = false, dyN = 0) {
           x += nx * mic * 0.0005; y += nyD * mic * 0.0005; z += nzD * mic * 0.0005;
         }
         pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z;
-        uvA[k * 2] = uu; uvA[k * 2 + 1] = vv;
+        // UV 存实际方向的线性球面坐标（θ/π、φ/2π），不存网格坐标——
+        // 网格翘曲只管把顶点密到脸上；纹理映射保持与 faces.js 全部标定
+        //（照片仿射/眼AO/鼻烘焙/法线高频）一致的旧球面系，否则照片五官
+        // 会被网格加密函数横压 2.6 倍、口鼻上抬 2cm（轮16A 的错位事故）
+        uvA[k * 2] = 0.5 + ph / (Math.PI * 2);
+        uvA[k * 2 + 1] = th / Math.PI;
         k++;
       }
     }
@@ -393,6 +398,14 @@ function headGeo(variant, P, hd = false, photoKey = null) {
 /** 眼睑罩（半球，肤色）：给眼睛压出「疲惫的半合」 */
 function lidGeo() {
   return G('lid', () => new THREE.SphereGeometry(0.0135, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.42));
+}
+
+/** 下睑带（窄环帽 54°）：只做贴住眼球下前缘的睑缘条。
+ *  旧版复用上睑的 75° 大帽壳转到下位——壳底越出加深后的眶下皮面，
+ *  仰视读成眼下两颗光皮球（人偶感元凶）；窄带上缘停在虹膜下缘、
+ *  下缘埋进眶腔，露出的只有「卧蚕」那一条肤色 */
+function lidLoGeo() {
+  return G('lidLo', () => new THREE.SphereGeometry(0.0135, 12, 4, 0, Math.PI * 2, 0, Math.PI * 0.3));
 }
 
 /** 眉毛贴片：沿眉弓弯曲的窄面片（毛发画在 alpha 贴图里，逐根可读） */
@@ -1336,11 +1349,12 @@ export class Humanoid {
     this.lidR = mkMesh(lidGeo(), lidSkin, eyeXoff, eyeYoff + 0.002, 0.0735, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
     this.lidR.rotation.x = this.lidBaseR;
     this.head.add(this.lidL, this.lidR);
-    // 下睑：睑缘从下方包住眼球（几乎不动——眨眼是上睑的事；眯眼时上抬）
+    // 下睑：窄睑缘带从下前方贴住眼球（几乎不动——眨眼是上睑的事；眯眼时上抬）
+    // 位置整体后收（z 0.0738→0.0720）：带体埋进眶腔，只露睑缘线
     this.lidLoBase = Math.PI - 0.58;
-    this.lidLoL = mkMesh(lidGeo(), lidSkin, -eyeXoff, eyeYoff - 0.0032, 0.0738, eyeScl * 1.05, eyeScl * 0.85, eyeScl * 1.05);
+    this.lidLoL = mkMesh(lidLoGeo(), lidSkin, -eyeXoff, eyeYoff - 0.0026, 0.072, eyeScl * 1.03, eyeScl * 0.8, eyeScl * 1.03);
     this.lidLoL.rotation.x = this.lidLoBase;
-    this.lidLoR = mkMesh(lidGeo(), lidSkin, eyeXoff, eyeYoff - 0.0032, 0.0738, eyeScl * 1.05, eyeScl * 0.85, eyeScl * 1.05);
+    this.lidLoR = mkMesh(lidLoGeo(), lidSkin, eyeXoff, eyeYoff - 0.0026, 0.072, eyeScl * 1.03, eyeScl * 0.8, eyeScl * 1.03);
     this.lidLoR.rotation.x = this.lidLoBase;
     this.head.add(this.lidLoL, this.lidLoR);
     // 睫毛：上睑缘窄弯带（贴图两端 alpha 渐隐——内外眦无贴片尖角）
