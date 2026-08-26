@@ -930,6 +930,8 @@ const ROLE_DEFS = {
   booth:    { torso: 'work', hair: 'crop', cap: true, face: 'gaunt', skin: 'pale', photo: 'pale', shoe: 'leather', uniform: true, ticketSlot: true, epaulet: true, pants: 'uniform' },
   // 理骨员：海洋馆巨骸厅的看守。胶皮围裙长手套，头永远歪向展缸那侧——它在听
   osteo:    { torso: 'work', hair: 'crop', face: 'gaunt', skin: 'chalk', photo: 'chalk', shoe: 'boot', apron: true, gloves: true, tiltHead: 0.3, brush: true, pants: 'work' },
+  // 湿客：返潮后街上巡走的「打捞回来的人」——衣服还是镇民的，皮是泡过的
+  returnee: { torso: 'work', hair: 'crop', face: 'gaunt', skin: 'corpse', photo: 'pale', shoe: 'cloth', pants: 'work', tiltHead: 0.18 },
 };
 
 function roleFromOpts(opts) {
@@ -972,6 +974,7 @@ export class Humanoid {
     const pick = (m) => (ghost ? ghostify(m) : m);
     // 肤色池：同一张贴图配不同年龄/色调——人群不再共享同一张皮
     const pickSkin = () => {
+      if (D.skin === 'corpse') return M.corpseSkin ?? M.skinPale;
       if (D.skin === 'chalk') return M.skinChalk ?? M.skinPale;
       if (D.skin === 'pale') {
         const pool = M.skinPales ?? [M.skinPale];

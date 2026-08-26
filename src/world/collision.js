@@ -8,6 +8,7 @@
 export function slideMove(pos, dx, dz, radius, colliders, bounds, footY = 0) {
   const fits = (nx, nz) => {
     for (const c of colliders) {
+      if (c.off) continue;                                         // 关闭中的碰撞体（异化态路线切换）
       if (c.noCollide) continue;                                   // 仅视线遮挡体
       if (c.maxY !== undefined && footY > c.maxY - 0.15) continue; // 站得比它高 → 可跨
       if (c.minY !== undefined && footY + 1.55 < c.minY) continue; // 整个人在它下面 → 可从下方通过
@@ -83,6 +84,7 @@ function segCircle(ax, az, bx, bz, c) {
 export function hasLineOfSight(a, b, colliders, heightAt) {
   const ax = a.x, az = a.z, bx = b.x, bz = b.z;
   for (const c of colliders) {
+    if (c.off) continue;
     if (c.noSightBlock) continue;
     const hit = c.r !== undefined ? segCircle(ax, az, bx, bz, c) : segAABB(ax, az, bx, bz, c);
     if (hit) {

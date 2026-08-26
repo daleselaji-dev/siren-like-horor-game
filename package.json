@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "verify": "node scripts/verify.mjs smoke && node scripts/verify.mjs gameplay && node scripts/verify.mjs looks && node scripts/verify.mjs playthrough",
+    "verify": "node scripts/verify.mjs smoke && node scripts/verify.mjs gameplay && node scripts/verify.mjs round4tools && node scripts/verify.mjs round5leak && node scripts/verify.mjs looks && node scripts/verify.mjs playthrough",
     "verify:one": "node scripts/verify.mjs",
     "desktop": "vite build && electron .",
     "dist": "vite build && electron-builder --win portable --linux AppImage",

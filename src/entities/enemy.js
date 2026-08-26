@@ -488,9 +488,10 @@ export class Enemy {
     this.suspectPos.copy(pos);
   }
 
-  /** 镁光定身：看见闪光——捂眼、断追踪 */
+  /** 镁光定身：看见闪光——捂眼、断追踪（泡过的眼睛不太吃光：flashK 打折） */
   flashStun(sec) {
     if (!this.enabled || this.grabbing) return;
+    sec *= this.def.flashK ?? 1;
     this.stunT = this.stunDur = Math.max(this.stunT, sec);
     this.stateTimer = 0;
     if (this.state === 'ALERT' || this.state === 'SUSPECT') {
@@ -519,8 +520,9 @@ export class Enemy {
     this.suspectMeter = 0;
   }
 
-  /** 贝灰线判定：脚下或去路一步之内有界 → 返回该线 */
+  /** 贝灰线判定：脚下或去路一步之内有界 → 返回该线（湿客不认界——它们已经不守规矩了） */
   limeAhead(tx, tz) {
+    if (this.def.ignoreLime) return null;
     const lines = this.world.dynamic.limeLines;
     if (!lines || !lines.length) return null;
     const dx = tx - this.pos.x, dz = tz - this.pos.z;

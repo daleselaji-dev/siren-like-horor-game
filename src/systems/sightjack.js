@@ -14,6 +14,7 @@ const CARRIER_FX = {
   gaze: { fov: 60, tint: [0.9, 0.86, 1.05], desat: 0.15, breath: 0.2 },      // 回眸客：过曝的残影
   waiter: { fov: 72, tint: [0.82, 0.96, 0.98], desat: 0.4, breath: 0 },      // 侍应：不呼吸的匀速
   sea: { fov: 58, tint: [0.78, 0.94, 1.06], desat: 0.28, breath: 0.5 },      // 海：它的眼睛
+  wet: { fov: 62, tint: [0.72, 0.9, 1.04], desat: 0.52, breath: 0.22 },      // 湿客：隔着水看陆地——窄、冷、几乎不换气
 };
 
 export class SightjackSystem {

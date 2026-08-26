@@ -137,6 +137,26 @@ const enemyDefs = [
     waypoints: P.osteoHall, floorY: HFY.f1,
     fov: 92, sightRange: 13, hearRange: 12, walkSpeed: 0.68, chaseSpeed: 2.3,
   },
+  // —— 湿客（返潮后才上街）：衣服是镇民的，皮是泡过的 ——
+  // 泡过的眼睛不太吃镁光(flashK)，也不认贝灰的界(ignoreLime)——但耳朵灌了水更好骗（hearRange 高=闹钟更好用）
+  {
+    id: 'wetcomer1', label: '湿客', kind: 'patrol', role: 'returnee', fxKind: 'wet', mute: true, enabled: false,
+    waypoints: P.wet1,
+    fov: 100, sightRange: 14, hearRange: 18, walkSpeed: 0.56, chaseSpeed: 2.4,
+    flashK: 0.55, ignoreLime: true,
+  },
+  {
+    id: 'wetcomer2', label: '湿客', kind: 'patrol', role: 'returnee', fxKind: 'wet', mute: true, enabled: false,
+    waypoints: P.wet2,
+    fov: 100, sightRange: 14, hearRange: 18, walkSpeed: 0.6, chaseSpeed: 2.4,
+    flashK: 0.55, ignoreLime: true,
+  },
+  {
+    id: 'wetcomer3', label: '湿客', kind: 'patrol', role: 'returnee', fxKind: 'wet', mute: true, enabled: false,
+    waypoints: P.wet3,
+    fov: 100, sightRange: 15, hearRange: 18, walkSpeed: 0.6, chaseSpeed: 2.45,
+    flashK: 0.55, ignoreLime: true,
+  },
 ];
 
 const enemies = enemyDefs.map((d) => new Enemy(engine.scene, world, M, d));
@@ -205,7 +225,7 @@ const tools = new ToolsSystem({ scene: engine.scene, engine, player, world, stea
 
 const game = {
   scene: engine.scene, engine, world, player, hud, audio,
-  enemies, byId, viewers, watchers, floaters, gaze, guest,
+  enemies, byId, viewers, watchers, floaters, gaze, guest, dog,
   sightjack, stealth, crt, tools, ocean, sky, M,
   state: 'TITLE', // TITLE | PLAY | NOTE | PAUSE | ENDED
   openNote(note) {

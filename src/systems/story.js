@@ -836,6 +836,21 @@ export class Story {
         g.hud.subtitle('湾里的沉船翻着龙骨。走龙骨过谷地——别下水。', 5);
       },
     });
+    // —— 返潮之后的镇区（异化态叙事：地图变了，路也变了） ——
+    add({
+      zone: Z.frontStreet, once: true, cond: () => this.flags.leaked,
+      act: () => {
+        g.hud.subtitle('街心摆满了椅子。一排一排，全脸朝海。', 5, 'song');
+        g.hud.subtitle('没有一把是空的——每把上面都放着一双叠好的鞋。', 5.5, 'song');
+      },
+    });
+    add({
+      zone: Z.villageCenter, once: true, cond: () => this.flags.leaked,
+      act: () => {
+        g.hud.subtitle('通酒店的主街隆起了一道脊。泥、壳，还有别人家的门。', 5.5);
+        g.hud.subtitle('路从今晚起不走这里。要过去，钻床单巷，或者绕盐田。', 5.5);
+      },
+    });
     add({
       zone: Z.lighthouse, once: true, cond: () => !this.flags.finaleBroken,
       act: () => {
@@ -943,6 +958,16 @@ export class Story {
       if (w) { w.sightRange += 2; w.walkSpeed = 1.15; }
     }
     byId.security?.setEnabled(true);
+    // —— 镇区异化：外面那座镇，从这一拍起不再是原来的镇 ——
+    // 主街隆脊封死/椅阵面海/CRT冢通电/床单巷挂帘（碰撞与视线遮挡一并启用）
+    g.world.applyLeakState?.();
+    // 履职的人一个不剩（守祀人除外——他的祭还没做完）
+    for (const id of ['netMender', 'saltWorker', 'dikePatrol', 'runner1', 'runner2', 'streetRunner', 'templeGuard', 'booth']) {
+      byId[id]?.setEnabled(false);
+    }
+    g.dog?.setEnabled(false);
+    // 上街的换成湿客：不认贝灰的界、镁光打折——绕开或用闹钟钓走
+    for (const id of ['wetcomer1', 'wetcomer2', 'wetcomer3']) byId[id]?.setEnabled(true);
     // 灯光：荧光变冷、闪烁加剧
     for (const hl of g.world.dynamic.hotelLights ?? []) {
       hl.flicker = Math.min(2.4, (hl.flicker ?? 0) + 0.8);
@@ -1694,6 +1719,22 @@ export class Story {
     }
   }
 
+  // ---------- 湿客（异化态敌人——初见叙事） ----------
+  updateWetcomers() {
+    if (this._wetSeen || !this.flags.leaked) return;
+    const p = this.g.player.pos;
+    for (const id of ['wetcomer1', 'wetcomer2', 'wetcomer3']) {
+      const w = this.g.byId[id];
+      if (!w || !w.enabled) continue;
+      if (Math.hypot(w.pos.x - p.x, w.pos.z - p.z) > 15) continue;
+      this._wetSeen = true;
+      this.g.hud.subtitle('街上有人在走。那不是镇上的人——衣服是镇上的。', 5.5, 'song');
+      this.g.hud.subtitle('裤脚一直在滴水。滴到地上，就不见了。', 5, 'song');
+      this.g.hud.subtitle('灰线拦不住它。想过去：别出声，或者拿闹钟把它钓开。', 5.5);
+      break;
+    }
+  }
+
   // ---------- 回眸客指路 ----------
   updateGaze() {
     const g = this.g;
@@ -1743,6 +1784,7 @@ export class Story {
     this.updateRuleTray(dt);
     this.updateAmbient();
     this.updateWatchers();
+    this.updateWetcomers();
     this.updateGaze();
     this.tryEnd();
 

@@ -2013,6 +2013,218 @@ export function buildTown(scene, M) {
   // ---- 提交静态合批 ----
   B.flush(scene);
 
+  // ================= ⑦ 返潮异化态（验户点火后才存在的镇区） =================
+  // 不进静态合批：整组随 applyLeakState() 一次性显形。碰撞体先以 off:true 注册，
+  // 点火时批量启用——主街封死、床单巷成为有视线掩护的绕行道。
+  {
+    const leak = new THREE.Group();
+    leak.visible = false;
+    scene.add(leak);
+    const leakColliders = [];
+    const laabb = (cx, cz, w, d, maxY, opts = {}) => {
+      const c = { minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, maxY, off: true, ...opts };
+      colliders.push(c); leakColliders.push(c);
+    };
+    const lcircle = (x, z, r, maxY, opts = {}) => {
+      const c = { x, z, r, maxY, off: true, ...opts };
+      colliders.push(c); leakColliders.push(c);
+    };
+    const add = (geo, mat, x, y, z, ry, sx, sy, sz, rx = 0, rz = 0) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      m.rotation.set(rx, ry, rz);
+      m.scale.set(sx, sy, sz);
+      leak.add(m);
+      return m;
+    };
+
+    // —— 沉积脊：主街（镇心→酒店）被海底顶上来的东西封死 ——
+    // 泥壳里嵌着不属于街面的东西：别人家的门、半条舢板
+    // 湿泥色：比标本沉积层暗、压光——刚从水压底下顶出来，还没干过
+    const wetSediment = M.sediment.clone();
+    wetSediment.color = new THREE.Color(0x848a80);
+    wetSediment.roughness = 0.55;
+    wetSediment.envMapIntensity = 1.5;
+    {
+      const lumpGeo = new THREE.SphereGeometry(0.5, 9, 7);
+      const lumps = new THREE.InstancedMesh(lumpGeo, wetSediment, 52);
+      const m4 = new THREE.Matrix4(); const q = new THREE.Quaternion();
+      const e = new THREE.Euler(); const s3 = new THREE.Vector3();
+      let n = 0;
+      for (let i = 0; i < 52; i++) {
+        const x = -20 + (i / 51) * 33 + (rand() - 0.5) * 1.4;
+        const z = -26 + (rand() - 0.5) * 2.0;
+        const sx = 1.7 + rand() * 1.7, sy = 1.0 + rand() * 1.3, sz = 1.5 + rand() * 1.3;
+        e.set((rand() - 0.5) * 0.4, rand() * 6.28, (rand() - 0.5) * 0.4);
+        q.setFromEuler(e); s3.set(sx, sy, sz);
+        m4.compose(new THREE.Vector3(x, g(x, z) + sy * 0.24, z), q, s3);
+        lumps.setMatrixAt(n++, m4);
+      }
+      lumps.count = n; lumps.instanceMatrix.needsUpdate = true;
+      leak.add(lumps);
+      // 壳屑盐痂：脊面上一层碎白
+      const shellGeo = new THREE.SphereGeometry(0.5, 7, 5);
+      const shells = new THREE.InstancedMesh(shellGeo, M.saltFrost, 26);
+      n = 0;
+      for (let i = 0; i < 26; i++) {
+        const x = -19 + rand() * 31, z = -26 + (rand() - 0.5) * 2.4;
+        e.set(0, rand() * 6.28, 0); q.setFromEuler(e);
+        s3.set(0.3 + rand() * 0.5, 0.10 + rand() * 0.10, 0.3 + rand() * 0.4);
+        m4.compose(new THREE.Vector3(x, g(x, z) + 0.95 + rand() * 0.5, z), q, s3);
+        shells.setMatrixAt(n++, m4);
+      }
+      shells.count = n; shells.instanceMatrix.needsUpdate = true;
+      leak.add(shells);
+      // 别人家的门：立在脊正中，虚掩着——门后还是脊
+      const dx = -3, dz = -26, dg = g(dx, dz);
+      add(GEO.box, M.woodDark, dx - 0.62, dg + 1.35, dz, 0.06, 0.15, 2.3, 0.15);
+      add(GEO.box, M.woodDark, dx + 0.62, dg + 1.35, dz, 0.06, 0.15, 2.3, 0.15);
+      add(GEO.box, M.woodDark, dx, dg + 2.52, dz, 0.06, 1.45, 0.16, 0.15);
+      const door = add(GEO.box, M.veneer, dx - 0.18, dg + 1.32, dz + 0.3, 0.72, 0.98, 2.2, 0.06);
+      door.rotation.x = 0.03;
+      // 半条舢板：船头朝天扎进泥里
+      add(GEO.box, M.woodDark, 6.5, g(6.5, -26) + 1.1, -26.2, 0.9, 3.1, 0.62, 1.15, 0.42, 0.12);
+      // 封路碰撞：四段拼满整脊（maxY 高到不可翻越）
+      laabb(-16, -26, 9.0, 3.6, 99);
+      laabb(-8, -26, 8.0, 3.6, 99);
+      laabb(0, -26, 8.0, 3.6, 99);
+      laabb(8.8, -26, 9.6, 3.6, 99);
+    }
+
+    // —— 面海椅阵：街心整整齐齐三十把椅子，全部朝海。每把上一双叠好的鞋 ——
+    {
+      const cols = [16, 18, 20, 22, 24, 26];   // 6 列
+      const rows = [-8.5, -6.5, -4.5, -2.5, -0.5]; // 5 排
+      const seatGeo = new THREE.BoxGeometry(0.44, 0.05, 0.44);
+      const backGeo = new THREE.BoxGeometry(0.05, 0.52, 0.44);
+      const legGeo = new THREE.BoxGeometry(0.36, 0.45, 0.36);
+      const seats = new THREE.InstancedMesh(seatGeo, M.wood, 30);
+      const backs = new THREE.InstancedMesh(backGeo, M.wood, 30);
+      const legs = new THREE.InstancedMesh(legGeo, M.woodDark, 30);
+      const shoeGeo = new THREE.BoxGeometry(0.1, 0.08, 0.26);
+      const shoes = new THREE.InstancedMesh(shoeGeo, M.paper, 60);
+      const m4 = new THREE.Matrix4(); const q = new THREE.Quaternion();
+      const e = new THREE.Euler(); const one = new THREE.Vector3(1, 1, 1);
+      let i = 0, si = 0;
+      q.identity();
+      for (const x of cols) {
+        for (const z of rows) {
+          const y = g(x, z);
+          m4.compose(new THREE.Vector3(x, y + 0.47, z), q, one);
+          seats.setMatrixAt(i, m4);
+          m4.compose(new THREE.Vector3(x - 0.2, y + 0.75, z), q, one); // 靠背在西侧=椅面朝东(海)
+          backs.setMatrixAt(i, m4);
+          m4.compose(new THREE.Vector3(x, y + 0.23, z), q, one);
+          legs.setMatrixAt(i, m4);
+          // 每把椅上一双并齐的鞋（鞋尖也朝海）
+          m4.compose(new THREE.Vector3(x + 0.02, y + 0.54, z - 0.07), q, one);
+          shoes.setMatrixAt(si++, m4);
+          m4.compose(new THREE.Vector3(x + 0.02, y + 0.54, z + 0.07), q, one);
+          shoes.setMatrixAt(si++, m4);
+          lcircle(x, z, 0.34, y + 1.0, { noSightBlock: true });
+          i++;
+        }
+      }
+      seats.count = backs.count = legs.count = i;
+      shoes.count = si;
+      seats.instanceMatrix.needsUpdate = backs.instanceMatrix.needsUpdate = true;
+      legs.instanceMatrix.needsUpdate = shoes.instanceMatrix.needsUpdate = true;
+      leak.add(seats, backs, legs, shoes);
+    }
+
+    // —— CRT 冢：沉积脊北脚下堆起九台电视，屏幕全朝着镇心亮雪花——放给谁看 ——
+    {
+      const px = -7.5, pz = -22.8, py = g(px, pz);
+      const defs = [
+        [0, 0.36, 0.3, 0.15], [0.95, 0.36, 0.55, 0.62], [-0.9, 0.36, 0.6, -0.45],
+        [1.7, 0.36, -0.1, 1.1], [-1.75, 0.36, 0.05, -1.0],
+        [0.42, 1.06, 0.35, 0.35], [-0.5, 1.06, 0.3, -0.4], [1.2, 1.06, -0.05, 0.8],
+        [0, 1.74, 0.1, -0.1],
+      ];
+      const screens = [];
+      for (const [ox, oy, oz, ry] of defs) {
+        add(GEO.box, M.crtShell, px + ox, py + oy, pz + oz, ry, 0.74, 0.62, 0.6);
+        const sc = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.44),
+          new THREE.MeshBasicMaterial({ color: 0x9aa4a8 }));
+        sc.position.set(px + ox + Math.sin(ry) * 0.31, py + oy + 0.02, pz + oz + Math.cos(ry) * 0.31);
+        sc.rotation.y = ry;
+        leak.add(sc);
+        screens.push(sc);
+      }
+      lcircle(px, pz, 2.1, py + 2.2);
+      // 屏堆的灰蓝光：建成时熄着（_base=0），点火时再给亮度
+      const pl = new THREE.PointLight(0x9fb4c0, 0, 14, 2);
+      pl.position.set(px, py + 2.0, pz + 1.2);
+      scene.add(pl);
+      lights.push(pl);
+      dynamic.leakState = { group: leak, colliders: leakColliders, screens, light: pl, applied: false };
+    }
+
+    // —— 湿床单巷：东绕行道上三道晾衣线，挂满湿透的白床单——一动不动 ——
+    // 床单挡视线不挡人：钻过去就是掩护（noCollide 视线遮挡体）
+    {
+      // 湿白布：泡了整夜——发青、压光、微微一层水膜的返光
+      const sheetMat = new THREE.MeshStandardMaterial({
+        map: M.textures.clothShirt?.map, color: 0xd6dcd8, roughness: 0.62,
+        envMapIntensity: 1.6, emissive: 0x10161a, side: THREE.DoubleSide,
+      });
+      const lines = [
+        { z: -20.5, x0: 13.5, x1: 21.5 },
+        { z: -25.0, x0: 15.0, x1: 23.0 },
+        { z: -29.5, x0: 13.0, x1: 21.0 },
+      ];
+      for (const ln of lines) {
+        const y0 = g(ln.x0, ln.z), y1 = g(ln.x1, ln.z);
+        add(GEO.cyl, M.ironDark, ln.x0, y0 + 1.3, ln.z, 0, 0.09, 2.6, 0.09);
+        add(GEO.cyl, M.ironDark, ln.x1, y1 + 1.3, ln.z, 0, 0.09, 2.6, 0.09);
+        const midY = (y0 + y1) / 2;
+        add(GEO.box, M.ironDark, (ln.x0 + ln.x1) / 2, midY + 2.42, ln.z, 0, ln.x1 - ln.x0, 0.025, 0.025);
+        // 每道线两侧各挂两幅（幅与幅之间露一指缝），中间留一条能钻的正缝
+        const w = (ln.x1 - ln.x0 - 1.4) / 2;
+        for (const side of [-1, 1]) {
+          const cx = (ln.x0 + ln.x1) / 2 + side * (w / 2 + 0.7);
+          const pw = (w - 0.12) / 2; // 每幅宽
+          for (const half of [-1, 1]) {
+            const hx = cx + half * (pw / 2 + 0.06);
+            const hgt = 1.38 + rand() * 0.24;             // 幅高不齐——各家的床单
+            const sag = 0.05 + rand() * 0.08;
+            add(GEO.box, sheetMat, hx, midY + 2.4 - sag - hgt / 2, ln.z + (rand() - 0.5) * 0.06,
+              (rand() - 0.5) * 0.05, pw, hgt, 0.04, 0.045 * side);
+          }
+          laabb(cx, ln.z, w, 0.3, midY + 2.4, { noCollide: true });
+        }
+      }
+    }
+
+    // —— 盐痂斑：从滩涂一路爬进镇街的白渍（返潮走过的脚印） ——
+    {
+      const crustGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
+      const crust = new THREE.InstancedMesh(crustGeo, M.saltFrost, 30);
+      const m4 = new THREE.Matrix4(); const q = new THREE.Quaternion();
+      const e = new THREE.Euler(); const s3 = new THREE.Vector3();
+      // 沿三条被认领的街：牌坊→街心、街心→脊、脊→酒店正门
+      const runs = [
+        { x0: 40, z0: 0, x1: 14, z1: -6 },
+        { x0: 12, z0: -8, x1: 0, z1: -22 },
+        { x0: -2, z0: -30, x1: -4, z1: -38 },
+      ];
+      let n = 0;
+      for (const rn of runs) {
+        for (let i = 0; i < 10; i++) {
+          const t = i / 9;
+          const x = rn.x0 + (rn.x1 - rn.x0) * t + (rand() - 0.5) * 3.5;
+          const z = rn.z0 + (rn.z1 - rn.z0) * t + (rand() - 0.5) * 3.5;
+          e.set(0, rand() * 6.28, 0); q.setFromEuler(e);
+          s3.set(0.8 + rand() * 1.6, 0.04, 0.6 + rand() * 1.2);
+          m4.compose(new THREE.Vector3(x, g(x, z) + 0.03, z), q, s3);
+          crust.setMatrixAt(n++, m4);
+        }
+      }
+      crust.count = n; crust.instanceMatrix.needsUpdate = true;
+      leak.add(crust);
+    }
+  }
+
   // ================= 巡逻路点 =================
   patrols.dike = [[-14, 70.5], [10, 72], [30, 73], [50, 74], [30, 73], [20, 62], [20, 60.8], [10, 66]];
   patrols.village1 = [[-2, 10], [12, 12], [16, -6], [2, -14], [-12, -6], [-8, 8]];
@@ -2025,6 +2237,11 @@ export function buildTown(scene, M) {
   patrols.dogWander = [[6, 6], [-8, 0], [2, -10], [14, 2]];
   // 镇街→酒店正门一线（核册当值的镇民）
   patrols.townStreet = [[6, -14], [-2, -28], [-4, -38], [2, -30], [10, -18]];
+  // 返潮后上街的湿客（验户点火才启用）
+  // wet1 的巡线从三道床单的缝里穿——那条巷是它的界
+  patrols.wet1 = [[17.5, -17], [18.3, -22.7], [19, -25], [18, -27.2], [17, -30.5], [17.9, -27.2], [19, -25], [18.2, -22.7]];
+  patrols.wet2 = [[-22, -2], [-24, 8], [-22, 18], [-16, 8]];
+  patrols.wet3 = [[46, -68], [56, -78], [48, -90], [40, -80]];
 
   // ================= 雨遮蔽（棚/檐/屋顶下不出现雨丝） =================
   dynamic.rainCovers = [
@@ -2078,6 +2295,18 @@ export function buildTown(scene, M) {
     colliders, bounds, heightAt, locations, patrols, dynamic, zones, lights, surfaceAt,
     waterLevelRef: { value: 0 },
     waterLevel() { return this.waterLevelRef.value; },
+    /** 返潮点火：异化镇区一次性显形——主街封脊、椅阵面海、CRT冢通电、床单巷挂帘 */
+    applyLeakState() {
+      const L = dynamic.leakState;
+      if (!L || L.applied) return;
+      L.applied = true;
+      L.group.visible = true;
+      for (const c of L.colliders) c.off = false;
+      dynamic.staticScreens = dynamic.staticScreens ?? [];
+      dynamic.staticScreens.push(...L.screens);
+      L.light._base = 9; // updateFx 以 _base 为准（建成时熄着）
+      L.light.intensity = 9;
+    },
     /** 每帧特效更新（烟柱 + 灯火呼吸 + 酒店荧光频闪 + 录像厅雪花屏） */
     updateFx(time) {
       for (const s of smokes) s.update(time);
