@@ -322,25 +322,85 @@ export function buildTown(scene, M) {
     if (!opts.noDoor) {
       piece(GEO.box, M.wood, -doorW / 2 + 0.3, doorH / 2 + 0.3, d / 2 + 0.18, 0.75, doorH - 0.06, 0.06, 0.85);
     }
-    // 窗（暗洞内嵌）
+    // 窗（暗洞内嵌 + 窗套）：楣/台/边梃/十字棂——墙上是一樘「装出来的窗」，
+    // 不再是盒面上贴一块黑
     const winY = h * 0.62;
-    piece(GEO.box, M.ironDark, -w / 2 + t / 2, winY, d * 0.18, t + 0.04, 0.7, 0.9);
-    piece(GEO.box, M.ironDark, w / 2 - t / 2, winY, -d * 0.15, t + 0.04, 0.7, 0.9);
+    const winAt = (side, lz) => {
+      const wallX = side * (w / 2 - t / 2);
+      piece(GEO.box, M.ironDark, wallX, winY, lz, t + 0.04, 0.7, 0.9);
+      const fx = side * (w / 2 + 0.005); // 墙外皮
+      piece(GEO.box, M.concreteDark, fx, winY + 0.43, lz, 0.09, 0.12, 1.08);          // 窗楣（滴水出挑）
+      piece(GEO.box, M.concreteDark, fx + side * 0.035, winY - 0.415, lz, 0.17, 0.07, 1.04); // 窗台板
+      piece(GEO.box, M.wood, fx, winY, lz - 0.47, 0.075, 0.78, 0.075);                // 边梃
+      piece(GEO.box, M.wood, fx, winY, lz + 0.47, 0.075, 0.78, 0.075);
+      piece(GEO.box, M.woodDark, fx + side * 0.01, winY, lz, 0.045, 0.68, 0.055);     // 竖棂
+      piece(GEO.box, M.woodDark, fx + side * 0.01, winY + 0.03, lz, 0.045, 0.055, 0.86); // 横棂
+    };
+    winAt(-1, d * 0.18);
+    winAt(1, -d * 0.15);
+    // 门头雨檐：门楣上一片有进深的小坡檐 + 双斜撑——进门的地方檐口先低一头
+    if (!opts.noDoor) {
+      piece(GEO.box, M.roof, 0, doorH + 0.64, d / 2 + 0.3, doorW + 0.76, 0.06, 0.8, 0, 0.4, 0);
+      piece(GEO.box, M.woodDark, 0, doorH + 0.79, d / 2 - t / 2 + 0.04, doorW + 0.8, 0.09, 0.1);
+      for (const ox of [-doorW / 2 - 0.22, doorW / 2 + 0.22]) {
+        piece(GEO.box, M.woodDark, ox, doorH + 0.44, d / 2 + 0.22, 0.06, 0.06, 0.62, 0, -0.72, 0);
+      }
+    }
     // 屋顶（双坡 + 正脊 + 压瓦石）：左坡 +x 端在屋脊(高)，右坡 -x 端在屋脊
     const roofPitch = 0.5, roofT = 0.14;
     const slopeLen = Math.hypot(w / 2 + 0.55, (w / 2) * roofPitch) + 0.15;
     const ang = Math.atan2((w / 2) * roofPitch, w / 2 + 0.4);
-    piece(GEO.box, M.roof, -w / 4 - 0.1, h + 0.3 + (w / 4) * roofPitch, 0, slopeLen, roofT, d + 1.0, 0, 0, ang);
-    piece(GEO.box, M.roof, w / 4 + 0.1, h + 0.3 + (w / 4) * roofPitch, 0, slopeLen, roofT, d + 1.0, 0, 0, -ang);
+    const slopeY = h + 0.3 + (w / 4) * roofPitch;
+    piece(GEO.box, M.roof, -w / 4 - 0.1, slopeY, 0, slopeLen, roofT, d + 1.0, 0, 0, ang);
+    piece(GEO.box, M.roof, w / 4 + 0.1, slopeY, 0, slopeLen, roofT, d + 1.0, 0, 0, -ang);
     piece(GEO.box, M.stone, 0, h + 0.34 + (w / 2) * roofPitch, 0, 0.4, 0.22, d + 1.05);
+    // 脊瓦筒：正脊上一根压顶圆筒——屋脊的剪影是「线」收的，不是石条切的
+    piece(GEO.cyl, M.roof, 0, h + 0.47 + (w / 2) * roofPitch, 0, 0.22, d + 1.02, 0.15, 0, Math.PI / 2, 0);
+    // 瓦垄：沿坡向下行的半筒垄条——坡面有了「一垄一垄」的排列节奏，
+    // 侧逆光下每根垄条自带一线高光一线影（坡顶细分的主力）
+    {
+      const span = d + 0.86;
+      const tileN = Math.max(6, Math.round(span / 0.36));
+      const perp = roofT / 2 + 0.03; // 垄条中心抬到坡面之上
+      const ty = slopeY + perp / Math.cos(ang);
+      for (let k = 0; k <= tileN; k++) {
+        const lz = -span / 2 + k * (span / tileN);
+        piece(GEO.cyl, M.roof, -w / 4 - 0.1, ty, lz, 0.115, slopeLen - 0.14, 0.075, 0, 0, ang + Math.PI / 2);
+        piece(GEO.cyl, M.roof, w / 4 + 0.1, ty, lz, 0.115, slopeLen - 0.14, 0.075, 0, 0, Math.PI / 2 - ang);
+      }
+      // 博风板：山墙两端沿坡缘的深色封边板——雨里泡黑的木口勾出屋顶轮廓线
+      for (const gz of [-(d + 1.0) / 2 + 0.05, (d + 1.0) / 2 - 0.05]) {
+        piece(GEO.box, M.woodDark, -w / 4 - 0.1, ty + 0.03, gz, slopeLen - 0.02, 0.15, 0.06, 0, 0, ang);
+        piece(GEO.box, M.woodDark, w / 4 + 0.1, ty + 0.03, gz, slopeLen - 0.02, 0.15, 0.06, 0, 0, -ang);
+      }
+    }
+    // 檐口层次：封檐板压出一条深色水平线 + 檐下一排出挑椽头（檐口不再是板的切口）
+    {
+      const eaveR = slopeLen / 2 - 0.06;
+      const eaveX = w / 4 + 0.1 + eaveR * Math.cos(ang);
+      const eaveY = slopeY - eaveR * Math.sin(ang);
+      piece(GEO.box, M.woodDark, -eaveX, eaveY - 0.1, 0, 0.055, 0.2, d + 1.0);
+      piece(GEO.box, M.woodDark, eaveX, eaveY - 0.1, 0, 0.055, 0.2, d + 1.0);
+      const rafN = Math.max(4, Math.round((d + 0.5) / 0.44));
+      for (let k = 0; k <= rafN; k++) {
+        const lz = -(d + 0.5) / 2 + k * ((d + 0.5) / rafN);
+        piece(GEO.box, M.woodDark, -eaveX + 0.17, eaveY - 0.14, lz, 0.36, 0.075, 0.075, 0, 0, ang);
+        piece(GEO.box, M.woodDark, eaveX - 0.17, eaveY - 0.14, lz, 0.36, 0.075, 0.075, 0, 0, -ang);
+      }
+    }
     // 压瓦石
     for (let i = -1; i <= 1; i++) {
-      piece(GEO.box, M.stone, -w / 4, h + 0.42 + (w / 4) * roofPitch, i * d * 0.32, 0.35, 0.18, 0.35);
-      piece(GEO.box, M.stone, w / 4, h + 0.42 + (w / 4) * roofPitch, i * d * 0.32, 0.35, 0.18, 0.35);
+      piece(GEO.box, M.stone, -w / 4, h + 0.52 + (w / 4) * roofPitch, i * d * 0.32, 0.35, 0.18, 0.35);
+      piece(GEO.box, M.stone, w / 4, h + 0.52 + (w / 4) * roofPitch, i * d * 0.32, 0.35, 0.18, 0.35);
     }
-    // 山墙封口（三角近似：两层收窄的墙）
-    piece(GEO.box, wallM, 0, h + 0.3 + (w / 8) * roofPitch * 2, -d / 2 + t / 2, w * 0.55, (w / 4) * roofPitch * 2, t);
-    piece(GEO.box, wallM, 0, h + 0.3 + (w / 8) * roofPitch * 2, d / 2 - t / 2, w * 0.55, (w / 4) * roofPitch * 2, t);
+    // 山墙封口（真三角收口）：中央立板 + 两片沿坡斜置封板贴着屋面内收——
+    // 山墙尖随屋面走，不再有方块顶破屋顶线
+    for (const gzS of [-1, 1]) {
+      const gz = gzS * (d / 2 - t / 2);
+      piece(GEO.box, wallM, 0, h + 0.3 + (w / 8) * roofPitch, gz, w * 0.42, (w / 4) * roofPitch, t);
+      piece(GEO.box, wallM, -w / 4 - 0.1, slopeY - 0.32, gz, slopeLen - 0.52, 0.5, t, 0, 0, ang);
+      piece(GEO.box, wallM, w / 4 + 0.1, slopeY - 0.32, gz, slopeLen - 0.52, 0.5, t, 0, 0, -ang);
+    }
 
     // 水泥勒脚（墙脚一圈防潮抹带——县镇砌法的「袜口」；溅泥吃在这上面）
     if (!opts.noDado) {
@@ -1108,6 +1168,10 @@ export function buildTown(scene, M) {
       B.add(GEO.box, M.plaster, kx - 0.94, kb + 1.65, kz + 0.78, 0, 0.12, 1.0, 0.44);
       B.add(GEO.box, M.slab, kx, kb + 0.06, kz, 0, 2.0, 0.14, 2.0);             // 地台
       B.add(GEO.box, M.roof, kx, kb + 2.85, kz, 0, 2.5, 0.16, 2.5);
+      // 岗亭顶：檐口收线 + 浅四水攒尖帽——一眼望过去它有「顶」，不是切平的柱
+      B.add(GEO.box, M.concreteDark, kx, kb + 2.74, kz, 0, 2.2, 0.08, 2.2);
+      B.add(GEO.cone, M.roof, kx, kb + 3.09, kz, Math.PI / 4, 3.1, 0.32, 3.1);
+      B.add(GEO.cyl, M.ironDark, kx, kb + 3.3, kz, 0, 0.05, 0.18, 0.05);
       // 玻璃只掩了半扇——够一条手臂探进去
       B.add(GEO.box, M.crtGlass, kx - 0.97, kb + 1.65, kz + 0.28, 0, 0.04, 1.0, 0.6);
       B.add(GEO.box, M.wood, kx - 1.16, kb + 1.18, kz, 0, 0.3, 0.06, 1.2);      // 外窗台
@@ -1250,10 +1314,44 @@ export function buildTown(scene, M) {
       aabb(vx + (0.7 + segW / 2), vz - d / 2 + t / 2, segW, t, base + h + 0.3);
       B.add(GEO.box, M.plaster, vx, base + h + 0.05, vz - d / 2 + t / 2, 0, 1.6, 0.5, t);
       B.add(GEO.box, M.roof, vx, base + h + 0.42, vz, 0, w + 0.9, 0.18, d + 0.9, 0, 0.04);
+      // 檐口线脚（两级出挑）+ 女儿墙 + 压顶：平顶房的顶不再是一块斜搭的板
+      B.add(GEO.box, M.concreteDark, vx, base + h + 0.2, vz, 0, w + 0.35, 0.1, d + 0.35);
+      B.add(GEO.box, M.concreteDark, vx, base + h + 0.31, vz, 0, w + 0.6, 0.11, d + 0.6);
+      for (const [px2, pz2, pw2, pd2] of [
+        [vx, vz - d / 2 - 0.39, w + 0.9, 0.14], [vx, vz + d / 2 + 0.39, w + 0.9, 0.14],
+        [vx - w / 2 - 0.38, vz, 0.14, d + 0.64], [vx + w / 2 + 0.38, vz, 0.14, d + 0.64],
+      ]) {
+        B.add(GEO.box, M.plaster, px2, base + h + 0.76, pz2, 0, pw2, 0.52, pd2);
+        B.add(GEO.box, M.concreteDark, px2, base + h + 1.05, pz2, 0, pw2 + 0.08, 0.07, pd2 + 0.08);
+      }
+      // 门脸山花：临街女儿墙中央抬起一块阶形门脸，灯箱嵌在它下面
+      B.add(GEO.box, M.plaster, vx, base + h + 1.28, vz - d / 2 - 0.39, 0, 4.2, 0.55, 0.16);
+      B.add(GEO.box, M.plaster, vx, base + h + 1.62, vz - d / 2 - 0.39, 0, 2.2, 0.36, 0.16);
+      B.add(GEO.box, M.concreteDark, vx, base + h + 1.83, vz - d / 2 - 0.39, 0, 2.4, 0.08, 0.24);
+      // 西墙高窗一对（带楣台与竖栅）——山墙面不再是一整面素灰
+      for (const wz2 of [vz - 1.6, vz + 1.4]) {
+        B.add(GEO.box, M.ironDark, vx - w / 2 + t / 2, base + 2.5, wz2, 0, t + 0.04, 0.55, 0.75);
+        B.add(GEO.box, M.concreteDark, vx - w / 2 - 0.01, base + 2.84, wz2, 0, 0.09, 0.1, 0.92);
+        B.add(GEO.box, M.concreteDark, vx - w / 2 - 0.045, base + 2.17, wz2, 0, 0.16, 0.07, 0.88);
+        for (let bi = -1; bi <= 1; bi++) {
+          B.add(GEO.cyl, M.ironDark, vx - w / 2 - 0.01, base + 2.5, wz2 + bi * 0.22, 0, 0.03, 0.56, 0.03);
+        }
+      }
+      // 铸铁落水管（东北角）：管口—管身—出水弯，箍两道
+      {
+        const dpx = vx + w / 2 + 0.1, dpz = vz + d / 2 + 0.08;
+        B.add(GEO.cyl, M.ironDark, dpx, base + (h + 0.3) / 2 + 0.3, dpz, 0, 0.09, h - 0.1, 0.09);
+        B.add(GEO.cyl, M.ironDark, dpx, base + h + 0.28, dpz - 0.1, 0, 0.09, 0.3, 0.09, 0.7, 0);
+        B.add(GEO.cyl, M.ironDark, dpx, base + 0.22, dpz - 0.12, 0, 0.085, 0.3, 0.085, -1.1, 0);
+        for (const hy of [0.32, 0.66]) {
+          B.add(GEO.box, M.ironDark, dpx, base + (h + 0.3) * hy, dpz, 0, 0.24, 0.06, 0.2);
+        }
+        B.add(GEO.box, M.concreteDark, dpx, base + 0.04, dpz - 0.25, 0, 0.4, 0.06, 0.5);
+      }
       // 半开的门
       B.add(GEO.box, M.woodDark, vx - 0.4, base + 1.3, vz - d / 2 + 0.25, 1.1, 0.9, 2.0, 0.06);
-      // 门脸灯箱 + 海报
-      B.add(GEO.box, plateMat('通宵录像', { w: 288, h: 88, bg: '#3a1a4a', fg: '#f0d28c', font: 0.46, emissive: 0.55 }), vx, base + h + 0.05, vz - d / 2 - 0.12, 0, 2.6, 0.6, 0.12);
+      // 门脸灯箱（抬上山花——夜里整条街最高的一块亮）+ 海报
+      B.add(GEO.box, plateMat('通宵录像', { w: 288, h: 88, bg: '#3a1a4a', fg: '#f0d28c', font: 0.46, emissive: 0.55 }), vx, base + h + 1.3, vz - d / 2 - 0.5, 0, 2.6, 0.6, 0.12);
       for (const ox of [-2.8, 2.8]) {
         const poster = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.0), M.notice);
         poster.position.set(vx + ox, base + 1.6, vz - d / 2 - 0.02);
@@ -1361,6 +1459,33 @@ export function buildTown(scene, M) {
       }
       // 屋顶 + 门脸招牌
       B.add(GEO.box, M.roof, vx, base + h + 0.42, vz, 0, w + 0.8, 0.18, d + 0.8, 0, 0.03);
+      // 檐口线脚 + 女儿墙压顶 + 弧形门脸山花（县镇门市的「脸面」做在顶口上）
+      B.add(GEO.box, M.concreteDark, vx, base + h + 0.2, vz, 0, w + 0.3, 0.1, d + 0.3);
+      B.add(GEO.box, M.concreteDark, vx, base + h + 0.31, vz, 0, w + 0.52, 0.11, d + 0.52);
+      for (const [px2, pz2, pw2, pd2] of [
+        [vx, vz - d / 2 - 0.34, w + 0.8, 0.13], [vx, vz + d / 2 + 0.34, w + 0.8, 0.13],
+        [vx - w / 2 - 0.33, vz, 0.13, d + 0.56], [vx + w / 2 + 0.33, vz, 0.13, d + 0.56],
+      ]) {
+        B.add(GEO.box, M.plaster, px2, base + h + 0.72, pz2, 0, pw2, 0.44, pd2);
+        B.add(GEO.box, M.concreteDark, px2, base + h + 0.97, pz2, 0, pw2 + 0.07, 0.06, pd2 + 0.07);
+      }
+      B.add(GEO.box, M.plaster, vx - 1.3, base + h + 1.12, vz - d / 2 - 0.34, 0, 2.6, 0.42, 0.15);
+      B.add(GEO.cyl, M.plaster, vx - 1.3, base + h + 1.3, vz - d / 2 - 0.34, 0, 1.15, 0.15, 0.6, Math.PI / 2, 0);
+      // 橱窗木套：帮衬压条 + 展台底沿（贴墙外皮出挑）——玻璃是「镶」进立面的
+      const swf = vz - d / 2 - 0.02;
+      B.add(GEO.box, M.veneerRed, vx - 0.18, base + 1.65, swf, 0, 0.09, 1.72, 0.1);
+      B.add(GEO.box, M.veneerRed, vx + 2.88, base + 1.65, swf, 0, 0.09, 1.72, 0.1);
+      B.add(GEO.box, M.veneerRed, vx + 1.35, base + 2.54, swf, 0, 3.16, 0.09, 0.1);
+      B.add(GEO.box, M.veneerRed, vx + 1.35, base + 0.98, swf - 0.02, 0, 3.16, 0.1, 0.16);
+      // 落水管（西南角）
+      {
+        const dpx = vx - w / 2 - 0.09, dpz = vz - d / 2 + 0.3;
+        B.add(GEO.cyl, M.ironDark, dpx, base + (h + 0.3) / 2 + 0.3, dpz, 0, 0.085, h - 0.15, 0.085);
+        B.add(GEO.cyl, M.ironDark, dpx, base + 0.2, dpz - 0.1, 0, 0.08, 0.28, 0.08, -1.1, 0);
+        for (const hy of [0.35, 0.7]) {
+          B.add(GEO.box, M.ironDark, dpx, base + (h + 0.3) * hy, dpz, 0, 0.2, 0.055, 0.22);
+        }
+      }
       B.add(GEO.box, plateMat('大新照相', { w: 288, h: 88, bg: '#173a4a', fg: '#f0d28c', font: 0.46, emissive: 0.5 }), vx, base + h + 0.02, vz - d / 2 - 0.12, 0, 2.5, 0.58, 0.12);
       // 橱窗雨棚 + 勒脚
       awning(vx + 1.35, base + 2.52, vz - d / 2 + 0.02, 3.3);
@@ -1715,6 +1840,16 @@ export function buildTown(scene, M) {
       B.add(GEO.box, M.veneer, cxb + 1.1, fy + 0.65, bz + 2.15, 0, 0.75, 1.25, 0.5);   // 五斗橱
       aabb(cxb + 1.1, bz + 2.15, 0.8, 0.55, fy + 1.3, { noSightBlock: true });
       B.add(GEO.box, M.woodDark, cxb + 1.1, fy + 0.3, bz + 1.15, 0, 0.8, 0.55, 0.55);  // 樟木箱
+      // 陈设加密：奖状/全家福镜框/痰盂/暖瓶/扫帚/挂衣——住着人的屋子有墙面有角落
+      B.add(GEO.box, plateMat('奖 状', { w: 224, h: 160, bg: '#c8362a', fg: '#f0d28c', font: 0.3 }), cxb + 0.55, fy + 1.85, bz - 2.8, 0, 0.56, 0.4, 0.03);
+      B.add(GEO.box, M.woodDark, cxb - 0.45, fy + 1.8, bz - 2.8, 0, 0.46, 0.6, 0.035);   // 全家福镜框
+      B.add(GEO.box, M.mural, cxb - 0.45, fy + 1.8, bz - 2.78, 0, 0.36, 0.5, 0.02);
+      B.add(GEO.cyl, M.clothShirt, cxb - 1.3, fy + 0.14, bz + 1.35, 0, 0.24, 0.24, 0.24); // 搪瓷痰盂
+      B.add(GEO.cyl, M.clothRed, cxb - 1.3, fy + 0.27, bz + 1.35, 0, 0.25, 0.03, 0.25);
+      B.add(GEO.box, M.crtShell, cxb + 0.72, fy + 0.98, bz - 0.42, 0, 0.18, 0.34, 0.18);  // 灶边暖瓶
+      B.add(GEO.cyl, M.wood, cxb - 1.42, fy + 0.66, bz + 0.25, 0, 0.035, 1.3, 0.035, 0, 0.18); // 倚墙扫帚
+      B.add(GEO.box, M.salt, cxb - 1.36, fy + 0.09, bz + 0.32, 0.25, 0.1, 0.2, 0.16);
+      B.add(GEO.box, M.clothWork, cxb + 1.45, fy + 1.5, bz - 0.8, 0, 0.06, 0.62, 0.4);    // 隔墙挂着的工装
       // 一盏白炽灯（人走灯不灭）
       const ul = new THREE.PointLight(0xffd9a0, variant === 'lit' ? 9 : 6, 8, 2);
       ul.position.set(cxb, fy + 2.25, bz - 0.6);
