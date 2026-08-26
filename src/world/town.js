@@ -2,6 +2,7 @@
 // 2001 年秋，沿海县镇。填湾造地上建了南方大酒店与蚀湾海洋馆。今晚全镇核册还地。
 // 输出：场景网格、碰撞体、heightAt、互动点位 locations、巡逻路点 patrols、动态对象 dynamic
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { Batcher, GEO } from './batcher.js';
 import { mulberry32 } from './textures.js';
 import { makeLightCone } from './materials.js';
@@ -341,6 +342,15 @@ export function buildTown(scene, M) {
     piece(GEO.box, wallM, 0, h + 0.3 + (w / 8) * roofPitch * 2, -d / 2 + t / 2, w * 0.55, (w / 4) * roofPitch * 2, t);
     piece(GEO.box, wallM, 0, h + 0.3 + (w / 8) * roofPitch * 2, d / 2 - t / 2, w * 0.55, (w / 4) * roofPitch * 2, t);
 
+    // 水泥勒脚（墙脚一圈防潮抹带——县镇砌法的「袜口」；溅泥吃在这上面）
+    if (!opts.noDado) {
+      const dh = 0.52, dy = dh / 2 + 0.32;
+      piece(GEO.box, M.concreteDark, 0, dy, -d / 2 + t / 2 - 0.035, w + 0.06, dh, 0.05);
+      piece(GEO.box, M.concreteDark, -w / 2 + t / 2 - 0.035, dy, 0, 0.05, dh, d + 0.06, Math.PI / 2);
+      piece(GEO.box, M.concreteDark, w / 2 - t / 2 + 0.035, dy, 0, 0.05, dh, d + 0.06, Math.PI / 2);
+      piece(GEO.box, M.concreteDark, -(doorW / 2 + segW / 2), dy, d / 2 - t / 2 + 0.035, segW + 0.04, dh, 0.05);
+      piece(GEO.box, M.concreteDark, (doorW / 2 + segW / 2), dy, d / 2 - t / 2 + 0.035, segW + 0.04, dh, 0.05);
+    }
     // 屋内家什
     if (!opts.empty) {
       piece(GEO.box, M.wood, -w * 0.22, 0.75, -d * 0.2, 1.3, 0.08, 0.8);          // 桌面
@@ -575,6 +585,195 @@ export function buildTown(scene, M) {
         scene.add(p);
       }
     }
+
+    // —— 街区精修（轮9）：路缘石/人行道/磨旧中线/井盖/雨水箅/架空线/变压器杆 ——
+    // 2001 年县镇街道的「骨架层」：路不是一条沥青毯，是缘石卡出来的一道槽。
+    {
+      // 垂直于折线段的左法线偏移
+      const perp = (ax, az, bx2, bz2) => {
+        const dx = bx2 - ax, dz = bz2 - az, L = Math.hypot(dx, dz) || 1;
+        return [-dz / L, dx / L, Math.atan2(dx, dz), L];
+      };
+      // 路缘石：沿折线偏移 off，一米一块（错缝 + 微沉降）
+      const layCurb = (pts, off) => {
+        for (let s = 0; s < pts.length - 1; s++) {
+          const [ax, az] = pts[s], [bx2, bz2] = pts[s + 1];
+          const [nx, nz, ang, L] = perp(ax, az, bx2, bz2);
+          const n = Math.max(1, Math.round(L / 1.0));
+          for (let i = 0; i < n; i++) {
+            const t = (i + 0.5) / n;
+            const x = ax + (bx2 - ax) * t + nx * off, z = az + (bz2 - az) * t + nz * off;
+            const sink = (rand() - 0.5) * 0.03; // 沉降不齐——旧街的牙口
+            B.add(GEO.box, M.concrete, x, g(x, z) + 0.1 + sink, z, ang + (rand() - 0.5) * 0.02, 0.24, 0.24, L / n - 0.03);
+          }
+        }
+      };
+      // 人行道：缘石内侧一条水泥方板带（板缝错动）
+      const layWalk = (pts, off, wid = 1.5) => {
+        for (let s = 0; s < pts.length - 1; s++) {
+          const [ax, az] = pts[s], [bx2, bz2] = pts[s + 1];
+          const [nx, nz, ang, L] = perp(ax, az, bx2, bz2);
+          const n = Math.max(1, Math.round(L / 1.5));
+          for (let i = 0; i < n; i++) {
+            const t = (i + 0.5) / n;
+            const x = ax + (bx2 - ax) * t + nx * off, z = az + (bz2 - az) * t + nz * off;
+            B.add(GEO.box, M.concrete, x, g(x, z) + 0.06 + (rand() - 0.5) * 0.02, z,
+              ang + (rand() - 0.5) * 0.015, wid, 0.1, L / n - 0.04);
+          }
+        }
+      };
+      // 磨旧的白漆中线：断续虚线，随机缺段（漆是补路时懒得重描的那种旧）
+      const layCenterline = (pts) => {
+        for (let s = 0; s < pts.length - 1; s++) {
+          const [ax, az] = pts[s], [bx2, bz2] = pts[s + 1];
+          const [, , ang, L] = perp(ax, az, bx2, bz2);
+          const n = Math.max(1, Math.round(L / 4));
+          for (let i = 0; i < n; i++) {
+            if (rand() < 0.3) continue; // 磨没了的段
+            const t = (i + 0.5) / n;
+            const x = ax + (bx2 - ax) * t, z = az + (bz2 - az) * t;
+            B.add(GEO.box, M.roadPaint, x, g(x, z) + 0.053, z, ang, 0.13, 0.012, 1.6 + rand() * 0.5);
+          }
+        }
+      };
+      const mainSt = [[46, 0.4], [30, -1.6], [18, -5.6], [11, -7.6]];
+      layCurb(mainSt, 2.45); layCurb(mainSt, -2.45);
+      layCurb([[74, 2.4], [46, 0.4]], 2.45); layCurb([[74, 2.4], [46, 0.4]], -2.45);
+      layWalk(mainSt, 3.45, 1.6);              // 北侧（商铺一侧）人行道
+      layCenterline([[74, 2], [46, 0]]);
+      layCenterline(mainSt);
+      // 井盖 ×3（铸铁圆盖 + 水泥圈）
+      for (const [mxx, mzz] of [[41, 0.2], [28, -2.4], [16, -6.2]]) {
+        const my = g(mxx, mzz);
+        B.add(GEO.cyl, M.concreteDark, mxx, my + 0.052, mzz, 0, 0.9, 0.02, 0.9);
+        B.add(GEO.cyl, M.ironDark, mxx, my + 0.062, mzz, rand() * 3, 0.72, 0.022, 0.72);
+        B.add(GEO.cyl, M.ironDark, mxx, my + 0.072, mzz, 0, 0.1, 0.01, 0.1);
+      }
+      // 雨水箅子 ×2（缘石边的铁格栅——街的「耳孔」）
+      for (const [dxx, dzz, dry] of [[37.5, 1.4, -0.13], [20, -3.2, -0.32]]) {
+        const dy2 = g(dxx, dzz);
+        B.add(GEO.box, M.ironDark, dxx, dy2 + 0.045, dzz, dry, 0.72, 0.05, 0.42);
+        for (let i = -2; i <= 2; i++) {
+          B.add(GEO.box, M.ironDark, dxx + Math.cos(dry) * i * 0.13, dy2 + 0.075, dzz - Math.sin(dry) * i * 0.13, dry, 0.1, 0.02, 0.4);
+        }
+      }
+      // —— 架空线：街灯杆顶之间的悬垂双线 + 到店面的下户线 ——
+      const wireGeos = [];
+      const wire = (x1, y1, z1, x2, y2, z2, sag = 0.5) => {
+        const mid = new THREE.Vector3((x1 + x2) / 2, Math.min(y1, y2) - sag, (z1 + z2) / 2);
+        const curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(x1, y1, z1), mid, new THREE.Vector3(x2, y2, z2),
+        ]);
+        wireGeos.push(new THREE.TubeGeometry(curve, 14, 0.016, 5));
+      };
+      const poleTops = [[48.5, -2.8], [38, -3.6], [30.5, 2.2], [21, -4.6], [13.5, -1.5]];
+      for (let i = 0; i < poleTops.length - 1; i++) {
+        const [x1, z1] = poleTops[i], [x2, z2] = poleTops[i + 1];
+        const y1 = g(x1, z1) + 4.55, y2 = g(x2, z2) + 4.55;
+        wire(x1, y1, z1, x2, y2, z2, 0.55);
+        wire(x1, y1 - 0.22, z1, x2, y2 - 0.22, z2, 0.62);
+      }
+      // 变压器杆（杂货铺后侧）：水泥双杆 + 横担 + 瓷瓶 + 油浸变压器
+      {
+        const tx2 = 39.4, tz2 = 4.2, tb = g(tx2, tz2);
+        for (const ox of [-0.35, 0.35]) {
+          B.add(GEO.cyl, M.concrete, tx2 + ox, tb + 3.5, tz2, 0, 0.15, 7.0, 0.15);
+        }
+        circle(tx2, tz2, 0.45, tb + 7.0, { noSightBlock: true });
+        B.add(GEO.box, M.ironDark, tx2, tb + 6.5, tz2, 0.35, 2.2, 0.12, 0.12);   // 上横担
+        B.add(GEO.box, M.ironDark, tx2, tb + 5.6, tz2, 0.35, 1.8, 0.1, 0.1);     // 下横担
+        for (const ox of [-0.85, 0, 0.85]) {
+          B.add(GEO.cyl, M.clothShirt, tx2 + ox * Math.cos(0.35), tb + 6.62, tz2 - ox * Math.sin(0.35), 0, 0.06, 0.14, 0.06); // 瓷瓶
+        }
+        B.add(GEO.box, M.ironDark, tx2, tb + 4.6, tz2, 0.35, 0.8, 1.0, 0.55);    // 变压器油箱
+        for (let i = -1; i <= 1; i++) {
+          B.add(GEO.box, M.ironDark, tx2 + i * 0.22, tb + 4.6, tz2 + 0.32, 0.35, 0.06, 0.9, 0.1); // 散热鳍
+        }
+        B.add(GEO.box, plateMat('高压危险', { w: 160, h: 96, bg: '#d8d0bc', fg: '#8c1616', font: 0.36 }), tx2 - 0.02, tb + 2.6, tz2 - 0.28, 0.35, 0.42, 0.3, 0.03);
+        // 引下线到街灯网 + 下户线到三家店面
+        const ty = tb + 6.5;
+        wire(tx2, ty, tz2, 48.5, g(48.5, -2.8) + 4.55, -2.8, 0.7);
+        wire(tx2, ty, tz2, 30.5, g(30.5, 2.2) + 4.55, 2.2, 0.7);
+        wire(tx2, tb + 5.6, tz2, 35, g(35, 6.2) + 2.9, 4.0, 0.5);      // 杂货铺
+        wire(30.5, g(30.5, 2.2) + 4.3, 2.2, 24.5, g(24.5, 4.2) + 3.3, 0.9, 0.55); // 录像厅
+        wire(13.5, g(13.5, -1.5) + 4.3, -1.5, 14, g(14, 2.8) + 3.1, 0.3, 0.5);    // 照相馆
+      }
+      // 家属区支线：从街灯网拉进巷子的一条晾在天上的线
+      wire(13.5, g(13.5, -1.5) + 4.35, -1.5, -20, g(-20, 12) + 4.4, 12, 1.4);
+      wire(-20, g(-20, 12) + 4.4, 12, -33, g(-33, 20) + 6.6, 20, 0.9);
+      {
+        const px2 = -20, pz2 = 12, pb = g(px2, pz2);
+        B.add(GEO.cyl, M.concrete, px2, pb + 2.5, pz2, 0, 0.13, 5.0, 0.13);
+        circle(px2, pz2, 0.2, pb + 5.0, { noSightBlock: true });
+        B.add(GEO.box, M.ironDark, px2, pb + 4.35, pz2, 1.1, 1.2, 0.09, 0.09);
+      }
+      if (wireGeos.length) {
+        const wm = new THREE.Mesh(
+          BufferGeometryUtils.mergeGeometries(wireGeos, false),
+          new THREE.MeshStandardMaterial({ color: 0x181a1c, roughness: 0.6 })
+        );
+        wm.castShadow = false;
+        scene.add(wm);
+      }
+      // 邮筒（电话亭旁：墨绿圆筒——夜里像个站着不动的人）
+      {
+        const mx2 = 31.6, mz2 = -5.2, mb = g(mx2, mz2);
+        B.add(GEO.cyl, M.concreteDark, mx2, mb + 0.06, mz2, 0, 0.62, 0.12, 0.62);
+        B.add(GEO.cyl, M.plasticGreen, mx2, mb + 0.62, mz2, 0, 0.5, 1.0, 0.5);
+        B.add(GEO.sphere, M.plasticGreen, mx2, mb + 1.12, mz2, 0, 0.5, 0.36, 0.5);
+        B.add(GEO.box, M.ironDark, mx2, mb + 1.0, mz2 - 0.24, 0, 0.3, 0.05, 0.06);
+        B.add(GEO.box, plateMat('信', { w: 64, h: 64, bg: '#1e4a3a', fg: '#e8e0c8', font: 0.6 }), mx2, mb + 0.78, mz2 - 0.255, 0, 0.2, 0.2, 0.02);
+        circle(mx2, mz2, 0.32, mb + 1.3, { noSightBlock: true });
+      }
+      // 水泥垃圾箱（永远没人清的那种敞口方筒）
+      {
+        const jx = 22.5, jz = -2.6, jb = g(jx, jz);
+        B.add(GEO.box, M.concreteDark, jx, jb + 0.42, jz, 0.2, 0.72, 0.84, 0.72);
+        B.add(GEO.box, M.ironDark, jx, jb + 0.8, jz, 0.2, 0.52, 0.1, 0.52);
+        circle(jx, jz, 0.5, jb + 0.9, { noSightBlock: true });
+      }
+    }
+
+    // —— 帆布雨棚（店面朝 -z）：条纹帆布斜面 + 前垂沿 + 钢管斜撑 ——
+    const awningMat = (() => {
+      const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+      const cx = c.getContext('2d');
+      for (let i = 0; i < 8; i++) {
+        cx.fillStyle = i % 2 ? '#274436' : '#8f8a76'; // 褪色的墨绿/米白条
+        cx.fillRect(i * 16, 0, 16, 64);
+      }
+      // 积灰与水渍
+      cx.fillStyle = 'rgba(40,36,28,0.22)'; cx.fillRect(0, 44, 128, 20);
+      cx.fillStyle = 'rgba(30,30,24,0.15)';
+      for (let i = 0; i < 30; i++) cx.fillRect(Math.random() * 128, Math.random() * 64, 3, 2);
+      const t2 = new THREE.CanvasTexture(c);
+      t2.colorSpace = THREE.SRGBColorSpace;
+      t2.wrapS = t2.wrapT = THREE.RepeatWrapping;
+      const m = new THREE.MeshStandardMaterial({ map: t2, roughness: 0.92, side: THREE.DoubleSide });
+      m.userData.fullUV = true;
+      return m;
+    })();
+    const awning = (ax2, ay2, az2, w2, dep = 1.1) => {
+      // 斜面（挂墙端高、外端低）
+      B.add(GEO.box, awningMat, ax2, ay2 - 0.18, az2 - dep / 2, 0, w2, 0.03, dep, -0.35, 0);
+      // 前垂沿
+      B.add(GEO.box, awningMat, ax2, ay2 - 0.5, az2 - dep + 0.14, 0, w2, 0.26, 0.025);
+      // 钢管斜撑
+      for (const ox of [-w2 / 2 + 0.12, w2 / 2 - 0.12]) {
+        B.add(GEO.cyl, M.ironDark, ax2 + ox, ay2 - 0.28, az2 - dep / 2 - 0.05, 0, 0.03, dep + 0.35, 0.03, -1.22, 0);
+      }
+    };
+    // 空调外机（挂墙 + 支架 + 淌黑的滴水痕）
+    const acUnit = (ax2, ay2, az2, ry2 = 0) => {
+      B.add(GEO.box, M.steel, ax2, ay2, az2, ry2, 0.78, 0.56, 0.3);
+      B.add(GEO.cyl, M.ironDark, ax2 - Math.cos(ry2) * 0.16, ay2, az2 + Math.sin(ry2) * 0.16 - 0.16, ry2, 0.36, 0.02, 0.36, Math.PI / 2, 0);
+      for (const ox of [-0.28, 0.28]) {
+        B.add(GEO.box, M.ironDark, ax2 + Math.cos(ry2) * ox, ay2 - 0.35, az2 + Math.sin(ry2) * ox + 0.12, ry2, 0.05, 0.4, 0.32, 0.5, 0);
+      }
+      // 冷凝水淌出的黑痕（贴回墙面）
+      B.add(GEO.box, M.concreteDark, ax2 + Math.cos(ry2) * 0.2 - Math.sin(ry2) * 0.15, ay2 - 0.85,
+        az2 + Math.sin(ry2) * 0.2 + Math.cos(ry2) * 0.15, ry2, 0.14, 1.1, 0.012);
+    };
 
     // —— 长途车站 ——
     {
@@ -997,8 +1196,15 @@ export function buildTown(scene, M) {
       const s = house(sx, sz, 2, 5.6, 4.6, { plaster: true, empty: true, noDoor: true });
       // 挑出的店招
       B.add(GEO.box, plateMat('供销杂货', { w: 288, h: 80, bg: '#1e4a3a', fg: '#e8e0c8', font: 0.46 }), sx, s.base + 2.6, sz - 2.7, 0, 2.4, 0.55, 0.1);
-      // 半落的卷帘门（门洞上半截）
+      // 半落的卷帘门（门洞上半截：波纹帘片 + 卷筒罩 + 底梁拉手）
       B.add(GEO.box, M.steel, sx, s.base + 1.95, sz - 2.35, 0, 1.3, 0.9, 0.08);
+      for (let i = 0; i < 6; i++) {
+        B.add(GEO.box, M.ironDark, sx, s.base + 1.56 + i * 0.15, sz - 2.39, 0, 1.3, 0.025, 0.02);
+      }
+      B.add(GEO.cyl, M.ironDark, sx, s.base + 2.44, sz - 2.32, 0, 0.14, 1.34, 0.14, 0, Math.PI / 2);
+      B.add(GEO.box, M.ironDark, sx, s.base + 1.5, sz - 2.36, 0, 1.34, 0.06, 0.1);
+      // 条纹帆布雨棚（门头下）
+      awning(sx, s.base + 2.42, sz - 2.28, 3.2);
       // 货架 ×2 + 柜台 + 冰柜
       const sh = (lx, lz) => {
         const p = s.local(lx, 0, lz);
@@ -1062,6 +1268,11 @@ export function buildTown(scene, M) {
         B.add(GEO.box, M.woodDark, vx + 1.6, base + 0.21, bzr, 0, 0.3, 0.42, 0.3);
         aabb(vx - 0.5, bzr, 5.0, 0.4, base + 0.5, { noSightBlock: true });
       }
+      // 勒脚 + 东墙空调外机（通宵场的冷气；淌了三年的黑痕）
+      B.add(GEO.box, M.concreteDark, vx, base + 0.56, vz - d / 2 - 0.04, 0, w + 0.1, 0.52, 0.05);
+      B.add(GEO.box, M.concreteDark, vx - w / 2 - 0.04, base + 0.56, vz, 0, 0.05, 0.52, d + 0.1);
+      B.add(GEO.box, M.concreteDark, vx + w / 2 + 0.04, base + 0.56, vz, 0, 0.05, 0.52, d + 0.1);
+      acUnit(vx + w / 2 + 0.2, base + 2.3, vz + 0.6, -Math.PI / 2);
       // 大屏电视墙（雪花永远在放；没人看，也没人关）
       B.add(GEO.box, M.crtShell, vx + 3.6, base + 1.5, vz + 1.0, 0, 0.9, 1.4, 1.2);
       const sscreen = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.75),
@@ -1151,6 +1362,11 @@ export function buildTown(scene, M) {
       // 屋顶 + 门脸招牌
       B.add(GEO.box, M.roof, vx, base + h + 0.42, vz, 0, w + 0.8, 0.18, d + 0.8, 0, 0.03);
       B.add(GEO.box, plateMat('大新照相', { w: 288, h: 88, bg: '#173a4a', fg: '#f0d28c', font: 0.46, emissive: 0.5 }), vx, base + h + 0.02, vz - d / 2 - 0.12, 0, 2.5, 0.58, 0.12);
+      // 橱窗雨棚 + 勒脚
+      awning(vx + 1.35, base + 2.52, vz - d / 2 + 0.02, 3.3);
+      B.add(GEO.box, M.concreteDark, vx, base + 0.56, vz - d / 2 - 0.04, 0, w + 0.1, 0.52, 0.05);
+      B.add(GEO.box, M.concreteDark, vx - w / 2 - 0.04, base + 0.56, vz, 0, 0.05, 0.52, d + 0.1);
+      B.add(GEO.box, M.concreteDark, vx + w / 2 + 0.04, base + 0.56, vz, 0, 0.05, 0.52, d + 0.1);
       // 半开的门
       B.add(GEO.box, M.woodDark, dcx - 0.32, base + 1.3, vz - d / 2 + 0.3, 1.05, 0.85, 2.0, 0.05);
       // 门市：柜台 + 背景布 + 道具椅 + 三脚架相机（道具点位）
@@ -1276,7 +1492,29 @@ export function buildTown(scene, M) {
       for (let f = 0; f < 2; f++) {
         for (let i = 0; i < 5; i++) {
           B.add(GEO.box, M.ironDark, bx + bayXs[i] + 0.3, (f ? f2 : f1) + 1.5, bz + D / 2 + 0.02, 0, 1.0, 1.1, 0.08);
+          // 窗台板 + 窗楣滴水线（北墙面唯一的凸凹节奏）
+          B.add(GEO.box, M.concrete, bx + bayXs[i] + 0.3, (f ? f2 : f1) + 0.92, bz + D / 2 + 0.08, 0, 1.16, 0.07, 0.16);
+          B.add(GEO.box, M.concrete, bx + bayXs[i] + 0.3, (f ? f2 : f1) + 2.1, bz + D / 2 + 0.06, 0, 1.1, 0.06, 0.12);
+          // 1F 防盗网（焊的方格铁栅——2001 年一楼的标配）
+          if (f === 0) {
+            for (let k = 0; k < 4; k++) {
+              B.add(GEO.box, M.ironDark, bx + bayXs[i] - 0.09 + k * 0.26, f1 + 1.5, bz + D / 2 + 0.1, 0, 0.022, 1.14, 0.022);
+            }
+            for (let k = 0; k < 3; k++) {
+              B.add(GEO.box, M.ironDark, bx + bayXs[i] + 0.3, f1 + 1.06 + k * 0.44, bz + D / 2 + 0.1, 0, 1.04, 0.022, 0.022);
+            }
+          }
         }
+      }
+      // 铸铁落水管两根（北墙两端：管箍 + 出水弯头）
+      for (const sx2 of [-W / 2 + 0.5, W / 2 - 0.5]) {
+        B.add(GEO.cyl, M.ironDark, bx + sx2, (base + roofY) / 2 + 0.2, bz + D / 2 + 0.14, 0, 0.075, roofY - base - 0.4, 0.075);
+        for (let k = 1; k <= 3; k++) {
+          B.add(GEO.box, M.ironDark, bx + sx2, base + k * (roofY - base) / 3.4, bz + D / 2 + 0.13, 0, 0.2, 0.06, 0.14);
+        }
+        B.add(GEO.cyl, M.ironDark, bx + sx2, base + 0.24, bz + D / 2 + 0.3, 0, 0.07, 0.42, 0.07, 1.1, 0);
+        // 管口下的青苔渍
+        B.add(GEO.box, M.concreteDark, bx + sx2, base + 0.3, bz + D / 2 + 0.115, 0, 0.3, 0.5, 0.012);
       }
       // 东西山墙（双层高）
       for (const sx of [-W / 2 + t / 2, W / 2 - t / 2]) {

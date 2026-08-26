@@ -497,6 +497,40 @@ export function buildHotel(ctx) {
       box(M.fluorescent, px, F2 - 0.06, 0.8, 1.4, 0.05, 0.16);
     }
     addLight(0xdfe8d8, 8, 10, 0, F2 - 0.8, 1.2, 0.5);
+    // —— 内装线脚（轮9）：木墙裙 + 铜压顶条 + 红木踢脚 + 檐口线 ——
+    // 2001 县镇酒店的「体面」全在一米以下：墙裙包浆、踢脚磕痕、上沿一条铜线。
+    {
+      const dado = (alongX, fixed, a, b2) => {
+        const len = b2 - a, mid = (a + b2) / 2;
+        if (alongX) {
+          box(M.veneer, mid, 0.5, fixed, len, 0.92, 0.045);
+          box(M.brass, mid, 0.97, fixed, len, 0.035, 0.055);
+          box(M.veneerRed, mid, 0.07, fixed, len, 0.14, 0.06);
+        } else {
+          box(M.veneer, fixed, 0.5, mid, 0.045, 0.92, len);
+          box(M.brass, fixed, 0.97, mid, 0.055, 0.035, len);
+          box(M.veneerRed, fixed, 0.07, mid, 0.06, 0.14, len);
+        }
+      };
+      dado(true, 0.19, -7.9, -1.98);  // 南墙西段（避楼梯口）
+      dado(true, 0.19, 1.98, 7.9);    // 南墙东段
+      dado(false, 7.81, 0.3, 4.95);   // 东墙南段（避东廊门）
+      dado(false, 7.81, 6.85, 10.85); // 东墙北段
+      dado(false, -7.81, 0.3, 2.3);   // 西墙南段（背柜以南）
+      dado(false, -7.81, 6.7, 10.85); // 西墙北段
+      // 檐口线（2F 楼板下皮一圈石膏线近似——挑空四缘）
+      for (const [cx2, cz2, cw, cd] of [
+        [0, 0.32, 15.7, 0.14], [-7.83, 5.5, 0.14, 10.6], [7.83, 5.5, 0.14, 10.6],
+      ]) {
+        box(M.hotelWall, cx2, F2 - 0.1, cz2, cw, 0.2, cd);
+      }
+    }
+    // 立式不锈钢烟灰缸一对（门斗两侧：沙面上摁着几枚旧烟头）
+    for (const px of [-3.2, 3.4]) {
+      cyl(M.steel, px, 0.32, 8.0, 0.13, 0.64, 0.13);
+      cyl(M.sand ?? M.salt, px, 0.65, 8.0, 0.11, 0.03, 0.11);
+      colliders.push({ x: hx + px, z: hz + 8.0, r: 0.15, maxY: hb + 0.68, noSightBlock: true });
+    }
     locations.lobbyCenter = world(0, 0.5, 5.5);
   }
 
@@ -553,29 +587,75 @@ export function buildHotel(ctx) {
         colliders.push({ x: hx + px, z: hz + pz, r: 0.4, maxY: hb + 1.7 });
       }
     }
-    // 圆桌 ×6（红台布+转盘+碗碟+方凳）
+    // 圆桌 ×6：席面全摆齐但一口没动——白瓷碗碟/红漆筷/茶盅，转盘上啤酒茶壶，席边暖瓶
+    // 每桌留一副「倒扣的碗」：满堂席设里独一副是给不来的人的
     const tables = [[-14.5, -4], [-10.5, -4], [-14.5, 0.5], [-10.5, 0.5], [-14.5, 5], [-10.5, 5]];
     dynamic.banquetTables = [];
     for (let ti = 0; ti < tables.length; ti++) {
       const [px, pz] = tables[ti];
       cyl(M.tableCloth, px, 0.42, pz, 1.5, 0.84, 1.5);
       cyl(M.crtGlass, px, 0.89, pz, 0.85, 0.04, 0.85); // 玻璃转盘
+      const deadSeat = (ti * 3) % 8;
       for (let k = 0; k < 8; k++) {
-        const a = (k / 8) * Math.PI * 2;
-        cyl(M.clothShirt, px + Math.cos(a) * 0.58, 0.875, pz + Math.sin(a) * 0.58, 0.11, 0.03, 0.11);
+        const a = (k / 8) * Math.PI * 2 + ti * 0.13;
+        const bx2 = px + Math.cos(a) * 0.58, bz2 = pz + Math.sin(a) * 0.58;
+        if (k === deadSeat) {
+          // 倒扣白瓷碗 + 双筷平搁碗底（忌讳的摆法，摆得端端正正）
+          cyl(M.porcelain, bx2, 0.868, bz2, 0.13, 0.055, 0.13);
+          box(M.veneerRed, bx2, 0.902, bz2, 0.012, 0.012, 0.3, a + 0.5);
+          box(M.veneerRed, bx2, 0.914, bz2, 0.012, 0.012, 0.3, a + 0.78);
+        } else {
+          cyl(M.porcelain, bx2, 0.849, bz2, 0.22, 0.018, 0.22);   // 骨碟
+          cyl(M.porcelain, bx2, 0.885, bz2, 0.125, 0.05, 0.125);  // 白瓷碗
+          // 红漆筷一双（斜搁碟边，角度略乱——摆桌的人手抖）
+          box(M.veneerRed, bx2 + Math.cos(a) * 0.1, 0.862, bz2 + Math.sin(a) * 0.1, 0.011, 0.011, 0.29, a + 1.35 + ti * 0.2);
+          box(M.veneerRed, bx2 + Math.cos(a) * 0.13, 0.862, bz2 + Math.sin(a) * 0.13, 0.011, 0.011, 0.29, a + 1.48 + ti * 0.2);
+          // 茶盅
+          cyl(M.porcelain, bx2 - Math.sin(a) * 0.19, 0.868, bz2 + Math.cos(a) * 0.19, 0.062, 0.055, 0.062);
+        }
         // 方凳
         box(M.veneer, px + Math.cos(a) * 1.05, 0.24, pz + Math.sin(a) * 1.05, 0.34, 0.48, 0.34);
       }
+      // 转盘上：绿玻璃啤酒瓶×2 + 白瓷茶壶 + 不锈钢烟灰缸（都没开封没斟过）
+      const ba = ti * 1.3;
+      for (let bi = 0; bi < 2; bi++) {
+        const bbx = px + Math.cos(ba + bi * 2.3) * 0.24, bbz = pz + Math.sin(ba + bi * 2.3) * 0.24;
+        cyl(M.glassGreen, bbx, 1.03, bbz, 0.09, 0.24, 0.09);
+        cyl(M.glassGreen, bbx, 1.2, bbz, 0.032, 0.1, 0.032);
+        cyl(M.brass, bbx, 1.253, bbz, 0.036, 0.012, 0.036); // 瓶盖
+      }
+      cyl(M.porcelain, px - Math.cos(ba) * 0.2, 0.985, pz - Math.sin(ba) * 0.2, 0.17, 0.15, 0.17);
+      B.add(GEO.sphere, M.porcelain, hx + px - Math.cos(ba) * 0.2, hb + 1.08, hz + pz - Math.sin(ba) * 0.2, 0, 0.05, 0.04, 0.05);
+      cyl(M.porcelain, px - Math.cos(ba) * 0.32, 1.0, pz - Math.sin(ba) * 0.32, 0.032, 0.14, 0.032, 0, 0, 0.9);
+      cyl(M.steel, px + Math.sin(ba) * 0.3, 0.925, pz - Math.cos(ba) * 0.3, 0.1, 0.03, 0.1);
+      // 印花铁皮暖瓶（席边地上——热水凉透了也没人倒过）
+      const ta = ti * 0.9 + 0.5;
+      const tx2 = px + Math.cos(ta) * 1.34, tz2 = pz + Math.sin(ta) * 1.34;
+      cyl(M.thermosRed, tx2, 0.19, tz2, 0.15, 0.38, 0.15);
+      cyl(M.porcelain, tx2, 0.415, tz2, 0.075, 0.07, 0.075);
+      box(M.ironDark, tx2, 0.31, tz2, 0.18, 0.018, 0.018, ta);
       colliders.push({ x: hx + px, z: hz + pz, r: 0.85, maxY: hb + 0.95, noSightBlock: true });
       dynamic.banquetTables.push(world(px, 0.9, pz));
     }
+    // 一只翻倒的方凳（3号桌外圈：席面纹丝不动，唯独有人从这里离开得很急）
+    box(M.veneer, -13.1, 0.18, 2.05, 0.34, 0.48, 0.34, 0.7, Math.PI / 2);
+    // 红木踢脚一圈（舞台以外三面，避东墙双开门/服务门洞）
+    box(M.veneerRed, -12.5, 0.09, 10.79, 8.4, 0.18, 0.06);
+    box(M.veneerRed, -16.79, 0.09, 1.65, 0.06, 0.18, 18.3);
+    box(M.veneerRed, -8.21, 0.09, -1.55, 0.06, 0.18, 11.9);
+    box(M.veneerRed, -8.21, 0.09, 8.7, 0.06, 0.18, 4.2);
     // 上宾空席：舞台下正对的独桌——单椅、餐具未动、桌牌
     {
       const px = -12.5, pz = -5.6;
       cyl(M.tableCloth, px, 0.42, pz, 1.1, 0.84, 1.1);
       box(M.veneerRed, px, 0.5, pz - 1.25, 0.5, 1.15, 0.5); // 高背椅
       box(M.veneerRed, px, 1.35, pz - 1.45, 0.5, 0.9, 0.12);
-      cyl(M.clothShirt, px, 0.875, pz, 0.13, 0.03, 0.13);
+      // 上宾席面：骨碟上倒扣的碗、双筷交叠压在碗底、独一只茶盅——都在等一个不会用嘴吃饭的东西
+      cyl(M.porcelain, px, 0.849, pz - 0.32, 0.24, 0.018, 0.24);
+      cyl(M.porcelain, px, 0.868, pz - 0.32, 0.13, 0.055, 0.13);
+      box(M.veneerRed, px, 0.902, pz - 0.32, 0.012, 0.012, 0.32, 0.42);
+      box(M.veneerRed, px, 0.914, pz - 0.32, 0.012, 0.012, 0.32, 1.12);
+      cyl(M.porcelain, px + 0.24, 0.868, pz - 0.22, 0.062, 0.055, 0.062);
       const plate = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.2, 0.03), plateMat('上宾', { bg: '#8c1616', fg: '#f0d28c', font: 0.55 }));
       plate.position.copy(world(px, 0.99, pz + 0.4));
       plate.rotation.x = -0.35;

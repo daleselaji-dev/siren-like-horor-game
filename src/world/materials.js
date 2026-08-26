@@ -146,14 +146,23 @@ export function buildMaterials(lowspec = false) {
   M.mural = new THREE.MeshStandardMaterial({ map: T.mural, roughness: 0.85 });
   // 整幅贴图类材质：合批时保持 0..1 UV，禁止世界空间平铺（否则字/画被切成色带）
   for (const sm of [M.xiPanel, M.signSouth, M.signSouthV, M.signAqua, M.mural]) sm.userData.fullUV = true;
-  // 镇口公路沥青（2001 年的县道：补丁摞补丁）——雨夜压暗压湿，灯下起油亮
-  M.asphalt = std(T.slab, { normalScale: 0.7, envInt: 1.3, roughness: 0.72 });
-  M.asphalt.color = new THREE.Color(0x3c4043);
+  // 镇口公路沥青（2001 年的县道：骨料麻面+龟裂+灌缝蛇线+补丁）——雨夜压暗压湿，灯下起油亮
+  M.asphalt = std(T.asphalt, { normalScale: 1.3, envInt: 1.35, roughness: 1.0 });
+  M.asphalt.color = new THREE.Color(0x8e9296); // 贴图基色偏亮，整体压到湿夜县道
+  // 现浇水泥：路缘石/人行道/勒脚/电杆——县镇街道的骨架色
+  M.concrete = std(T.concrete, { normalScale: 1.1, envInt: 0.9 });
+  M.concreteDark = std(T.concrete, { color: 0x8a8e8a, normalScale: 1.2, envInt: 0.7 }); // 勒脚/溅泥带
+  // 道路白漆（磨旧的中线/停车线）：漆皮浮在沥青上，磨掉一半
+  M.roadPaint = std(T.concrete, { color: 0xd8d8cc, normalScale: 0.5, envInt: 1.0, roughness: 0.92 });
   // 巨物残骸骨料：陈年象牙色，盐析出的干骨面
   M.bone = std(T.salt, { normalScale: 0.8, envInt: 1.1, roughness: 0.95 });
   M.bone.color = new THREE.Color(0xcfc4ac);
   M.notice = new THREE.MeshStandardMaterial({ map: T.notice, roughness: 0.9, side: THREE.DoubleSide });
   M.tableCloth = new THREE.MeshStandardMaterial({ color: 0xa41c1a, roughness: 0.85 }); // 圆桌红台布
+  // 宴席餐具三件：白瓷(带一点青口冷光)/绿玻璃啤酒瓶/印花铁皮暖瓶
+  M.porcelain = new THREE.MeshStandardMaterial({ color: 0xe6eae2, roughness: 0.18, envMapIntensity: 1.7 });
+  M.glassGreen = new THREE.MeshStandardMaterial({ color: 0x274a26, roughness: 0.08, metalness: 0.15, envMapIntensity: 2.0 });
+  M.thermosRed = new THREE.MeshStandardMaterial({ color: 0xb63430, roughness: 0.32, metalness: 0.25, envMapIntensity: 1.3 });
   M.aquaGlass = new THREE.MeshPhysicalMaterial({
     color: 0x18424a, roughness: 0.1, metalness: 0, transparent: true, opacity: 0.55,
     envMapIntensity: 1.6,

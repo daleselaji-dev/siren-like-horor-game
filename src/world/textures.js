@@ -394,6 +394,79 @@ export function slabTexture(seed = 66, size = 512) {
   }, 2.4);
 }
 
+/** 县道沥青（2001 补丁摞补丁）：骨料麻面 + 龟裂网 + 灌缝沥青蛇线 + 补丁块 + 油渍坑洼。
+ *  各向同性（路段盒体朝向不一，方向性特征会在拐弯处穿帮）。 */
+export function asphaltTexture(seed = 611, size = 512) {
+  const fbm = makeFbm(seed, 5);
+  const crackR = makeRidged(seed + 9, 4);      // 龟裂网
+  const snakeR = makeRidged(seed + 31, 2);     // 灌缝蛇线（更粗更稀）
+  const cell = makeCellular(seed + 3, 72);     // 骨料颗粒
+  const patchN = makeValueNoise(seed + 17, 6); // 补丁分区
+  return buildMaps(size, (u, v, out) => {
+    const f = fbm(u * 2.2, v * 2.2);
+    // 补丁：分区噪声硬阈值——新补的一块颜色更黑更平
+    const pv = patchN(u, v);
+    const patch = pv > 0.72 ? 1 : 0;
+    // 骨料：细胞噪声，石子心亮、缝隙沉
+    const c = cell(u * 1.0, v * 1.0);
+    const grain = clamp01(1 - c.f1 * 1.9);          // 石子凸点
+    const gap = clamp01((c.f2 - c.f1) * 3.2);       // 缝隙(骨料间)
+    let base = 52 + f * 16 + grain * 26 - (1 - gap) * 8;
+    if (patch) base = 34 + f * 8 + grain * 12;      // 新补丁：更黑、骨料细
+    let r = base, g = base + 2, b = base + 4;
+    // 磨白：车辙外的老化面浮起灰白（骨料磨出的石色）
+    const wear = clamp01((fbm(u * 1.1 + 7, v * 1.1 + 4) - 0.5) * 2.4) * (1 - patch);
+    r += wear * 26; g += wear * 27; b += wear * 26;
+    // 龟裂网：细黑线
+    const crack = clamp01((crackR(u * 3.2, v * 3.2) - 0.9) * 12) * (1 - patch * 0.7);
+    r *= 1 - crack * 0.55; g *= 1 - crack * 0.55; b *= 1 - crack * 0.5;
+    // 灌缝沥青蛇线：粗黑亮线（低粗糙——新沥青的油光）
+    const snake = clamp01((snakeR(u * 1.1 + 3, v * 1.1 + 6) - 0.955) * 26);
+    r = r * (1 - snake) + snake * 22; g = g * (1 - snake) + snake * 23; b = b * (1 - snake) + snake * 26;
+    // 油渍：暗斑 + 低粗糙
+    const oil = clamp01((fbm(u * 2.6 + 12, v * 2.6 + 8) - 0.62) * 4);
+    r *= 1 - oil * 0.3; g *= 1 - oil * 0.3; b *= 1 - oil * 0.24;
+    // 坑洼：深黑点
+    const pot = clamp01((fbm(u * 5 + 21, v * 5 + 17) - 0.72) * 8);
+    r *= 1 - pot * 0.5; g *= 1 - pot * 0.5; b *= 1 - pot * 0.46;
+    out[0] = r; out[1] = g; out[2] = b;
+    out[3] = clamp01(0.5 + grain * 0.24 - crack * 0.2 - pot * 0.3 - snake * 0.06 + (patch ? -0.04 : 0));
+    out[4] = clamp01(0.9 - snake * 0.5 - oil * 0.32 - (patch ? 0.1 : 0) + wear * 0.06);
+  }, 2.2);
+}
+
+/** 现浇水泥（路缘石/人行道/勒脚/女儿墙）：抹光面 + 木模板痕 + 崩边 + 泛碱白 + 雨渍 */
+export function concreteTexture(seed = 631, size = 512) {
+  const fbm = makeFbm(seed, 5);
+  const ridge = makeRidged(seed + 11, 3);
+  const drip = makeValueNoise(seed + 29, 40);
+  return buildMaps(size, (u, v, out) => {
+    const f = fbm(u * 2.4, v * 2.4);
+    let r = 118 + f * 26, g = 120 + f * 25, b = 116 + f * 23;
+    // 木模板痕：低频横带明暗
+    const board = Math.sin(v * Math.PI * 2 * 5 + f * 1.6) * 0.5 + 0.5;
+    r -= board * 7; g -= board * 7; b -= board * 6;
+    // 抹刀弧痕：斜向微亮弧
+    const trowel = clamp01((Math.sin((u * 3 + v * 5 + f * 2) * Math.PI * 2) - 0.7) * 3);
+    r += trowel * 9; g += trowel * 9; b += trowel * 8;
+    // 泛碱白霜（水泥的盐析——和镇子的盐语言同宗）
+    const eff = clamp01((fbm(u * 3 + 6, v * 3 + 9) - 0.6) * 3.4);
+    r += eff * 44; g += eff * 44; b += eff * 40;
+    // 细裂 + 崩点
+    const crack = clamp01((ridge(u * 2.6, v * 2.6) - 0.93) * 15);
+    r *= 1 - crack * 0.4; g *= 1 - crack * 0.4; b *= 1 - crack * 0.36;
+    const chipHole = clamp01((fbm(u * 7 + 14, v * 7 + 3) - 0.74) * 9);
+    r *= 1 - chipHole * 0.34; g *= 1 - chipHole * 0.34; b *= 1 - chipHole * 0.3;
+    // 雨渍竖条
+    const dr = clamp01((drip(u * 5, 0.3) - 0.6) * 4) * sstep(0.1, 0.8, v);
+    r *= 1 - dr * 0.16; g *= 1 - dr * 0.17; b *= 1 - dr * 0.15;
+    const grain = (fbm(u * 12, v * 12) - 0.5) * 12;
+    out[0] = r + grain; out[1] = g + grain; out[2] = b + grain;
+    out[3] = clamp01(0.55 + f * 0.14 - crack * 0.18 - chipHole * 0.2);
+    out[4] = clamp01(0.88 - trowel * 0.1 + eff * 0.06 - dr * 0.12);
+  }, 1.8);
+}
+
 /** 盐霜/盐堆 v2：结晶颗粒闪点 */
 export function saltTexture(seed = 77, size = 256) {
   const fbm = makeFbm(seed, 5);
@@ -1463,6 +1536,8 @@ export function buildTextureSet(lowspec = false) {
     slab: slabTexture(66, mid),
     salt: saltTexture(77, small),
     rock: rockTexture(88, mid),
+    asphalt: asphaltTexture(611, hero),
+    concrete: concreteTexture(631, mid),
     corpseSkin: corpseSkinTexture(111, mid),
     clothNavy: clothTexture(122, [38, 46, 62], small),
     clothGrey: clothTexture(123, [58, 60, 58], small),
