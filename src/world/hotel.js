@@ -391,6 +391,55 @@ export function buildHotel(ctx) {
     for (const [vx, vz] of [[-4, 8.2], [1.5, 6.4]]) cyl(M.concrete, vx, ROOF + 0.55, vz, 0.3, 1.1, 0.3); // 排气烟囱
   }
 
+  // ================= 立面轮17：窗套/竖壁柱/线脚层叠/逐窗雨痕/雨棚梁吊筋/屋顶栏杆 =================
+  // 门3审计「整栋仍像浅灰矩形盒+扁窗」的加密轮：远看第一读是四道竖壁柱与
+  // 逐窗抹灰窗套的凹凸网格 + 檐下阴影暗带；近看每樘窗有 10cm 出墙的围框、
+  // 加厚窗台板与台下雨痕——立面每一格都有进深，污渍有年龄
+  {
+    const winsN = [[-15.5, -13.5], [-11.5, -9.5], [-7, -5], [-2.5, -0.5], [1.5, 3.5], [6, 8], [10.5, 12.5], [14, 16]];
+    const surroundM = new THREE.MeshStandardMaterial({ color: 0x8d887c, roughness: 0.86 }); // 窗套抹灰（断言标记色）
+    const pilM = new THREE.MeshStandardMaterial({ color: 0x767066, roughness: 0.9 });       // 壁柱水泥（断言标记色）
+    let rs = 7;
+    const rnd2 = () => (rs = (rs * 16807) % 2147483647) / 2147483647;
+    for (const y0 of [F2, F3]) {
+      for (const [a, b] of winsN) {
+        const cx2 = (a + b) / 2, w2 = b - a, sillY = y0 + 1.0, topY = y0 + 2.4, ch = topY - sillY;
+        box(surroundM, cx2, topY + 0.1, 11.2, w2 + 0.44, 0.2, 0.24);        // 窗套上枋（出墙 10cm）
+        box(surroundM, a - 0.11, y0 + 1.71, 11.2, 0.22, ch + 0.4, 0.24);    // 窗套左梃
+        box(surroundM, b + 0.11, y0 + 1.71, 11.2, 0.22, ch + 0.4, 0.24);    // 窗套右梃
+        box(M.concreteDark, cx2, sillY - 0.1, 11.23, w2 + 0.52, 0.1, 0.34); // 窗台板加厚出挑
+        // 台板下雨痕（位置/长短逐窗错落——同一场雨，不同的年龄）
+        for (let k2 = 0; k2 < 2; k2++) {
+          if (k2 && rnd2() < 0.4) continue;
+          const sxp = cx2 - w2 * 0.3 + rnd2() * w2 * 0.6;
+          const ln2 = 0.5 + rnd2() * 0.9;
+          box(M.concreteDark, sxp, sillY - 0.18 - ln2 / 2, 11.157, 0.08 + rnd2() * 0.06, ln2, 0.012);
+        }
+      }
+      // 腰线层叠：既有腰线下加一皮浅出挑 + 檐下阴影暗带（远距读得出的横刻痕）
+      box(surroundM, 0, y0 - 0.08, 11.185, 34.6, 0.1, 0.2);
+      box(M.ironDark, 0, y0 - 0.17, 11.152, 34.6, 0.08, 0.012);
+    }
+    box(M.ironDark, 0, ROOF + 0.8, 11.152, 34.8, 0.1, 0.012); // 女儿墙压顶下阴影带
+    // —— 竖壁柱四道（出墙 13cm）：北立面切成五段竖构图，窗带在柱间成组 ——
+    for (const px of [-12.5, -3.75, 4.75, 13.25]) {
+      box(pilM, px, (ROOF + 0.7) / 2, 11.2, 0.62, ROOF + 0.7, 0.17);
+      box(M.concreteDark, px, ROOF + 0.78, 11.24, 0.74, 0.14, 0.24); // 柱顶收头
+    }
+    // —— 雨棚结构可读：底板下三根纵梁 + 前缘横梁 + 斜拉吊筋（锚板入墙）——
+    for (const bx of [-4.1, 0, 4.1]) box(M.concreteDark, bx, 3.21, 12.95, 0.16, 0.14, 3.66);
+    box(M.concreteDark, 0, 3.21, 14.55, 12.1, 0.14, 0.16);
+    for (const s of [-1, 1]) {
+      cyl(M.steel, s * 5.2, 4.52, 12.88, 0.03, 3.5, 0.03, 0, -1.24, 0); // 吊筋斜拉杆
+      box(M.ironDark, s * 5.2, 5.1, 11.19, 0.22, 0.26, 0.1);            // 上端锚板（入墙）
+      box(M.ironDark, s * 5.2, 3.98, 14.52, 0.12, 0.12, 0.12);          // 下端节点
+    }
+    // —— 屋顶栏杆（北沿）：细杆一排——天际线的锯齿，雾里也读得出「上面有东西」 ——
+    for (let px = -15; px <= 15; px += 2.5) cyl(M.ironDark, px, ROOF + 1.32, 10.85, 0.028, 0.75, 0.028);
+    box(M.ironDark, 0, ROOF + 1.68, 10.85, 30.6, 0.045, 0.045);
+    box(M.ironDark, 0, ROOF + 1.34, 10.85, 30.6, 0.035, 0.035);
+  }
+
   // ================= 正门：进深门斗 + 体积雨棚 + 灯箱 + 玻璃门 =================
   // 轮16门3：门脸从墙皮里长出 1.5m——玻璃门退在门斗腔里，雨棚是一只有檐口板带的
   // 「盒子」压在两墩一排柱上，不再是一片悬空薄板
@@ -427,15 +476,20 @@ export function buildHotel(ctx) {
     }
     // 门楣灯箱（门斗腔内低位一窄条：夜里两级亮面）
     box(M.signSouth, 0, 2.55, 11.32, 7.2, 0.42, 0.18);
-    // 玻璃门框（中缝常开 1.4m）
+    // —— 玻璃门整樘后退 40cm（轮17：门斗真正凹进墙皮）——
+    // 门洞两颊红漆木侧颊 + 顶楣封板：站在门前先进「腔」，再推门
+    for (const s of [-1, 1]) box(M.veneerRed, s * 2.52, 1.62, 10.85, 0.16, 3.24, 0.78);
+    box(M.veneerRed, 0, 2.88, 10.85, 5.2, 0.76, 0.78);   // 凹腔顶楣
+    box(M.brass, 0, 2.52, 10.62, 4.9, 0.05, 0.06);       // 楣底金压线
+    // 玻璃门框（中缝常开 1.4m；门扇在凹腔底）
     for (const px of [-2.4, 2.4]) {
-      box(M.brass, px, 1.25, 11, 0.12, 2.5, 0.12);
-      colliders.push({ x: hx + px, z: hz + 11, r: 0.09, maxY: hb + 2.5 });
+      box(M.brass, px, 1.25, 10.6, 0.12, 2.5, 0.12);
+      colliders.push({ x: hx + px, z: hz + 10.6, r: 0.09, maxY: hb + 2.5 });
     }
-    box(M.crtGlass, -1.75, 1.25, 11, 1.2, 2.4, 0.05);
-    colliders.push({ minX: hx - 2.36, maxX: hx - 1.15, minZ: hz + 10.9, maxZ: hz + 11.1, maxY: hb + 2.4 });
-    box(M.crtGlass, 1.75, 1.25, 11, 1.2, 2.4, 0.05);
-    colliders.push({ minX: hx + 1.15, maxX: hx + 2.36, minZ: hz + 10.9, maxZ: hz + 11.1, maxY: hb + 2.4 });
+    box(M.crtGlass, -1.75, 1.25, 10.6, 1.2, 2.4, 0.05);
+    colliders.push({ minX: hx - 2.36, maxX: hx - 1.15, minZ: hz + 10.5, maxZ: hz + 10.7, maxY: hb + 2.4 });
+    box(M.crtGlass, 1.75, 1.25, 10.6, 1.2, 2.4, 0.05);
+    colliders.push({ minX: hx + 1.15, maxX: hx + 2.36, minZ: hz + 10.5, maxZ: hz + 10.7, maxY: hb + 2.4 });
     // 两侧玻璃幕墙（大堂临街面）
     box(M.crtGlass, -4.2, 1.35, 11, 3.5, 2.7, 0.05);
     colliders.push({ minX: hx - 5.95, maxX: hx - 2.45, minZ: hz + 10.9, maxZ: hz + 11.1, maxY: hb + 2.7, noSightBlock: true });
