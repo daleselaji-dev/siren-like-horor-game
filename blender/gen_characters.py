@@ -18,7 +18,7 @@ SPECS = {
         'armband': True, 'belly': 0.12,
         'pose_l': 'sides', 'pose_r': 'sides', 'curl': 0.5,
         'head_pitch': -0.06,  # 下巴微抬
-        'head': {'age': 0.55, 'brow_k': 1.10, 'nose_k': 1.05, 'cheek_k': 1.18, 'hollow': 0.028,
+        'head': {'age': 0.55, 'brow_k': 1.10, 'nose_k': 1.05, 'cheek_k': 1.18, 'hollow': 0.015,
                  'jaw_k': 1.06, 'chin_k': 1.05, 'lid': 0.40, 'socket_k': 1.05,
                  'rx': 0.076, 'ry': 0.090, 'rz': 0.104},
         'stubble': 0.5, 'forehead_lines': 2,

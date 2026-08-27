@@ -23,18 +23,18 @@ TAU = math.pi * 2
 # ------------------------- 地标表（几何/贴图共用） -------------------------
 LM = {
     'eye_lon': 0.44, 'eye_z': 0.115,          # 眼窝中心
-    'brow_lon': 0.38, 'brow_z': 0.305,        # 眉弓双峰
-    'nasion_z': 0.205,                        # 鼻根
+    'brow_lon': 0.38, 'brow_z': 0.295,        # 眉弓双峰
+    'nasion_z': 0.200,                        # 鼻根
     'tip_z': -0.055,                          # 鼻尖
-    'alae_lon': 0.115, 'alae_z': -0.095,      # 鼻翼
-    'nostril_lon': 0.058, 'nostril_z': -0.150,
+    'alae_lon': 0.185, 'alae_z': -0.100,      # 鼻翼（r13 的 0.115 只有真人鼻宽一半→锥刺鼻）
+    'nostril_lon': 0.095, 'nostril_z': -0.150,
     'philtrum_z': -0.235,
     'lip_up_z': -0.297, 'seam_z': -0.348, 'lip_dn_z': -0.402,
-    'mouth_lon': 0.235,                       # 嘴角
-    'sulcus_z': -0.468, 'chin_z': -0.562,
+    'mouth_lon': 0.315,                       # 嘴角（口裂全宽 ~4.8cm）
+    'sulcus_z': -0.472, 'chin_z': -0.575,
     'gonion_lon': 0.98, 'gonion_z': -0.30,    # 下颌角
-    'cheek_lon': 0.60, 'cheek_z': 0.02,       # 颧骨
-    'hollow_lon': 0.74, 'hollow_z': -0.21,    # 颊陷
+    'cheek_lon': 0.62, 'cheek_z': 0.035,      # 颧骨
+    'hollow_lon': 0.76, 'hollow_z': -0.20,    # 颊陷
     'ear_lon': 1.60, 'ear_z': -0.02,          # 耳中心
 }
 
@@ -140,94 +140,114 @@ class HeadField:
         k_lip = g.get('lip_k', 1.0)
         k_chin = g.get('chin_k', 1.0) * dmp
         k_cheek = g.get('cheek_k', 1.0) * dmp
-        hollow = g.get('hollow', 0.030) * dmp
+        hollow = g.get('hollow', 0.020) * dmp
         k_jaw = g.get('jaw_k', 1.0)
 
         # ---------- 1 颅型 ----------
         back = np.clip(-np.cos(lon), 0, 1)
-        push_r(back * G(z - 0.10, 0.38), 0.055)                    # 后脑饱满
-        push_r(g2(1.22, 0.38, 0.30, 0.24), -0.032)                 # 太阳穴收平
-        push_y(G(lon, 0.55) * G(z - 0.52, 0.22), 0.012)            # 额圆
-        P[:, 1] += np.clip(z - 0.40, 0, None) * front * 0.16       # 额向后斜（不是蛋壳正圆）
-        P[:, 2] -= np.clip(z - 0.66, 0, None) * 0.06               # 颅顶略平
+        push_r(back * G(z - 0.10, 0.40), 0.055)                    # 枕后饱满
+        push_r(g2(1.26, 0.36, 0.30, 0.26), -0.030)                 # 颞侧收平（太阳穴是平面不是球面）
+        push_r(g2(1.95, 0.42, 0.55, 0.30), 0.020)                  # 顶结节（颅侧最宽点在耳后上方）
+        push_r(g2(0.90, 0.74, 0.42, 0.22), -0.016)                 # 额侧上收（颅前部略窄于顶宽）
+        push_y(g2(0.30, 0.50, 0.30, 0.16), 0.016)                  # 额结节双丘
+        P[:, 1] += np.clip(z - 0.36, 0, None) * front * 0.20       # 额向后斜（不是蛋壳正圆）
+        P[:, 2] -= np.clip(z - 0.64, 0, None) * 0.07               # 颅顶略平
 
         # ---------- 2 面平面 ----------
-        fm = front ** 1.5 * G(z + 0.02, 0.46) * (y < 0)
-        P[:, 1] += (-y) * 0.075 * fm                               # 前脸压平（脸不是球面）
+        fm = front ** 1.15 * G(z + 0.08, 0.54) * (y < 0)
+        P[:, 1] += (-y) * 0.085 * fm                               # 前脸压平（脸不是球面）
+        push_r(g2(1.02, -0.16, 0.30, 0.22), -0.016)                # 颊侧平面（颧下到颌角上方收平）
 
         # ---------- 3 下颌 ----------
-        s = smooth(np.clip(-z, 0, 1) / 0.95)
-        P[:, 0] *= 1 - (0.165 - self.bloat * 0.10) * s             # 颌区侧向收窄
-        P[:, 1] *= 1 - 0.045 * s
+        s = smooth(np.clip(-z, 0, 1) / 1.05)
+        P[:, 0] *= 1 - (0.150 - self.bloat * 0.09) * s             # 颌区侧向收窄（缓锥，不掐花生腰）
+        P[:, 1] *= 1 - 0.040 * s
         alc = np.minimum(al, 1.35)
-        jz = LM['chin_z'] - 0.03 + 0.36 * smooth(alc / 1.10) ** 1.25   # 下颌缘曲线：颏→耳下
+        jz = LM['chin_z'] - 0.03 + 0.37 * smooth(alc / 1.10) ** 1.25   # 下颌缘曲线：颏→耳下
         below = np.clip(jz - z, 0, None)
         npull = smooth(below / 0.26) * smooth(np.clip((1.75 - al) / 0.45, 0, 1))  # 耳侧平滑淡出（布尔截断=颊上硬折痕）
-        P[:, 0] *= 1 - 0.22 * npull * k_jaw
-        P[:, 1] = np.where(y < 0, P[:, 1] * (1 - 0.16 * npull * k_jaw), P[:, 1])
+        P[:, 0] *= 1 - 0.18 * npull * k_jaw
+        P[:, 1] = np.where(y < 0, P[:, 1] * (1 - 0.15 * npull * k_jaw), P[:, 1])
         # 颌底压平：下颌缘以下的球底向上抬成下颌底平面（否则侧影是垂囊）
-        P[:, 2] += below * 0.62 * np.clip(front + 0.35, 0, 1) * smooth(below / 0.10)
-        push_r(G(z - jz, 0.075) * smooth(np.clip((1.42 - al) / 0.30, 0, 1)) * front ** 0.3,
-               0.011 * k_jaw)                                      # 下颌缘棱线
-        push_r(g2(LM['gonion_lon'], LM['gonion_z'], 0.24, 0.14), 0.032 * k_jaw)  # 下颌角
-        # 颏
-        push_y(g2(0, LM['chin_z'], 0.24, 0.12, False), 0.052 * k_chin)
-        push_y(g2(0, LM['sulcus_z'], 0.17, 0.045, False), -0.026)  # 颏唇沟
+        P[:, 2] += below * 0.62 * np.clip(front * 0.55 + 0.62, 0, 1) * smooth(below / 0.10)
+        # 颌下颈锥：下颌缘以下整圈向颈轴收拢——头底不再是挂在领口上的垂球
+        deep = smooth(below / 0.22)
+        P[:, 0] *= 1 - 0.26 * deep
+        P[:, 1] = np.where(y < 0, P[:, 1] * (1 - 0.22 * deep), P[:, 1] * (1 - 0.15 * deep))
+        # 前下面部宽度锥收：从颧下向颏收窄前半脸（否则窄吻柱两侧的颊壁读成肿袋）
+        P[:, 0] *= 1 - 0.10 * smooth(np.clip(-0.05 - z, 0, 1) / 0.55) * front * (1 - deep * 0.5)
+        push_r(G(z - jz, 0.070) * smooth(np.clip((1.42 - al) / 0.30, 0, 1)) * front ** 0.3,
+               0.014 * k_jaw)                                      # 下颌缘棱线
+        push_r(g2(LM['gonion_lon'], LM['gonion_z'], 0.22, 0.13), 0.020 * k_jaw)  # 下颌角
+        push_r(g2(0.92, -0.24, 0.18, 0.14), 0.007 * k_jaw)         # 咬肌体量（颌角上方）
+        # 颏：前凸台 + 侧收（颏是方的不是溜的）
+        push_y(g2(0, LM['chin_z'], 0.21, 0.095, False), 0.094 * k_chin)
+        push_y(g2(0.14, LM['chin_z'] + 0.01, 0.10, 0.09), 0.018 * k_chin)   # 颏结节双点
+        push_y(g2(0, LM['sulcus_z'], 0.16, 0.040, False), -0.034)  # 颏唇沟
         # 老年下颌松弛（jowl）
-        push_r(g2(0.55, -0.50, 0.17, 0.10), 0.020 * self.age)
+        push_r(g2(0.55, -0.50, 0.17, 0.10), 0.011 * self.age)
 
-        # ---------- 4 眉弓 ----------
+        # ---------- 4 眉弓（台阶读法：眉上平坡、眉峰前凸、眉下急收进眶） ----------
         bl = LM['brow_lon']
-        bipeak = G(lon - bl, 0.30) + G(lon + bl, 0.30) + 0.55 * G(lon, 0.20)
-        push_y(bipeak * G(z - LM['brow_z'], 0.075), 0.055 * k_brow)
-        push_y(G(lon, 0.16) * G(z - 0.19, 0.055), -0.011)          # 鼻根凹（眉心之下）
+        bipeak = G(lon - bl, 0.32) + G(lon + bl, 0.32) + 0.50 * G(lon, 0.22)
+        push_y(bipeak * G(z - LM['brow_z'], 0.062), 0.062 * k_brow)
+        push_y(bipeak * G(z - LM['brow_z'] - 0.06, 0.05), 0.022 * k_brow)   # 眉上缓坡（不是孤立香肠棱）
+        push_y(g2(0.44, 0.225, 0.30, 0.042), -0.020)               # 眉下急收（眶顶阴影带）
+        push_y(G(lon, 0.15) * G(z - LM['nasion_z'], 0.048), -0.052)  # 鼻根深凹（侧影的第一个台阶）
 
         # ---------- 5 眶窝 ----------
         for sgn in (-1, 1):
             E = np.array(self.eye_dirs[sgn])
             ang = np.arccos(np.clip(D @ E, -1, 1))
-            push_r(-0.052 * G(ang, 0.235) ** 1.4 * dmp * g.get('socket_k', 1.0), 1.0)
+            push_r(-0.062 * G(ang, 0.225) ** 1.35 * dmp * g.get('socket_k', 1.0), 1.0)
             # 眶下缘（颧突上沿）
-            push_r(G(ang - 0.285, 0.07) * G(z - (LM['eye_z'] - 0.16), 0.09), 0.012)
-        push_y(g2(0.20, 0.085, 0.075, 0.075), -0.020)              # 内眦泪槽加深
+            push_r(G(ang - 0.285, 0.07) * G(z - (LM['eye_z'] - 0.16), 0.09), 0.013)
+        push_y(g2(0.20, 0.085, 0.075, 0.075), -0.022)              # 内眦泪槽加深
         # 眼袋（年长者）
         push_y(g2(0.42, -0.045, 0.12, 0.045), 0.012 * self.age + 0.02 * self.bloat)
 
         # ---------- 6 鼻 ----------
         nz, tz = LM['nasion_z'], LM['tip_z']
         t = np.clip((nz - z) / (nz - tz), 0, 1)
-        wz = smooth((z - (tz - 0.035)) / 0.05) * smooth((nz + 0.06 - z) / 0.06)
-        push_y(G(lon, 0.115 - 0.028 * t) * wz * (0.030 + 0.068 * t), k_nose)   # 鼻梁直脊
-        push_r(g2(0.20, 0.10, 0.09, 0.10), -0.018)                 # 梁侧凹（立体鼻梁）
-        push_y(g2(0, tz, 0.140, 0.070, False), 0.094 * k_nose)     # 鼻尖（宽高斯=球感不是锥刺）
-        P[:, 2] -= g2(0, tz - 0.005, 0.07, 0.05, False) * 0.016    # 尖微垂
-        push_y(g2(0, -0.108, 0.040, 0.032, False), 0.042 * k_nose)  # 鼻小柱（鼻底要回收）
-        push_y(g2(LM['alae_lon'], LM['alae_z'], 0.055, 0.042), 0.080 * k_nose)  # 鼻翼
-        push_y(g2(0.165, -0.098, 0.028, 0.048), -0.022)            # 鼻翼沟
-        push_y(g2(LM['nostril_lon'], LM['nostril_z'], 0.028, 0.020), -0.050)   # 鼻孔（几何凹）
+        wz = smooth((z - (tz - 0.035)) / 0.05) * smooth((nz + 0.03 - z) / 0.07)
+        push_y(G(lon, 0.100 - 0.022 * t) * wz * (0.024 + 0.062 * t), k_nose)   # 鼻梁直脊（窄脊，非整脸隆坡）
+        push_y(g2(0.19, 0.06, 0.075, 0.10), -0.024)                # 梁侧壁凹（鼻梁要从脸里「立起来」）
+        push_y(g2(0, tz, 0.100, 0.052, False), 0.084 * k_nose)     # 鼻尖球（紧凑，不是锥刺）
+        push_y(g2(0, tz + 0.048, 0.080, 0.028, False), -0.015)     # supratip 微断（尖与梁分界）
+        P[:, 2] -= g2(0, tz - 0.005, 0.06, 0.045, False) * 0.016   # 尖微垂
+        push_y(g2(0, -0.112, 0.045, 0.032, False), 0.038 * k_nose)  # 鼻小柱
+        push_y(g2(0, -0.178, 0.075, 0.028, False), -0.020)         # 鼻底回收（subnasale 台阶）
+        push_y(g2(LM['alae_lon'], LM['alae_z'], 0.070, 0.042), 0.078 * k_nose)  # 鼻翼球
+        push_y(g2(0.245, -0.092, 0.030, 0.050), -0.026)            # 鼻翼沟（翼与颊分界）
+        push_y(g2(LM['nostril_lon'], LM['nostril_z'], 0.036, 0.018), -0.052)   # 鼻孔（几何凹）
 
         # ---------- 7 人中/唇 ----------
-        push_y(g2(0, LM['philtrum_z'], 0.055, 0.070, False), 0.018)
-        push_y(g2(0, LM['philtrum_z'] + 0.005, 0.016, 0.055, False), -0.012)   # 人中沟
-        push_y(G(lon, 0.27) * G(z + 0.35, 0.11), 0.020)            # 口轮匝肌基座
-        cup = g2(0.055, LM['lip_up_z'], 0.095, 0.040) + 0.55 * G(lon, 0.05) * G(z - (LM['lip_up_z'] + 0.006), 0.042)
-        push_y(cup, 0.037 * k_lip)                                 # 上唇（丘比特弓双峰）
-        push_y(g2(0.06, LM['lip_dn_z'], 0.10, 0.048), 0.040 * k_lip)  # 下唇
+        push_y(g2(0, LM['philtrum_z'], 0.060, 0.062, False), 0.022)
+        push_y(g2(0, LM['philtrum_z'] + 0.005, 0.018, 0.050, False), -0.014)   # 人中沟
+        push_y(G(lon, 0.36) * G(z + 0.35, 0.105), 0.024)           # 口轮匝肌基座（唇丘）
+        cup = g2(0.065, LM['lip_up_z'], 0.105, 0.038) + 0.55 * G(lon, 0.055) * G(z - (LM['lip_up_z'] + 0.006), 0.040)
+        push_y(cup, 0.040 * k_lip)                                 # 上唇（丘比特弓双峰）
+        push_y(g2(0.07, LM['lip_dn_z'], 0.11, 0.046), 0.044 * k_lip)  # 下唇
+        push_y(g2(0, LM['lip_dn_z'] - 0.004, 0.020, 0.030, False), -0.008)     # 下唇中缝微凹
         mo = self.mouth_open
-        push_y(G(lon, 0.17) * G(z - LM['seam_z'], 0.016), -(0.038 + 0.03 * mo))  # 口裂缝
-        push_y(g2(LM['mouth_lon'], -0.350, 0.045, 0.035), -0.018)  # 嘴角回收
-        push_r(g2(LM['mouth_lon'], -0.350, 0.05, 0.04), -0.012)
+        push_y(G(lon, 0.22) * G(z - LM['seam_z'], 0.014), -(0.046 + 0.03 * mo))  # 口裂缝（锐）
+        push_y(g2(LM['mouth_lon'], -0.352, 0.045, 0.035), -0.020)  # 嘴角回收
+        push_r(g2(LM['mouth_lon'], -0.352, 0.05, 0.04), -0.006)
         if mo > 0:  # 溺亡者微张的下颌
             m = G(lon, 0.26) * G(z + 0.44, 0.11)
             P[:, 2] -= m * 0.055 * mo
             push_y(m * mo, -0.018)
 
         # ---------- 8 颧/颊 ----------
-        push_r(g2(LM['cheek_lon'], LM['cheek_z'], 0.30, 0.15), 0.042 * k_cheek)
-        push_r(g2(LM['hollow_lon'], LM['hollow_z'], 0.24, 0.15), -hollow)
+        push_r(g2(LM['cheek_lon'], LM['cheek_z'], 0.26, 0.13), 0.040 * k_cheek)   # 颧体
+        for i in range(4):                                          # 颧弓棱：颧体→耳屏的一道骨桥
+            tt = i / 3
+            push_r(g2(0.72 + 0.52 * tt, 0.030 - 0.035 * tt, 0.16, 0.075), 0.014 * k_cheek * (1 - tt * 0.35))
+        push_r(g2(1.10, 0.30, 0.24, 0.16), -0.016)                 # 颧弓上方颞窝
+        push_r(g2(LM['hollow_lon'], LM['hollow_z'], 0.24, 0.14), -hollow)
         for i in range(5):                                          # 法令沟（线状）
             tt = i / 4
-            push_y(g2(0.17 + 0.13 * tt, -0.11 - 0.21 * tt, 0.024, 0.030), -0.013 * g.get('naso_k', 1.0))
+            push_y(g2(0.20 + 0.14 * tt, -0.11 - 0.21 * tt, 0.024, 0.030), -0.010 * g.get('naso_k', 1.0))
 
         # ---------- 9 泡胀（湿客） ----------
         if self.bloat > 0:
@@ -238,7 +258,13 @@ class HeadField:
                 push_r(G(ang, 0.16), 0.030 * self.bloat)
 
         # ---------- 10 不对称 + 皮肤微形 ----------
-        P[:, 0] += self.asym * np.sin(z * 3.1 + self.asym_phase) * (0.4 + 0.6 * np.abs(y))
+        # 眼区豁免：不对称横移若扫过眶窝，眼球/睑壳（对称摆放）就会单边错位成「歪眼」
+        eye_guard = np.ones(len(D))
+        for sgn in (-1, 1):
+            E = np.array(self.eye_dirs[sgn])
+            ang_e = np.arccos(np.clip(D @ E, -1, 1))
+            eye_guard *= 1 - np.exp(-(ang_e / 0.30) ** 2)
+        P[:, 0] += self.asym * np.sin(z * 3.1 + self.asym_phase) * (0.4 + 0.6 * np.abs(y)) * eye_guard
         mid = fbm3(D * 5.0, self.seed + 11, octaves=2) - 0.5
         fine = vnoise3(D * 16.0, self.seed + 23) - 0.5
         micro = (0.005 + 0.004 * self.age) * mid + 0.0025 * fine
@@ -328,7 +354,7 @@ def eye_anchor(field, sgn):
     """眼球中心：眶面往里退，球从眼裂里探出来。"""
     d = field.eye_dirs[sgn]
     surf = field.pos(d)
-    return surf + Vector(d) * (-EYE_R * 0.52) + Vector((0, 0.0015, 0))
+    return surf + Vector(d) * (-EYE_R * 0.38) + Vector((0, 0.0015, 0))
 
 
 def gaze_dir(sgn):
@@ -365,8 +391,9 @@ def build_eyeball(field, sgn, mats):
 
 def build_lids(field, sgn, mats):
     """参数化睑壳：上/下睑各是一张贴着眼球球面的曲面片，
-    眼裂边缘落在光滑杏仁曲线上（无锯齿），睑缘第一排内收出厚度，
-    上睑带睑板褶。两片在内外眦相接。"""
+    眼裂边缘落在光滑杏仁曲线上（无锯齿），睑缘第一排内收出厚度并用深色睑线材质
+    （远看=睫毛线），上睑带睑板褶；外侧行逐渐吸附回头面——壳与眶窝无缝合一，
+    杜绝「贴脸护目镜」。两片在内外眦相接，内眦处加泪阜。"""
     g = field.g
     lidc = g.get('lid', 0.42)            # 0=大睁 1=闭
     tilt = g.get('canthal_tilt', 0.10)   # 外眦上挑
@@ -379,14 +406,15 @@ def build_lids(field, sgn, mats):
     phi_max = 0.93                        # 眼裂横向半开角（两眦收进皮里，不露黑缝）
     open_up = (1 - lidc) * 0.42 + 0.10    # 上睑提起角
     open_dn = (1 - lidc) * 0.15 + 0.055   # 下睑下垂角
-    n_u, n_v = 26, 7
+    n_u, n_v = 26, 8
 
     def on_sphere(phi, psi, r):
         d = (fwd + sidev * math.tan(phi) + up2 * math.tan(psi)).normalized()
         return d * r
 
     bm = bmesh.new()
-    for which, opn, ext in ((1, open_up, 0.50), (-1, open_dn, 0.36)):
+    lid_faces = []
+    for which, opn, ext in ((1, open_up, 0.62), (-1, open_dn, 0.46)):
         grid = []
         for i in range(n_u + 1):
             t = i / n_u
@@ -404,10 +432,20 @@ def build_lids(field, sgn, mats):
                     r = EYE_R * 1.035
                 else:
                     r = EYE_R * (1.035 + 0.10 * ((j - 1) / (n_v - 1)) ** 1.3)
-                # 上睑板褶：中段外鼓
+                # 上睑板褶：中段外鼓 + 睑板上缘折痕（双眼皮沟）
                 if which > 0 and 2 <= j <= n_v - 1:
                     r += EYE_R * 0.05 * math.sin((j - 1.2) / (n_v - 1) * math.pi) * shape
-                row.append(on_sphere(phi, psi, r))
+                    if j == n_v - 2:
+                        r -= EYE_R * 0.035 * shape   # 睑褶沟
+                p = on_sphere(phi, psi, r)
+                # 外侧行吸附回头面：j 从 n_v-2 起与眶面混合（壳长进皮里）
+                if j >= n_v - 2:
+                    wq = (j - (n_v - 2)) / 2.0
+                    dw = Vector(c + p)
+                    if dw.length > 1e-6:
+                        surf = field.pos(dw.normalized()) + field.normal(dw.normalized()) * 0.0006
+                        p = p.lerp(surf - c, 0.45 + 0.55 * wq)
+                row.append(p)
             grid.append(row)
         vrows = [[bm.verts.new(p) for p in row] for row in grid]
         for i in range(n_u):
@@ -415,21 +453,36 @@ def build_lids(field, sgn, mats):
                 a, b = vrows[i][j], vrows[i][j + 1]
                 c2, d2 = vrows[i + 1][j + 1], vrows[i + 1][j]
                 try:
-                    bm.faces.new((a, b, c2, d2) if which > 0 else (d2, c2, b, a))
+                    f = bm.faces.new((a, b, c2, d2) if which > 0 else (d2, c2, b, a))
+                    lid_faces.append((f, j))
                 except ValueError:
                     pass
     uvl = bm.loops.layers.uv.verify()
     uu, vv = uv_of(LM['eye_lon'] * sgn, LM['eye_z'])
-    for fce in bm.faces:
-        fce.material_index = 0
+    for fce, j in lid_faces:
+        fce.material_index = 1 if j == 0 else 0   # 睑缘第一环 = 睑线（睫毛读法）
         for lp in fce.loops:
             d = lp.vert.co.normalized()
             lp[uvl].uv = (uu + d.dot(sidev) * 0.012 * sgn, vv + d.dot(up2) * 0.012)
+    # 泪阜：内眦里的一粒淡红小丘
+    inner = on_sphere(-phi_max - 0.045, -0.01, EYE_R * 1.005)
+    ret = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=EYE_R * 0.14)
+    for v in ret['verts']:
+        v.co = Vector((v.co.x, v.co.y * 0.7, v.co.z * 0.8)) + inner
+        for lp2 in v.link_loops:
+            lp2[uvl].uv = (uu, vv)
+    for f in bm.faces:
+        if f.material_index not in (0, 1):
+            f.material_index = 2
+    # icosphere 面默认 material_index=0，改成泪阜材质
+    for v in ret['verts']:
+        for f in v.link_faces:
+            f.material_index = 2
     me = bpy.data.meshes.new('Lid')
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me)
     bm.free()
-    obj = _new_obj('Lid' + ('L' if sgn < 0 else 'R'), me, [mats['skin']])
+    obj = _new_obj('Lid' + ('L' if sgn < 0 else 'R'), me, [mats['skin'], mats['lidline'], mats['caruncle']])
     obj.location = c
     return obj
 
@@ -440,7 +493,7 @@ def build_brow(field, sgn, mats):
     """沿眉弓的碎毛簇（不是一根漂浮胶条）。"""
     rng = np.random.default_rng(field.seed + 41 + sgn)
     bm = bmesh.new()
-    n = 16
+    n = 22
     for i in range(n + 1):
         t = i / n
         lon = sgn * (0.14 + t * 0.55)
@@ -454,10 +507,10 @@ def build_brow(field, sgn, mats):
         flow = (flow - nrm * flow.dot(nrm)).normalized()
         side = flow.cross(nrm).normalized()
         L = 0.0060 * (0.7 + 0.6 * math.sin(t * math.pi) ** 0.7)
-        w = 0.0008 + 0.0006 * math.sin(t * math.pi)
-        for k in range(3):  # 每站 3 根小簇
+        w = 0.0007 + 0.0005 * math.sin(t * math.pi)
+        for k in range(4):  # 每站 4 根小簇（叠瓦覆盖，不露皮）
             j = (rng.random() - 0.5)
-            q0 = p + side * (j * 0.004) + nrm * 0.0002
+            q0 = p + side * (j * 0.005) + nrm * 0.0002
             fl = (flow + side * (rng.random() - 0.5) * 0.5 + nrm * 0.15).normalized()
             q1 = q0 + fl * L * 0.6 + nrm * 0.0008
             q2 = q1 + fl * L * 0.4 - nrm * 0.0002
@@ -488,14 +541,39 @@ def _hairline_z(lon, style):
     return 0.42 * max(0.0, front) ** 1.5 + 0.10 - 0.50 * max(0.0, -front)
 
 
+def _shell_lift_arr(field, D, style):
+    """发壳厚度场（壳/卡同源）：底厚 + 绺团噪声起伏 + 顺梳向的条状沟壑。
+    D: (N,3) 单位方向。返回 (N,) 米制 lift（发际线以下平滑降为负=沉入头内）。"""
+    sd = field.seed
+    lift = 0.0026 if style == 'slick' else 0.0038
+    clump = vnoise3(D * 9.0, sd + 77)
+    # 顺梳向条状沟壑：对短发≈经度向条纹（发丝束的走向感），中频+高频两层
+    strand = vnoise3(np.stack([D[:, 0] * 26.0, D[:, 1] * 26.0, D[:, 2] * 5.0], axis=1), sd + 78)
+    fine = vnoise3(np.stack([D[:, 0] * 60.0, D[:, 1] * 60.0, D[:, 2] * 9.0], axis=1), sd + 79)
+    lon = np.arctan2(D[:, 0], -D[:, 1])
+    hl = np.array([_hairline_z(l, style) for l in lon])
+    hl = hl + 0.009 * np.sin(lon * 7 + sd) + 0.005 * np.sin(lon * 13 + sd * 2)
+    t = np.clip((D[:, 2] - hl + 0.02) / 0.09, 0, 1)
+    t = t * t * (3 - 2 * t)
+    amp = 1.0 if style != 'slick' else 0.45
+    lf = (lift * (0.50 + 1.05 * clump) + 0.0016 * (strand - 0.5) * 2 * amp +
+          0.0008 * (fine - 0.5) * 2 * amp + 0.002)
+    return -0.002 + lf * t
+
+
+def _shell_lift_one(field, d, style):
+    return float(_shell_lift_arr(field, np.array([list(d)]), style)[0])
+
+
 def build_scalp(field, spec, mats):
-    """打底头皮壳：发际线噪声化、厚度不均——防露头皮，但剪影交给发卡。"""
+    """打底头皮壳：发际线噪声化、绺团+发束条纹起伏——壳本身的剪影就得是毛的，
+    发卡在壳上再加碎口。"""
     style = spec.get('hair', 'short')
     if style == 'none':
         return None
     sd = field.seed
     bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=56, v_segments=42, radius=1.0)
+    bmesh.ops.create_uvsphere(bm, u_segments=88, v_segments=64, radius=1.0)
 
     def hl_at(lon):  # 平滑起伏的发际线（不出锯齿；起伏过深会在缺口处剩下孤立发卡「陶片」）
         return _hairline_z(lon, style) + 0.009 * math.sin(lon * 7 + sd) + 0.005 * math.sin(lon * 13 + sd * 2)
@@ -515,16 +593,9 @@ def build_scalp(field, spec, mats):
         return None
     D /= np.linalg.norm(D, axis=1, keepdims=True)
     base = field.unit_pos(D) * np.array([field.rx, field.ry, field.rz])
-    lift = 0.0026 if style == 'slick' else 0.0032
-    clump = vnoise3(D * 9.0, field.seed + 77)
-    for i, (v, p, d) in enumerate(zip(bm.verts, base, D)):
-        lon = math.atan2(d[0], -d[1])
-        t = (d[2] - hl_at(lon) + 0.02) / 0.09
-        t = min(1.0, max(0.0, t))
-        t = t * t * (3 - 2 * t)
-        # t=0 → 壳沉入头内 2mm（被头面吃掉）；t=1 → 全厚度。交线自然平滑。
-        lf = -0.002 + (lift * (0.55 + 0.9 * clump[i]) + 0.002) * t
-        v.co = Vector(p) + Vector(d) * lf
+    lifts = _shell_lift_arr(field, D, style)
+    for v, p, d, lf in zip(bm.verts, base, D, lifts):
+        v.co = Vector(p) + Vector(d) * float(lf)
     uvl = bm.loops.layers.uv.verify()
     for f in bm.faces:
         f.material_index = 0
@@ -537,9 +608,9 @@ def build_scalp(field, spec, mats):
     return _new_obj('Scalp', me, [mats.get('hair_dk', mats['hair'])])
 
 
-def build_hair_cards(field, spec, mats, count=430):
-    """碎发卡群：短发贴头皮沿梳向走表面（发尾微翘离头 1-3mm），
-    湿客改为重力垂落贴脸的湿绺。剪影靠发际线/鬓角/颈后碎发打散。"""
+def build_hair_cards(field, spec, mats, count=560):
+    """碎发卡群（≥300/头）：卡骑在发壳表面（根部厚度=壳厚场同源），沿梳向走全头，
+    梢部收尖微翘；发际线/鬓角/颈后另加细碎越线短茬。湿客改为重力垂落贴脸的湿绺。"""
     style = spec.get('hair', 'short')
     if style == 'none':
         return build_nape_wisps(field, spec, mats)
@@ -560,11 +631,10 @@ def build_hair_cards(field, spec, mats, count=430):
         sideburn_root = (abs(abs(lon) - TAU / 4) < 0.20 and -0.10 < d.z < hl)
         if not (d.z > hl - 0.03 or sideburn_root):
             continue
-        if not edge_zone and rng.random() < 0.4:
-            continue
         made += 1
         nrm = field.normal(d)
-        p = field.pos(d) + nrm * 0.0013   # 根部贴壳（2.4mm 浮离在发际线剪影上读成碎纸片）
+        base_lift = max(0.0004, _shell_lift_one(field, d, style))
+        p = field.pos(d) + nrm * (base_lift + 0.0004)   # 根部贴壳面（壳厚同源，不悬浮不沉没）
         front = math.cos(lon)
         # 梳向（切向场）：前额向后上、顶部向后、侧面向后下、后脑向下
         if style == 'slick':
@@ -573,7 +643,7 @@ def build_hair_cards(field, spec, mats, count=430):
             comb = Vector((d.x * 0.45, 0.55 * front + 0.35, -0.15 - 0.45 * max(0.0, -front) - 0.3 * max(0.0, 0.3 - d.z)))
         comb = (comb - nrm * comb.dot(nrm)).normalized()
         comb = (comb + Vector((rng.random() - 0.5, rng.random() - 0.5, rng.random() - 0.5)) * 0.35).normalized()
-        L = (0.010 + rng.random() * 0.013) * (0.92 if edge_zone else 1.0)
+        L = (0.012 + rng.random() * 0.014) * (0.92 if edge_zone else 1.0)
         if sideburn_root:
             if rng.random() < 0.5:
                 made -= 1
@@ -582,11 +652,11 @@ def build_hair_cards(field, spec, mats, count=430):
         if wet and math.cos(lon) > 0.45 and rng.random() < 0.45:
             made -= 1
             continue  # 湿客：前帘稀疏（别糊死眉眼）
-        segs = 4
+        segs = 5
         if wet:
             L = (0.030 + rng.random() * 0.028) * (0.55 if math.cos(lon) > 0.45 else 1.0)
             comb = (comb * 0.4 + Vector((0, 0, -1)) + Vector((d.x, d.y, 0)).normalized() * 0.35).normalized()
-        w0 = (0.0014 if not wet else 0.0040) + rng.random() * 0.0009
+        w0 = (0.0013 if not wet else 0.0040) + rng.random() * 0.0008
         pts = [Vector(p)]
         dirv = comb.copy()
         for sgi in range(segs):
@@ -601,9 +671,10 @@ def build_hair_cards(field, spec, mats, count=430):
                     q = q * (rmin / max(q.length, 1e-6))
                 dirv = (dirv + Vector((0, 0, -1.2)) * (sgi + 1) / segs).normalized()
             else:
-                # 干短发：全程贴面投影（表面 + 渐增浮离），杜绝飘出脸颊的散卡
+                # 干短发：骑壳投影（壳面 + 梢部渐翘），杜绝飘出脸颊的散卡
                 t = (sgi + 1) / segs
-                lift = 0.0007 + 0.0009 * (t ** 2) + rng.random() * 0.0003
+                sl = max(0.0004, _shell_lift_one(field, dq, style))
+                lift = sl + 0.0004 + 0.0009 * (t ** 2) + rng.random() * 0.0002
                 q = surf + nq * lift
                 lon_q = math.atan2(dq.x, -dq.y)
                 if dq.z < -0.24 or (dq.z < _hairline_z(lon_q, style) - 0.06 and abs(abs(lon_q) - TAU / 4) > 0.28):
@@ -617,7 +688,7 @@ def build_hair_cards(field, spec, mats, count=430):
         side = dirv.cross(nrm).normalized()
         rows = []
         for i2, q in enumerate(pts):
-            wk = w0 * (1 - 0.7 * i2 / segs)
+            wk = w0 * (1 - 0.85 * (i2 / segs) ** 1.3)   # 梢部收尖
             rows.append((bm.verts.new(q - side * wk), bm.verts.new(q + side * wk)))
         mi = int(rng.choice([0, 0, 0, 1, 1, 2]))   # 发色抖动：基/深/浅
         if edge_zone and front > 0.15:
@@ -628,6 +699,47 @@ def build_hair_cards(field, spec, mats, count=430):
             try:
                 f2 = bm.faces.new((a, b, b2, a2))
                 f2.material_index = mi
+            except ValueError:
+                pass
+    # —— 发际线越线细茬：前额/鬓角/颈后（打掉「头盔分界线」的关键） ——
+    if not wet:
+        for i in range(130):
+            which = rng.random()
+            L_cap = 1.0
+            if which < 0.45:      # 前发际
+                lon = (rng.random() - 0.5) * 1.6
+                zz = _hairline_z(lon, style) + (rng.random() - 0.62) * 0.07
+            elif which < 0.75:    # 鬓角（短茬贴皮，长了在颊侧剪影上读成天线）
+                lon = (1 if rng.random() < 0.5 else -1) * (TAU / 4 + (rng.random() - 0.5) * 0.30)
+                zz = -0.14 + rng.random() * 0.26
+                L_cap = 0.0045
+            else:                 # 颈后
+                lon = math.pi + (rng.random() - 0.5) * 1.6
+                zz = -0.52 + rng.random() * 0.22
+            cl = math.sqrt(max(0.0, 1 - zz * zz))
+            d = Vector((math.sin(lon) * cl, -math.cos(lon) * cl, zz))
+            nrm = field.normal(d)
+            p = field.pos(d) + nrm * 0.0006
+            downv = Vector((d.x * 0.3, d.y * 0.3, -1.0)).normalized()
+            if which < 0.45:
+                downv = Vector((d.x * 0.3, -0.25, -0.75)).normalized()   # 前茬向下贴额
+            downv = (downv - nrm * downv.dot(nrm)).normalized()
+            downv = (downv + Vector((rng.random() - 0.5, rng.random() - 0.5, rng.random() - 0.5)) * 0.4).normalized()
+            L = min(0.004 + rng.random() * 0.006, L_cap)
+            side = downv.cross(nrm).normalized()
+            w = 0.0004 + rng.random() * 0.0004
+            q1 = p + downv * L * 0.6 + nrm * 0.0003
+            q2 = q1 + downv * L * 0.4 - nrm * 0.0001
+            a = bm.verts.new(p - side * w)
+            b = bm.verts.new(p + side * w)
+            c2 = bm.verts.new(q1 + side * w * 0.5)
+            d2 = bm.verts.new(q1 - side * w * 0.5)
+            e2 = bm.verts.new(q2)
+            try:
+                f2 = bm.faces.new((a, b, c2, d2))
+                f2.material_index = 1
+                f3 = bm.faces.new((d2, c2, e2))
+                f3.material_index = 1
             except ValueError:
                 pass
     uvl = bm.loops.layers.uv.verify()
@@ -683,38 +795,51 @@ def build_nape_wisps(field, spec, mats):
 # ------------------------- 耳廓 -------------------------
 
 def build_ear(field, sgn, mats):
-    """参数化耳：helix 轮匝 / scapha / 对耳轮 / 耳甲腔 / 耳垂 / 耳屏。
-    径向环带网格：ring0=外缘（卷起）→ ring4=耳甲腔底（贴头）。"""
-    n_sec = 22
-    rings_t = [0.0, 0.30, 0.52, 0.74, 1.0]
-    # 高度剖面（外→内）：rim 高、scapha 低、antihelix 略高、concha 深（对比放缓防「肉桂卷」）
-    ring_h = [0.0048, 0.0024, 0.0032, -0.0016, -0.0036]
-    a, b = 0.0185, 0.0114   # 半高/半宽
+    """参数化耳（真人尺寸 ~5.8×3.6cm）：helix 轮匝卷缘 / scapha 舟状沟 /
+    antihelix 对耳轮脊 / concha 耳甲深腔 / 耳垂 / 耳屏。
+    七级径向环带：外缘背折→rim 峰→scapha 谷→antihelix 脊→内坡→腔壁→腔底。"""
+    n_sec = 26
+    #            t 半径衰减 , 高度
+    rings = [(0.00, -0.0012),   # 外缘背折（rim 有厚度，不是纸片）
+             (0.10, 0.0078),    # helix 峰
+             (0.28, 0.0022),    # scapha 谷
+             (0.46, 0.0062),    # antihelix 脊
+             (0.62, 0.0026),    # 内坡
+             (0.82, -0.0026),   # 腔壁
+             (1.00, -0.0078)]   # concha 底（贴头）
+    a, b = 0.0290, 0.0180   # 半高/半宽（真人：耳高 ~6cm）
     d0 = Vector((math.sin(LM['ear_lon']) * sgn, -math.cos(LM['ear_lon']), LM['ear_z'])).normalized()
     base = field.pos(d0)
-    nrm = Vector((sgn, 0.30, 0.05)).normalized()    # 耳平面外法向（贴颅、微外张）
-    upv = Vector((0, -0.30, 1)).normalized()        # 耳轴略后仰
-    fwdv = upv.cross(nrm).normalized()              # 头部前向切向
-    base = base - nrm * 0.0028                      # 根部埋进头侧
+    nrm = Vector((sgn, 0.26, 0.06)).normalized()    # 耳平面外法向（贴颅、微外张）
+    upv = Vector((0, -0.36, 1)).normalized()        # 耳轴后仰 ~20°
+    fwdv = upv.cross(nrm).normalized() * (1 if sgn > 0 else 1)   # 头部前向切向
+    base = base - nrm * 0.0030                      # 根部埋进头侧
     bm = bmesh.new()
     grid = []
-    for ri, (t, h) in enumerate(zip(rings_t, ring_h)):
+    for ri, (t, h) in enumerate(rings):
         ring = []
         for k in range(n_sec):
             th = k / n_sec * TAU
-            # 外缘椭圆，下端收窄成耳垂
-            ca, sa = math.cos(th), math.sin(th)
-            rr = 1.0 - 0.18 * max(0.0, -sa) * (abs(ca) ** 0.5)
-            ea = a * rr * (1 - t * 0.88)
-            eb = b * rr * (1 - t * 0.85)
+            ca, sa = math.cos(th), math.sin(th)   # ca>0 = 朝脸前方；sa>0 = 朝上
+            # 外缘轮廓：上宽下窄的 D 形，耳垂圆
+            rr = 1.0 - 0.22 * max(0.0, -sa) * (abs(ca) ** 0.6) + 0.06 * max(0.0, sa) * abs(ca)
+            ea = a * rr * (1 - t * 0.90)
+            eb = b * rr * (1 - t * 0.86)
             zloc = sa * ea
             xloc = ca * eb
             hh = h
-            if sa < -0.55 and ri <= 1:   # 耳垂厚而平
-                hh = 0.0030
-            if 0.2 < ca < 0.9 and -0.3 < sa < 0.35 and ri == 3:  # 耳屏侧微凸
-                hh = 0.001
-            p = base + fwdv * (-xloc) + upv * zloc + nrm * (hh + 0.0018)
+            lobe = sa < -0.60
+            if lobe and ri <= 3:      # 耳垂：厚软无沟
+                hh = 0.0038 - 0.0008 * ri
+            front_sec = ca > 0.55 and -0.35 < sa < 0.4
+            if front_sec and ri == 3:
+                hh = 0.0008            # antihelix 不越过腔前口
+            if front_sec and ri in (4, 5):
+                hh = h - 0.0012        # 腔前口向耳屏开敞
+            # 上前段 helix 根扎进颊侧（crus of helix）
+            if ri <= 1 and ca > 0.7 and sa > 0.1:
+                hh -= 0.0030
+            p = base + fwdv * (-xloc) + upv * zloc + nrm * (hh + 0.0022)
             ring.append(bm.verts.new(p))
         grid.append(ring)
     for ri in range(len(grid) - 1):
@@ -723,11 +848,17 @@ def build_ear(field, sgn, mats):
             bm.faces.new((grid[ri][k], grid[ri][k2], grid[ri + 1][k2], grid[ri + 1][k]))
     # 封耳甲腔底
     bm.faces.new(tuple(reversed(grid[-1])))
+    # 耳屏：腔前口上的小瓣（挡住耳道）
+    trag = base + fwdv * (-b * 0.86) + upv * (-a * 0.10) + nrm * 0.0012
+    ret = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=0.0052)
+    for v in ret['verts']:
+        v.co = Vector((v.co.x, v.co.y, v.co.z)) * 1.0
+        v.co = trag + fwdv * v.co.x * 0.55 + upv * v.co.z * 0.9 + nrm * v.co.y * 0.55
     # 背面壳（耳背，嵌进头侧）
     back = []
     for k in range(n_sec):
         v = grid[0][k]
-        back.append(bm.verts.new(v.co - nrm * 0.0085))
+        back.append(bm.verts.new(v.co - nrm * 0.0095 + (base - v.co) * 0.10))
     for k in range(n_sec):
         k2 = (k + 1) % n_sec
         bm.faces.new((back[k2], back[k], grid[0][k], grid[0][k2]))

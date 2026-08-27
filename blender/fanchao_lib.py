@@ -328,6 +328,15 @@ def build_clothed_torso(spec, m, mats, seed):
     bm = bmesh.new()
     rings = tube(bm, path, widths, depths, ring_n=ring_n, cap_start=True, cap_end=True,
                  mat_index=0, bulge=bulge, y_off=yoffs)
+    # 肩坡场：把躯干上部的外侧角向下压——斜方肌从颈根斜下到肩峰（板箱→人肩的关键）
+    slope = 0.062 if outfit in ('zhongshan', 'waiter') else 0.050   # 棉袄垫厚坡缓
+    x_in = 0.055
+    for v in bm.verts:
+        zz = v.co.z
+        if zz > m['waist']:
+            tz = smoothstep((zz - m['waist']) / (m['shoulder'] + 0.012 - m['waist']))
+            tx = smoothstep(max(0.0, abs(v.co.x) - x_in) / max(1e-5, m['sw'] + pad - x_in))
+            v.co.z -= slope * (tx ** 1.6) * (tz ** 2.2)
     # 下摆卷边：底环向外下再折入（布有厚度）
     r0 = rings[0]
     out_ring, in_ring = [], []
@@ -457,12 +466,13 @@ def build_arm(side, spec, m, mats, pose, seed=1):
     """袖管：袖山三角肌鼓 + 肘内侧挤褶 + 翻边袖口（开口见内里）+ 腕内衬皮肤管。
     返回（[obj...], 腕位置Vector, 手朝向dict）。"""
     yo_sh = stoop_off(spec, m, m['shoulder'])
-    sh = Vector((side * m['sw'], yo_sh, m['shoulder'] - 0.012))
+    # 袖根内收下沉：肩峰在斜方肌坡的下端，袖山必须塞进坡底而不是并排搭板
+    sh = Vector((side * m['sw'] * 0.90, yo_sh, m['shoulder'] - 0.034))
     outfit = spec.get('outfit', 'zhongshan')
     pad = 0.011 if outfit in ('zhongshan', 'waiter') else 0.022
     bloat = spec.get('bloat', 0.0)
-    upper_r = 0.040 * m['H'] / 1.72 * (1 + bloat * 0.2)
-    fore_r = 0.031 * m['H'] / 1.72 * (1 + bloat * 0.25)
+    upper_r = 0.038 * m['H'] / 1.72 * (1 + bloat * 0.2)
+    fore_r = 0.030 * m['H'] / 1.72 * (1 + bloat * 0.25)
     wrist_r = 0.024 * m['H'] / 1.72 * (1 + bloat * 0.3)
     if pose == 'tray':
         el = sh + Vector((side * 0.015, -0.035, -(m['shoulder'] - m['waist']) * 0.62))
@@ -483,13 +493,13 @@ def build_arm(side, spec, m, mats, pose, seed=1):
     # 9 节点路径（肩帽→袖口）。袖山顶环必须是「正上方的水平小环」：
     # 任何侧向偏移都会让首环平面立起来，整个环半径变成竖直方向的出头量——
     # r10–r12 的「肩角」全部源于此。水平环的顶=cap.z，确定压在肩坡线以下。
-    cap = sh + Vector((0.0, 0.0, 0.004 - pad * 0.1))
-    mid_u1 = sh.lerp(el, 0.33) + Vector((side * 0.007, -0.004, 0))
-    mid_u2 = sh.lerp(el, 0.66) + Vector((side * 0.004, -0.002, 0))
+    cap = sh + Vector((0.0, 0.0, 0.010))
+    mid_u1 = sh.lerp(el, 0.33) + Vector((side * 0.009, -0.004, 0))
+    mid_u2 = sh.lerp(el, 0.66) + Vector((side * 0.005, -0.002, 0))
     mid_f1 = el.lerp(wr, 0.35)
     mid_f2 = el.lerp(wr, 0.72)
     path = [cap, sh, mid_u1, mid_u2, el, mid_f1, mid_f2, wr]
-    rads = [upper_r * 0.40 + pad * 0.4, upper_r * 1.02 + pad, upper_r + pad, upper_r * 0.93 + pad,
+    rads = [upper_r * 0.30 + pad * 0.3, upper_r * 1.00 + pad, upper_r + pad, upper_r * 0.93 + pad,
             fore_r + pad + 0.005, fore_r * 0.97 + pad, fore_r * 0.88 + pad, wrist_r + pad + 0.003]
     axis = (wr - sh).normalized()
     eln = 4  # 肘节点下标
@@ -555,12 +565,13 @@ def _meta_to_mesh(obj, name, mat, decimate=0.55):
 
 
 def build_hand(side, wrist, hand_frame, spec, mats, curl=0.55, spread=0.0):
-    """metaball 连续皮肤手：掌腹/鱼际/四指三节（关节鼓）/拇指——无木节缝。"""
+    """metaball 连续皮肤手：掌腹/鱼际/四指三节（关节鼓）/拇指——无木节缝。
+    指梢背面贴指甲盖。返回 [手, 指甲] obj 列表。"""
     d = Vector(hand_frame['dir']).normalized()
     palm_n = Vector(hand_frame['palm']).normalized()
     sidev = d.cross(palm_n).normalized()
     bloat = spec.get('bloat', 0.0)
-    S = (1 + bloat * 0.28) * spec.get('H', 1.72) / 1.72
+    S = (1 + bloat * 0.28) * spec.get('H', 1.72) / 1.72 * 1.10   # 真人手长 ~0.105H；r13 小一号=火柴棍
     key = 'HandMeta' + ('L' if side < 0 else 'R')
     mb = bpy.data.metaballs.new(key)
     mb.resolution = 0.0028
@@ -587,7 +598,7 @@ def build_hand(side, wrist, hand_frame, spec, mats, curl=0.55, spread=0.0):
     for ir in range(n_rows):
         t = ir / (n_rows - 1)
         tpalm = 0.004 + t * 0.080
-        wpalm = (0.008 + t * 0.0065) * S
+        wpalm = (0.0092 + t * 0.0075) * S
         rpalm = (0.0135 - t * 0.0025) * S
         nk = max(2, int(math.ceil(2 * wpalm / (rpalm * 0.5))))
         for ik in range(nk + 1):
@@ -595,13 +606,14 @@ def build_hand(side, wrist, hand_frame, spec, mats, curl=0.55, spread=0.0):
             ball(wrist + d * tpalm * S + sidev * kx * wpalm - palm_n * 0.001, rpalm)
     # 鱼际（拇指根肉）
     ball(wrist + d * 0.030 * S - sidev * 0.022 * S - palm_n * 0.005, 0.0125 * S)
-    # 四指：三节密链 + 关节微鼓
+    # 四指：三节密链 + 关节微鼓；记录指梢帧给指甲
     fl = [0.86, 1.0, 0.95, 0.74]
+    nail_frames = []
     for i in range(4):
-        off = sidev * ((i - 1.5) * 0.0180 * S)
+        off = sidev * ((i - 1.5) * 0.0190 * S)
         base = wrist + d * 0.086 * S + off
         chain(wrist + d * 0.076 * S + off * 0.9, base, 0.0088 * S, 0.0080 * S)  # 掌指过渡
-        L = 0.061 * fl[i] * S
+        L = 0.066 * fl[i] * S
         dir1 = (d + sidev * (spread * (i - 1.5) * 0.16) - palm_n * curl * 0.30).normalized()
         dir2 = (dir1 - palm_n * curl * 0.85).normalized()
         dir3 = (dir2 - palm_n * curl * 1.05).normalized()
@@ -611,13 +623,39 @@ def build_hand(side, wrist, hand_frame, spec, mats, curl=0.55, spread=0.0):
             chain(p, q, rr * S, rr * S)
             ball(q, rr * S * 1.14)   # 关节微鼓
             p = q
+        nail_frames.append((Vector(q), dir3, 0.0058 * S))
     # 拇指：两节
     tb = wrist + d * 0.028 * S - sidev * 0.030 * S - palm_n * 0.004
     t1 = tb - sidev * 0.020 * S + d * 0.024 * S - palm_n * 0.010
     t2 = t1 - sidev * 0.008 * S + d * 0.030 * S - palm_n * 0.014 * curl
     chain(tb, t1, 0.0100 * S, 0.0085 * S)
     chain(t1, t2, 0.0082 * S, 0.0064 * S)
-    return _meta_to_mesh(obj, 'Hand' + ('L' if side < 0 else 'R'), mats['skin_flat'], decimate=0.62)
+    nail_frames.append((Vector(t2), (t2 - t1).normalized(), 0.0064 * S))
+    hand = _meta_to_mesh(obj, 'Hand' + ('L' if side < 0 else 'R'), mats['skin_flat'], decimate=0.62)
+    # —— 指甲盖：指梢背面的一片微曲甲板（横向微拱、指向指尖） ——
+    bm = bmesh.new()
+    for tip, tdir, rr in nail_frames:
+        back_n = (-palm_n - tdir * (-palm_n).dot(tdir)).normalized()   # 甲面朝手背
+        sside = tdir.cross(back_n).normalized()
+        c0 = tip - tdir * rr * 0.55 + back_n * rr * 0.72
+        nw, nl = rr * 0.72, rr * 1.15
+        rows = []
+        for iu in range(4):
+            tu = iu / 3
+            rowv = []
+            for iv in range(4):
+                tv = iv / 3 - 0.5
+                arch = (1 - (tv * 2) ** 2) * rr * 0.16
+                pt = (c0 + tdir * (tu * nl) + sside * (tv * 2 * nw) +
+                      back_n * (arch - tu * tu * rr * 0.34))
+                rowv.append(bm.verts.new(pt))
+            rows.append(rowv)
+        for iu in range(3):
+            for iv in range(3):
+                bm.faces.new((rows[iu][iv], rows[iu][iv + 1], rows[iu + 1][iv + 1], rows[iu + 1][iv]))
+    nails = finish_mesh('Nails' + ('L' if side < 0 else 'R'), bm, [mats['nail']], subsurf=1)
+    nails.data.materials[0].use_backface_culling = False
+    return [hand, nails]
 
 
 def build_legs(spec, m, mats):
@@ -627,7 +665,7 @@ def build_legs(spec, m, mats):
     bloat = spec.get('bloat', 0.0)
     objs = []
     for side in (-1, 1):
-        hx = side * m['hipw'] * 0.52
+        hx = side * m['hipw'] * 0.60
         thigh_r = 0.058 * m['H'] / 1.72 * (1 + bloat * 0.15)
         knee_r = 0.040 * m['H'] / 1.72 * (1 + bloat * 0.18)
         calf_r = 0.044 * m['H'] / 1.72 * (1 + bloat * 0.2)
@@ -674,7 +712,7 @@ def build_feet(spec, m, mats):
     S = (1 + (bloat * 0.3 if bare else 0)) * m['H'] / 1.72
     objs = []
     for side in (-1, 1):
-        hx = side * m['hipw'] * 0.52
+        hx = side * m['hipw'] * 0.60
         if bare:
             key = 'FootMeta' + ('L' if side < 0 else 'R')
             mb = bpy.data.metaballs.new(key)
@@ -710,22 +748,22 @@ def build_feet(spec, m, mats):
             objs.append(_meta_to_mesh(obj, 'Foot' + ('L' if side < 0 else 'R'),
                                       mats['skin_flat'], decimate=0.6))
             continue
-        zb = 0.052 * S
-        path = [Vector((hx, 0.034 * S, zb * 1.10)),
-                Vector((hx, 0.018, zb * 1.00)),
-                Vector((hx, -0.03 * S, zb * 0.84)),
-                Vector((hx, -0.075 * S, zb * 0.66)),
-                Vector((hx, -0.118 * S, zb * 0.52)),
-                Vector((hx, -0.148 * S, zb * 0.42))]
-        w = [0.030 * S, 0.037 * S, 0.041 * S, 0.041 * S, 0.036 * S, 0.022 * S]
-        dep = [0.033 * S, 0.035 * S, 0.032 * S, 0.027 * S, 0.021 * S, 0.012 * S]
+        zb = 0.054 * S
+        path = [Vector((hx, 0.042 * S, zb * 1.10)),
+                Vector((hx, 0.022, zb * 1.00)),
+                Vector((hx, -0.038 * S, zb * 0.84)),
+                Vector((hx, -0.094 * S, zb * 0.66)),
+                Vector((hx, -0.148 * S, zb * 0.52)),
+                Vector((hx, -0.185 * S, zb * 0.42))]
+        w = [0.032 * S, 0.039 * S, 0.043 * S, 0.043 * S, 0.038 * S, 0.023 * S]
+        dep = [0.035 * S, 0.037 * S, 0.034 * S, 0.028 * S, 0.022 * S, 0.012 * S]
         bm = bmesh.new()
         tube(bm, path, w, dep, ring_n=14, ref=Vector((0, 0, 1)), cap_start=True, cap_end=True)
-        # 鞋底沿条：沿足底一圈的扁放样
-        sole_path = [Vector((hx, 0.040 * S, 0.010)), Vector((hx, -0.02 * S, 0.009)),
-                     Vector((hx, -0.09 * S, 0.008)), Vector((hx, -0.155 * S, 0.008))]
-        sw = [0.036 * S, 0.043 * S, 0.043 * S, 0.026 * S]
-        sd = [0.010, 0.010, 0.009, 0.008]
+        # 鞋底沿条：沿足底一圈的扁放样（鞋帮厚度=沿条外扩 3mm）
+        sole_path = [Vector((hx, 0.050 * S, 0.011)), Vector((hx, -0.025 * S, 0.010)),
+                     Vector((hx, -0.11 * S, 0.009)), Vector((hx, -0.192 * S, 0.009))]
+        sw = [0.038 * S, 0.045 * S, 0.045 * S, 0.027 * S]
+        sd = [0.011, 0.011, 0.010, 0.009]
         tube(bm, sole_path, sw, sd, ring_n=10, ref=Vector((0, 0, 1)), cap_start=True, cap_end=True)
         objs.append(finish_mesh('Foot' + ('L' if side < 0 else 'R'), bm, [mats['shoe']], subsurf=1))
     return objs
@@ -830,6 +868,11 @@ def assemble_character(spec):
                                              int(face_arr.shape[1] * 0.42):int(face_arr.shape[1] * 0.58)].mean(axis=(0, 1))),
                               rough=0.62 if wet else 0.72),
         'eye': tex_mat(name + '_eye', eye_img, rough=0.34 if wet else 0.15),
+        # 睑缘线（睫毛读法）与内眦泪阜
+        'lidline': flat_mat(name + '_lidline',
+                            tuple(srgb_to_linear(float(np.clip(c * 0.42, 0, 1))) for c in skin_rgb), rough=0.55),
+        'caruncle': flat_mat(name + '_caruncle', (srgb_to_linear(0.50), srgb_to_linear(0.22), srgb_to_linear(0.20)),
+                             rough=0.35),
         'hair': flat_mat(name + '_hair', spec.get('hair_rgb', (0.09, 0.08, 0.07)), rough=0.85),
         'hair_dk': flat_mat(name + '_hairdk', tuple(c * 0.55 for c in spec.get('hair_rgb', (0.09, 0.08, 0.07))), rough=0.92),
         'hair_lt': flat_mat(name + '_hairlt', tuple(min(1, c * 1.7 + 0.03) for c in spec.get('hair_rgb', (0.09, 0.08, 0.07))), rough=0.8),
@@ -840,6 +883,9 @@ def assemble_character(spec):
                             rough=0.5 if wet else 0.9, bump=0.09 if wet else 0.14, bump_scale=280.0),
         'shoe': flat_mat(name + '_shoe', spec.get('shoe_rgb', (0.06, 0.055, 0.05)), rough=0.45),
         'button': flat_mat(name + '_btn', (0.35, 0.33, 0.28), rough=0.4, metal=0.6),
+        'nail': flat_mat(name + '_nail',
+                         tuple(srgb_to_linear(float(np.clip(c * 1.06 + 0.04, 0, 1))) for c in
+                               ((0.52, 0.58, 0.58) if wet else skin_rgb)), rough=0.30),
         'band': flat_mat(name + '_bandm', (0.55, 0.08, 0.07), rough=0.75),
         'straw': flat_mat(name + '_straw', (0.55, 0.44, 0.26), rough=0.9),
         'tray': flat_mat(name + '_tray', (0.30, 0.20, 0.12), rough=0.55),
@@ -864,10 +910,10 @@ def assemble_character(spec):
     slv_l, wr_l, hf_l = build_arm(-1, spec, m, mats, poseL, seed)
     slv_r, wr_r, hf_r = build_arm(1, spec, m, mats, poseR, seed)
     parts += slv_l + slv_r
-    parts.append(build_hand(-1, wr_l, hf_l, spec, mats,
-                            curl=spec.get('curl', 0.55), spread=spec.get('spread', 0.0)))
-    parts.append(build_hand(1, wr_r, hf_r, spec, mats,
-                            curl=spec.get('curl', 0.55), spread=spec.get('spread', 0.0)))
+    parts += build_hand(-1, wr_l, hf_l, spec, mats,
+                        curl=spec.get('curl', 0.55), spread=spec.get('spread', 0.0))
+    parts += build_hand(1, wr_r, hf_r, spec, mats,
+                        curl=spec.get('curl', 0.55), spread=spec.get('spread', 0.0))
 
     if spec.get('armband'):
         parts.append(build_armband(spec, m, mats))
@@ -898,7 +944,7 @@ def assemble_character(spec):
     pivot.parent = root
 
     field, head_objs = HF.forge_head(spec, seed, mats)
-    head_lift = field.rz * 0.44   # 头压低：下颌落到领口，不露木偶长颈
+    head_lift = field.rz * 0.41   # 头压低：下颌落到领口，不露木偶长颈
     if spec.get('hat') == 'straw':
         hat = add_straw_hat(mats)
         crown = field.pos(Vector((0, -0.12, 1.0)))
