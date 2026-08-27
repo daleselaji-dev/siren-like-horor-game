@@ -9,33 +9,33 @@ export async function run(page, h) {
   const assert = (ok, msg) => { if (!ok) throw new Error('ASSERT: ' + msg); };
 
   // 1. 装配断言（GLB 解析是异步的——等到齐）
-  await page.waitForFunction(() => window.__game?.heroFigures?.ready === 4, { timeout: 30000, polling: 300 });
+  await page.waitForFunction(() => window.__game?.heroFigures?.ready === 5, { timeout: 30000, polling: 300 });
   const info = await page.evaluate(() => {
     const H = window.__game.heroFigures;
     return H.figures.map((f) => ({
-      key: f.def.key, tris: Math.round(f.tris), head: !!f.head,
-      enabled: f.enabled, visible: f.root.visible,
+      key: f.def.key, tris: Math.round(f.tris), head: !!f.head, minTris: f.def.minTris ?? 9000,
+      statue: !!f.def.statue, enabled: f.enabled, visible: f.root.visible,
       pos: [f.root.position.x.toFixed(1), f.root.position.z.toFixed(1)],
     }));
   });
   console.log('[blenderglb]', JSON.stringify(info));
-  assert(info.length === 4, '应装配四件英雄件');
+  assert(info.length === 5, '应装配五件英雄件（四人形+神像）');
   for (const f of info) {
-    assert(f.tris > 9000, `${f.key} 三角面数 ${f.tris} 应 >9000（细模门槛，胶囊人偶是两位数）`);
-    assert(f.head, `${f.key} 应带 HeadPivot`);
+    assert(f.tris > f.minTris, `${f.key} 三角面数 ${f.tris} 应 >${f.minTris}（细模门槛，胶囊人偶是两位数）`);
+    assert(f.statue || f.head, `${f.key} 应带 HeadPivot`);
   }
   const wet = info.find((f) => f.key === 'wetguest');
   assert(wet && !wet.visible, '湿客在返潮点火前不应可见');
 
   // 2. 四机位取证（0.8–2.2m 近景，直接对脸）
-  const look = async (name, px, pz, tx, tz, yHint) => {
-    await page.evaluate(({ px, pz, tx, tz, yHint }) => {
+  const look = async (name, px, pz, tx, tz, yHint, pitch = 0.02) => {
+    await page.evaluate(({ px, pz, tx, tz, yHint, pitch }) => {
       const g = window.__game;
       const yaw = Math.atan2(-(tx - px), -(tz - pz));
       g.player.setPosition(px, pz, yaw, yHint);
-      g.player.pitch = 0.02;
+      g.player.pitch = pitch;
       g.player.syncCamera(0);
-    }, { px, pz, tx, tz, yHint });
+    }, { px, pz, tx, tz, yHint, pitch });
     await h.sleep(700);
     await h.shot(name);
   };
@@ -50,6 +50,7 @@ export async function run(page, h) {
   await look('hero_townsman_back', P.townsman[0] - 2.4, P.townsman[2] - 0.8, P.townsman[0], P.townsman[2], P.townsman[1] + 0.1);
   await look('hero_emcee', P.emcee[0] + 0.3, P.emcee[2] - 2.4, P.emcee[0], P.emcee[2], P.emcee[1] + 0.1);
   await look('hero_waiter', P.waiter[0] - 1.4, P.waiter[2] - 1.6, P.waiter[0], P.waiter[2], P.waiter[1] + 0.1);
+  await look('hero_seagod', P.seagod[0] + 2.3, P.seagod[2] + 1.4, P.seagod[0], P.seagod[2], P.seagod[1] + 0.1, -0.34);
 
   // 3. 守夜人转头读法：站到近处等两拍，头应朝向玩家
   await page.evaluate(({ x, z }) => {

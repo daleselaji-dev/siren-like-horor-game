@@ -70,7 +70,7 @@ SPECS = {
 def parse_args():
     argv = sys.argv
     args = argv[argv.index('--') + 1:] if '--' in argv else []
-    opts = {'only': list(SPECS.keys()), 'blend': 'blender/out', 'glb': 'src/assets/models'}
+    opts = {'only': list(SPECS.keys()) + ['seagod'], 'blend': 'blender/out', 'glb': 'src/assets/models'}
     i = 0
     while i < len(args):
         if args[i] == '--only':
@@ -87,15 +87,23 @@ def parse_args():
     return opts
 
 
+# 场景关键件（非人形）：走独立装配器
+PROPS = {
+    'seagod': {'name': 'seagod', 'seed': 7101, 'builder': 'assemble_seagod'},
+}
+
+
 def main():
     opts = parse_args()
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     os.chdir(root_dir)
     for key in opts['only']:
-        spec = SPECS[key]
         print('[gen] building %s ...' % key)
         F.clear_scene()
-        F.assemble_character(spec)
+        if key in PROPS:
+            getattr(F, PROPS[key]['builder'])(PROPS[key])
+        else:
+            F.assemble_character(SPECS[key])
         F.save_and_export(key, opts['blend'], opts['glb'])
     print('[gen] all done.')
 

@@ -100,11 +100,16 @@ def setup_and_render(blend_path, out_dir, tag, name, samples, scale):
     sc.camera = cam
 
     # 头位（估）：找 HeadPivot
-    head_z = 1.55
+    head_z = None
+    top_z = 0.0
     for o in sc.objects:
         if o.name.startswith('HeadPivot'):
             head_z = o.matrix_world.translation.z
-            break
+        if o.type == 'MESH':
+            for c in o.bound_box:
+                top_z = max(top_z, (o.matrix_world @ Vector(c)).z)
+    if head_z is None:
+        head_z = max(0.6, top_z - 0.22)  # 场景件：以包围盒顶估「头位」
 
     views = {
         'full': {'loc': Vector((1.35, -2.6, 1.35)), 'aim': Vector((0, 0, 0.92)), 'lens': 42,

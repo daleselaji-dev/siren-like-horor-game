@@ -10,6 +10,7 @@ import emceeUri from '../assets/models/emcee.glb?inline';
 import waiterUri from '../assets/models/waiter.glb?inline';
 import townsmanUri from '../assets/models/townsman.glb?inline';
 import wetguestUri from '../assets/models/wetguest.glb?inline';
+import seagodUri from '../assets/models/seagod.glb?inline';
 
 function dataUriToBuffer(uri) {
   const b64 = uri.slice(uri.indexOf(',') + 1);
@@ -19,7 +20,7 @@ function dataUriToBuffer(uri) {
   return u8.buffer;
 }
 
-const URIS = { emcee: emceeUri, waiter: waiterUri, townsman: townsmanUri, wetguest: wetguestUri };
+const URIS = { emcee: emceeUri, waiter: waiterUri, townsman: townsmanUri, wetguest: wetguestUri, seagod: seagodUri };
 
 export class HeroFigures {
   constructor(scene, world, hud) {
@@ -59,8 +60,15 @@ export class HeroFigures {
         light: null,
       },
       {
+        // 场景关键件：塌祠里请出来的无面海神像（Blender bpy 细模）
+        key: 'seagod', label: '无面的像', minTris: 2000, statue: true,
+        pos: [-18.4, -31.4], face: [-14.5, -30.6], track: 'none',
+        sub: '祠塌了，像被请出来立在道边。脸不是风磨平的——是手，一天一天，把眉眼抹掉。', subR: 4.5,
+        light: { color: 0xff8a3a, intensity: 1.6, dist: 4, dy: 0.35, dxz: [0, -0.5] },
+      },
+      {
         key: 'wetguest', label: '数床单的人',
-        pos: [19.0, -25.45], face: [19.0, -24.6], track: 'creep', trackR: 6, needLeak: true,
+        pos: [17.55, -25.45], face: [17.55, -24.6], track: 'creep', trackR: 6, needLeak: true,
         sub: '床单巷里多了一个人。他面对着床单站着，离布只有一拳。别打扰他数。', subR: 6,
         light: { color: 0x5a7a86, intensity: 1.4, dist: 5, dy: 2.2, dxz: [0, -1.2] },
       },
@@ -104,8 +112,9 @@ export class HeroFigures {
       if (fig.head) fig.headBase = fig.head.quaternion.clone();
       root.visible = fig.enabled;
       this.scene.add(root);
-      // 人形碰撞柱（不遮视线）
-      this.world.colliders.push({ x: def.pos[0], z: def.pos[1], r: 0.34, maxY: gy + 1.9, noSightBlock: true });
+      // 人形碰撞柱（不遮视线；未到岗时关闭）
+      fig.collider = { x: def.pos[0], z: def.pos[1], r: 0.28, maxY: gy + 1.9, noSightBlock: true, off: !fig.enabled };
+      this.world.colliders.push(fig.collider);
       if (def.light) {
         const pl = new THREE.PointLight(def.light.color, def.light.intensity, def.light.dist, 2);
         pl.position.set(def.pos[0] + def.light.dxz[0], gy + def.light.dy, def.pos[1] + def.light.dxz[1]);
@@ -129,6 +138,7 @@ export class HeroFigures {
       if (def.needLeak && !fig.enabled && ctx.leaked) {
         fig.enabled = true;
         fig.root.visible = true;
+        if (fig.collider) fig.collider.off = false;
         if (fig.light && fig.light._base) fig.light.intensity = fig.light._base;
       }
       if (!fig.enabled) continue;

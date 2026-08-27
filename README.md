@@ -166,10 +166,14 @@ npm run desktop       # 不打包，直接以桌面窗口运行（开发用）
 ## 技术栈与取舍
 
 - **Three.js 0.185 + Vite + Electron**：无 GPU 云环境用 SwiftShader 无头验证；WebGL2 实时渲染。
-- **零二进制资产**：贴图（水磨石/矿棉吊顶/墙纸/缎面/浮木/沉积/盐霜……）全部 Canvas 程序化生成，
-  颜色+法线+粗糙度三件套；模型（小镇建筑/三层酒店/海洋馆/人形）全程序化建模；
+- **资产管线**：贴图（水磨石/矿棉吊顶/墙纸/缎面/浮木/沉积/盐霜……）全部 Canvas 程序化生成，
+  颜色+法线+粗糙度三件套；场景模型（小镇建筑/三层酒店/海洋馆/工位人形）全程序化建模；
   音频（海床/点名谣/报数员广播/收声/材质化脚步/木板呻吟/CRT 蜂鸣）全 WebAudio 合成。
-  仓库内唯一的二进制是可直接运行的 Windows exe。
+  在此之上，五件**英雄细模**（车站守夜人/橱窗立像/迎宾侍应/床单巷湿客/无面海神像）
+  走 **Blender 4.1.1 headless 管线**（bpy 脚本生成 → .blend → Cycles CLI 渲染验证 →
+  gltfpack meshopt 压缩 GLB → `?inline` base64 内联进 bundle），
+  每件 2 万上下三角面 + 1024 球面展开程序化皮肤贴图，压缩后约 125KB/件。
+  GLB 内联使 dev / 无头验证(http) / Electron(file://) 三端同一条加载路径，零运行时网络请求。
 - **渲染**：ACES、UnrealBloom、胶片颗粒、暗角、轻色差、指数雾、程序化云月、
   动态水面（渗漏态深绿黑切换）、PCF 软阴影、PBR 材质。室内光全部来自灯具
   （荧光管频闪/钨丝吊灯/门头灯箱/CRT 荧光），**无恐怖蓝滤镜**。
@@ -203,17 +207,50 @@ npm run desktop       # 不打包，直接以桌面窗口运行（开发用）
 - **CRT 预现**：低分辨率 RenderTarget + 第二相机 + 图层掩码，轮询刷新离玩家最近的屏。
 - **人群**：宴会厅满员用烘焙合并网格（一桌宾客一 draw call）。
 
+## Blender 细模管线（bpy → .blend → CLI 渲染 → GLB）
+
+英雄人物与场景关键件不再手搓 three.js 几何，而是在 **Blender 4.1.1（headless，无 MCP）**
+里用 bpy Python 程序化建模——放样人体（躯干/四肢/分指手）+ 参数化头雕（单位球场沉积变形：
+眉弓/眼窝/鼻/唇带/颏/颌角）+ numpy 直绘球面展开皮肤贴图（骨相阴影/唇色/胡茬/老年斑/
+盐霜/溺亡大理石纹），死魂曲读法：**6 米外是普通人，2 米内才读出唯一主异常**
+（司仪口部钙化、侍应颈长一档头垂太低、守夜人半脸盐霜、湿客整皮泡发、神像无面）。
+
+```bash
+bash blender/install_blender.sh        # 幂等安装官方 Blender 4.1.1 到 ~/blender-4.1.1
+bash blender/build_assets.sh r9 48     # 一条龙：生成 → 渲染(轮r9,48spp) → gltfpack 压缩入库
+
+# 或分步：
+~/blender-4.1.1/blender --background --python blender/gen_characters.py \
+    -- --only emcee,wetguest --glb blender/export        # bpy 生成 .blend + 原始 GLB
+~/blender-4.1.1/blender --background --python blender/render_verify.py \
+    -- --chars emcee --round r9 --samples 48             # Cycles CPU 渲染验证图
+npx gltfpack -i blender/export/emcee.glb -o src/assets/models/emcee.glb -cc -kn
+```
+
+多轮迭代对照图在 `verify/blender/`（r1 过曝胶囊 → r2 眼球出窝 → r3 四人成形 →
+r4 鞋裤衔接/湿客头身比 → r5 神像），`.blend` 工程在 `blender/out/`（可打开续雕）。
+游戏内运行时装配在 `src/world/heroModels.js`：HeadPivot 转头三读法
+（守夜人慢转头 / 湿客极慢 creep / 橱窗立像「被注视即冻结」）、
+呼吸微动画（活人才有）、首见字幕、人形碰撞柱、灯光预算接入。
+`node scripts/verify.mjs blenderglb` 对五件断言：装配齐 / 细模面数门槛 /
+HeadPivot / 转头积分 / 首见字幕 / 湿客返潮点火才到岗。
+
 ## 项目结构
 
 ```
 docs/            设计文档 + 美术圣经（返潮·蚀湾设定）
+blender/         Blender 4.1.1 headless 管线：install_blender.sh / fanchao_lib.py(bpy构建库)
+                 gen_characters.py / render_verify.py / build_assets.sh / out/*.blend
 src/
+  assets/models/ gltfpack meshopt 压缩的英雄件 GLB（?inline 内联进 bundle）
   core/          引擎壳(渲染/后处理)、输入、程序化音频
-  world/         程序化贴图、材质、几何合批、蚀湾小镇、南方大酒店+海洋馆、水面、天空
+  world/         程序化贴图、材质、几何合批、蚀湾小镇、南方大酒店+海洋馆、水面、天空、
+                 heroModels.js(Blender 英雄件运行时装配/微动画/字幕)
   entities/      玩家控制器、高保真程序化人形、工位AI、浮客/回眸客/上宾
   systems/       视奸、潜行/振动、CRT预现、议程时钟、叙事导演(文书/触发/检查点/终局)
   ui/            HUD(字幕/目标/文书/议程/振动/暂停/死亡/结局)
-scripts/         无头浏览器验证(构建→启动→截图→按八节拍自动通关)
+scripts/         无头浏览器验证(构建→启动→截图→按九节拍自动通关)
+verify/blender/  Blender CLI 渲染的多轮迭代对照图（r1→r5）
 release/         Windows 便携 exe（入库，可直接下载运行）
 ```
 
@@ -227,6 +264,7 @@ node scripts/verify.mjs round4tools  # 反击工具：镁光定身/闹钟诱饵/
 node scripts/verify.mjs round5leak   # 世界切换：封脊碰撞/湿客五员/双态材质干湿/幻潮面活性
 node scripts/verify.mjs round6guest  # 主怪：部件计数/镁光定格/闹钟钓臂/贝灰界前悬停断言
 node scripts/verify.mjs round7mech   # 箱庭机制：录音对照三点三奖励/保险丝拔插/暗区视程
+node scripts/verify.mjs blenderglb   # Blender 英雄件：五件装配/细模面数/转头/字幕/返潮到岗
 node scripts/verify.mjs looks        # 外观：镇口车站/牌坊/告示墙/巨骸/工位近景/渗漏态
 node scripts/verify.mjs playthrough  # 主线全流程通关：10 条文书 + 三条规则怪谈的
                                      # 违反与遵守双路径逐 flag 断言

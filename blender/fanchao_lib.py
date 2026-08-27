@@ -1102,3 +1102,131 @@ def save_and_export(name, blend_dir, glb_dir):
         export_image_format='JPEG', export_jpeg_quality=82)
     print('[fanchao] saved %s + %s' % (blend_path, glb_path))
     return blend_path, glb_path
+
+
+# ============================= 场景关键件：无面海神像 =============================
+
+def assemble_seagod(spec):
+    """塌祠里请出来的木胎神像：袍是剥落的朱漆，脸被手一天一天抹平。
+    做法：放样袍身+交袖，球头削平脸，逐面材质散布「漆-露木」斑驳（免UV的风化读法）。"""
+    seed = spec.get('seed', 7)
+    rng = rng_stream(seed)
+    name = spec['name']
+    mats = {
+        'lacquer': flat_mat(name + '_lacquer', (0.27, 0.055, 0.045), rough=0.6),
+        'wood': flat_mat(name + '_wood', (0.21, 0.175, 0.14), rough=0.85),
+        'woodface': flat_mat(name + '_woodface', (0.37, 0.305, 0.235), rough=0.55),
+        'stone': flat_mat(name + '_stone', (0.21, 0.21, 0.22), rough=0.9),
+        'gilt': flat_mat(name + '_gilt', (0.55, 0.42, 0.18), rough=0.45, metal=0.7),
+        'ash': flat_mat(name + '_ash', (0.20, 0.19, 0.18), rough=0.95),
+        'ember': flat_mat(name + '_ember', (0.9, 0.35, 0.12), rough=0.4),
+    }
+    root = bpy.data.objects.new(name + '_root', None)
+    bpy.context.collection.objects.link(root)
+    parts = []
+
+    def weather(obj, ratio=0.45, cell=9.0):
+        """逐面掉漆：以面心噪声把部分面换成露木材质。"""
+        obj.data.materials.append(mats['wood'])
+        for poly in obj.data.polygons:
+            c = poly.center
+            n = math.sin(c.x * cell * 7.1 + seed) + math.sin(c.z * cell + c.y * cell * 3.3 + seed * 2)
+            if (n + 2) / 4 < ratio:
+                poly.material_index = 1
+
+    # 底座（石）
+    bm = bmesh.new()
+    r = bmesh.ops.create_cube(bm, size=1)
+    for v in r['verts']:
+        v.co = Vector((v.co.x * 0.56, v.co.y * 0.46, v.co.z * 0.26))
+        v.co.z += 0.13
+    parts.append(finish_mesh('Plinth', bm, [mats['stone']], subsurf=0))
+
+    # 袍身放样（略前倾——像在听）
+    prof = [(0.26, 0.205), (0.34, 0.19), (0.52, 0.148), (0.70, 0.125),
+            (0.86, 0.135), (0.97, 0.142), (1.04, 0.085), (1.075, 0.055)]
+    path = [Vector((0, -(z - 0.26) * 0.045, z)) for z, _ in prof]
+    widths = [pr for _, pr in prof]
+    depths = [pr * 0.82 for _, pr in prof]
+    wr = rng.random(16)
+    def bulge(i, a):
+        # 竖向衣褶
+        return 1 + 0.04 * math.sin(a * 7 + wr[i % 16] * 6) * min(1, (len(prof) - i) / 4)
+    bm = bmesh.new()
+    tube(bm, path, widths, depths, ring_n=18, cap_start=True, cap_end=True, bulge=bulge)
+    robe = finish_mesh('Robe', bm, [mats['lacquer']], subsurf=1)
+    weather(robe, 0.42)
+    parts.append(robe)
+
+    # 交袖（双手拢在袖里）
+    for sgn in (-1, 1):
+        sh = Vector((sgn * 0.135, -0.075, 0.94))
+        mid = Vector((sgn * 0.10, -0.19, 0.78))
+        end = Vector((-sgn * 0.03, -0.225, 0.66))
+        bm = bmesh.new()
+        tube(bm, [sh, mid, end], [0.052, 0.048, 0.042], [0.046, 0.042, 0.038],
+             ring_n=12, cap_start=True, cap_end=True)
+        slv = finish_mesh('Sleeve', bm, [mats['lacquer']], subsurf=1)
+        weather(slv, 0.40)
+        parts.append(slv)
+
+    # 头（木胎）：脸削平 + 抹痕
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=18, radius=1.0)
+    for v in bm.verts:
+        v.co = Vector((v.co.x * 0.072, v.co.y * 0.076, v.co.z * 0.092))
+        # 无面：前脸推平成一块磨光的木板面，边缘留一点没抹净的起伏
+        lim = -0.030 - 0.006 * math.sin(v.co.z * 60 + seed)
+        if v.co.y < lim:
+            v.co.y = lim + (v.co.y - lim) * 0.06
+    me = bpy.data.meshes.new('GodHead')
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    head = new_object('GodHead', me)
+    head.data.materials.append(mats['woodface'])
+    shade_smooth(head)
+    add_subsurf(head, 1)
+    head.location = Vector((0, -0.045, 1.155))
+    # 抹平的脸是「woodface」，颅侧仍带漆
+    head.data.materials.append(mats['lacquer'])
+    for poly in head.data.polygons:
+        if poly.center.y > 0.01:
+            poly.material_index = 1
+    parts.append(head)
+
+    # 冕板 + 旒（垂珠简化为细柱）
+    bm = bmesh.new()
+    r = bmesh.ops.create_cube(bm, size=1)
+    for v in r['verts']:
+        v.co = Vector((v.co.x * 0.085, v.co.y * 0.13, v.co.z * 0.014))
+        v.co += Vector((0, -0.045, 1.26))
+    parts.append(finish_mesh('Crown', bm, [mats['gilt']], subsurf=0))
+    for sgn in (-1, 1):
+        for k in range(3):
+            bm = bmesh.new()
+            r = bmesh.ops.create_cube(bm, size=1)
+            for v in r['verts']:
+                v.co = Vector((v.co.x * 0.004, v.co.y * 0.004, v.co.z * 0.05))
+                v.co += Vector((sgn * (0.02 + k * 0.025), -0.115, 1.19))
+            parts.append(finish_mesh('Tassel', bm, [mats['gilt']], subsurf=0))
+
+    # 香炉 + 三炷插着的香（一炷还没烧完——有人天天来）
+    bm = bmesh.new()
+    tube(bm, [Vector((0, -0.42, 0.0)), Vector((0, -0.42, 0.05)), Vector((0, -0.42, 0.10))],
+         [0.055, 0.07, 0.058], [0.055, 0.07, 0.058], ring_n=12, cap_start=True, cap_end=True)
+    parts.append(finish_mesh('Censer', bm, [mats['ash']], subsurf=1))
+    for k in range(3):
+        bm = bmesh.new()
+        ang = (k - 1) * 0.16
+        r = bmesh.ops.create_cube(bm, size=1)
+        for v in r['verts']:
+            v.co = Vector((v.co.x * 0.0035, v.co.y * 0.0035, v.co.z * 0.085))
+            v.co = Matrix.Rotation(ang, 4, 'Y') @ v.co
+            v.co += Vector(((k - 1) * 0.02, -0.42, 0.16))
+        stick = finish_mesh('Incense', bm, [mats['ash'] if k != 1 else mats['ember']], subsurf=0)
+        parts.append(stick)
+
+    for o in parts:
+        o.parent = root
+    return root
