@@ -391,6 +391,46 @@ export function buildHotel(ctx) {
     for (const [vx, vz] of [[-10.3, 2.6], [10.4, 1.2]]) cyl(M.concrete, vx, ROOF + 0.55, vz, 0.3, 1.1, 0.3); // 排气烟囱
   }
 
+  // ================= 立面轮25：整幅风化蒙尘层 + 逐窗台淌水痕 =================
+  // 父审「仍是低模雨夜灰楼/一整块米黄盒子」——瓷砖 tile 的砖缝/grime 频率太高，
+  // 广角 30m 外读不出来；缺的是「低频」的脏：整幅雨洗蒙尘贴花（明度低频起伏
+  // + 檐口淌水带 + 底部溅泥带）盖在三面外墙外 5mm，逐窗台再各贴一片淌水痕。
+  // 全部透明贴花，不动墙体几何与既有断言标记色
+  {
+    const washM = new THREE.MeshStandardMaterial({
+      map: M.textures.facadeWeather, transparent: true, depthWrite: false,
+      roughness: 1.0, polygonOffset: true, polygonOffsetFactor: -1,
+    });
+    const mkWash = (w, h, pos, ry = 0) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), washM);
+      m.position.copy(pos);
+      m.rotation.y = ry;
+      m.renderOrder = 1;
+      m.castShadow = false;
+      m.receiveShadow = false;
+      scene.add(m);
+    };
+    mkWash(34.3, 10.0, world(0, 5.1, 11.157));                    // 北立面整幅
+    mkWash(34.3, 10.0, world(0, 5.1, -11.157), Math.PI);          // 南立面
+    mkWash(22.3, 10.0, world(-17.157, 5.1, 0), -Math.PI / 2);     // 西立面
+    mkWash(22.3, 10.0, world(17.157, 5.1, 0), Math.PI / 2);       // 东立面
+    // 逐窗台淌水痕（北立面 2F/3F 十六樘）：窗角起头、向下渐消
+    const streakM = new THREE.MeshStandardMaterial({
+      map: M.textures.sillStreak, transparent: true, depthWrite: false,
+      roughness: 1.0, polygonOffset: true, polygonOffsetFactor: -2,
+    });
+    const winsN25 = [[-15.5, -13.5], [-11.5, -9.5], [-7, -5], [-2.5, -0.5], [1.5, 3.5], [6, 8], [10.5, 12.5], [14, 16]];
+    for (const y0 of [F2, F3]) {
+      for (const [a, b] of winsN25) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(b - a + 0.2, 0.95), streakM);
+        m.position.copy(world((a + b) / 2, y0 + 0.48, 11.16));
+        m.renderOrder = 2;
+        m.castShadow = false;
+        scene.add(m);
+      }
+    }
+  }
+
   // ================= 立面轮17：窗套/竖壁柱/线脚层叠/逐窗雨痕/雨棚梁吊筋/屋顶栏杆 =================
   // 门3审计「整栋仍像浅灰矩形盒+扁窗」的加密轮：远看第一读是四道竖壁柱与
   // 逐窗抹灰窗套的凹凸网格 + 檐下阴影暗带；近看每樘窗有 10cm 出墙的围框、
@@ -774,18 +814,43 @@ export function buildHotel(ctx) {
     box(M.signSouth, 0, 3.86, 14.94, 7.2, 0.66, 0.1);
     // 檐底嵌筒灯三只 + 暖光
     for (const lxq of [-3.4, 0, 3.4]) cyl(M.tungsten, lxq, 3.26, 13.2, 0.14, 0.05, 0.14);
-    addLight(0xffd9a0, 7, 7.5, 0, 2.9, 13.1, 0.5);
+    addLight(0xffd9a0, 9, 8.5, 0, 2.9, 13.1, 0.5); // 轮25：7→9——门前光池要摊到台阶下的湿地上
     // 轮24·入口体积光：筒灯下三束暖光锥 + 灯笼红光晕锥——雨雾夜里
     // 正门是「从光里走进去」的腔，不是一张亮贴纸（门3入口层次）
+    // 轮25：束径/浓度/长度全抬档（0.055/1.35/3.3→0.085/1.8/4.1）——hotel_wide
+    // 30m 外要能读出「三根光柱插进雨雾」，旧值只在 5m 内可见
     for (const lxq of [-3.4, 0, 3.4]) {
-      const cone = makeLightCone(0xffd9a0, 0.055, 0.16, 1.35, 3.3);
+      const cone = makeLightCone(0xffd9a0, 0.085, 0.18, 1.8, 4.1);
       cone.position.copy(world(lxq, 3.24, 13.2));
       scene.add(cone);
     }
     for (const px of [-3.4, 3.4]) {
-      const cone = makeLightCone(0xff6048, 0.04, 0.3, 1.0, 2.4);
+      const cone = makeLightCone(0xff6048, 0.06, 0.3, 1.2, 2.7);
       cone.position.copy(world(px, 2.35, 12.6));
       scene.add(cone);
+    }
+    // 轮25·门前湿地光池：暖光在积水地皮上的假反弹椭圆（additive 软片）——
+    // 体积光有了「落点」，入口光才闭环（光柱→光池→反射）
+    {
+      const pc = document.createElement('canvas');
+      pc.width = pc.height = 128;
+      const px2 = pc.getContext('2d');
+      const gr = px2.createRadialGradient(64, 64, 4, 64, 64, 62);
+      gr.addColorStop(0, 'rgba(255,196,120,0.55)');
+      gr.addColorStop(0.5, 'rgba(255,170,96,0.18)');
+      gr.addColorStop(1, 'rgba(255,150,80,0)');
+      px2.fillStyle = gr;
+      px2.fillRect(0, 0, 128, 128);
+      const pt = new THREE.CanvasTexture(pc);
+      const poolM = new THREE.MeshBasicMaterial({
+        map: pt, transparent: true, opacity: 0.5, depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const pool = new THREE.Mesh(new THREE.PlaneGeometry(9.5, 5.2), poolM);
+      pool.rotation.x = -Math.PI / 2;
+      pool.position.copy(world(0, 0.07, 14.6));
+      pool.renderOrder = 3;
+      scene.add(pool);
     }
     // 雨棚立柱（镜面不锈钢包柱 + 石柱础）
     for (const px of [-4.6, 4.6]) {

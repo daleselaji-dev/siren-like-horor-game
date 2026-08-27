@@ -1575,6 +1575,89 @@ export function poreplateTexture(size = 128) {
   return t;
 }
 
+/** 轮25·外墙风化蒙尘层（RGBA 贴花）：雨洗竖痕 + 蒙尘斑块 + 檐口淌水带 +
+ *  底部溅泥带——盖在瓷砖立面外 5mm 的整幅透明层，「一整块米黄盒子」的
+ *  均色感从贴花层面打碎（法线/砖缝仍由 tile 自己的图承担） */
+export function facadeWeatherTexture(size = 512, seed = 4451) {
+  const [c, ctx] = makeCanvas(size);
+  ctx.clearRect(0, 0, size, size);
+  const rand = mulberry32(seed);
+  // 蒙尘斑块：大而软的暗斑（低 alpha）——立面明度低频起伏
+  for (let i = 0; i < 26; i++) {
+    const x = rand() * size, y = rand() * size, r = size * (0.06 + rand() * 0.16);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const a = 0.04 + rand() * 0.07;
+    g.addColorStop(0, `rgba(40,38,32,${a.toFixed(3)})`);
+    g.addColorStop(1, 'rgba(40,38,32,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // 檐口淌水带：从顶缘往下的一排竖痕（顶浓渐消）
+  for (let i = 0; i < 34; i++) {
+    const x = rand() * size, w = 2 + rand() * 7, h = size * (0.12 + rand() * 0.3);
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    const a = 0.08 + rand() * 0.12;
+    g.addColorStop(0, `rgba(34,32,28,${a.toFixed(3)})`);
+    g.addColorStop(1, 'rgba(34,32,28,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, 0, w, h);
+  }
+  // 中带随机雨洗竖痕（起点随机、更细更淡）
+  for (let i = 0; i < 46; i++) {
+    const x = rand() * size, y0 = size * (0.15 + rand() * 0.5);
+    const w = 1.5 + rand() * 4, h = size * (0.08 + rand() * 0.22);
+    ctx.save();
+    ctx.translate(x, y0);
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    const a = 0.05 + rand() * 0.08;
+    g.addColorStop(0, `rgba(38,36,30,${a.toFixed(3)})`);
+    g.addColorStop(1, 'rgba(38,36,30,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-w / 2, 0, w, h);
+    ctx.restore();
+  }
+  // 底部溅泥带：下缘一条渐浓的土色带 + 碎点
+  {
+    const g = ctx.createLinearGradient(0, size * 0.82, 0, size);
+    g.addColorStop(0, 'rgba(52,44,34,0)');
+    g.addColorStop(1, 'rgba(52,44,34,0.20)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, size * 0.82, size, size * 0.18);
+    for (let i = 0; i < 80; i++) {
+      ctx.fillStyle = `rgba(48,40,30,${(0.06 + rand() * 0.12).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(rand() * size, size * (0.86 + rand() * 0.14), 1 + rand() * 3, 0, 6.28);
+      ctx.fill();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** 轮25·窗台淌水痕（RGBA 小贴花）：窗台两角起头的深色竖痕，向下渐消 */
+export function sillStreakTexture(size = 128, seed = 7717) {
+  const [c, ctx] = makeCanvas(size);
+  ctx.clearRect(0, 0, size, size);
+  const rand = mulberry32(seed);
+  for (const xr of [0.12 + rand() * 0.08, 0.5 + (rand() - 0.5) * 0.2, 0.86 - rand() * 0.08]) {
+    const x = xr * size, w = 3 + rand() * 6, h = size * (0.5 + rand() * 0.45);
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, `rgba(30,28,24,${(0.22 + rand() * 0.12).toFixed(3)})`);
+    g.addColorStop(0.5, `rgba(30,28,24,${(0.10 + rand() * 0.06).toFixed(3)})`);
+    g.addColorStop(1, 'rgba(30,28,24,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - w / 2, 0, w, h);
+    // 痕两缘的细锈线
+    ctx.fillStyle = 'rgba(58,42,28,0.14)';
+    ctx.fillRect(x - w / 2 - 1, 0, 1, h * 0.7);
+    ctx.fillRect(x + w / 2, 0, 1, h * 0.7);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 /** 核册通告红纸（镇口张贴） */
 export function noticeTexture(size = 256) {
   const [c, ctx] = makeCanvas(size);
@@ -1691,6 +1774,8 @@ export function buildTextureSet(lowspec = false) {
   set.signAqua = signboardTexture('蚀湾海洋馆', false, 768, 224);
   set.mural = muralTexture(lowspec ? 256 : 512);
   set.poreplate = poreplateTexture();
+  set.facadeWeather = facadeWeatherTexture(lowspec ? 256 : 512);
+  set.sillStreak = sillStreakTexture();
   set.notice = noticeTexture();
   return set;
 }

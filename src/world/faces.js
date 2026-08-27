@@ -50,6 +50,9 @@ const FACE_DEFS = {
     // 轮25：法线/毛孔清漆双降档（1.22/1.4→0.92/1.05）+ 清漆 0.16→0.10——
     // 旧值三层法线叠打把照片皮渲成「腌肉壳」（keeper 灾难帧的油亮暗肤主凶）；
     // 老人皮的皱走照片色阶，凹凸只留三成
+    // 轮25二稿：lift 1.15——中褐照片过夜景 ACES 中间调压暗后读成「油亮暗肤」，
+    // 烘焙时全皮提亮一档（贴图空间定标，不是取证灯作弊）
+    lift: 1.15,
     mat: { envInt: 0.42, cc: 0.10, ccRough: 0.55, normalScale: 0.92, poreScale: 1.05 },
   },
   oldf: {
@@ -578,7 +581,8 @@ function compositeFace(M, job, img) {
     // 轮15·同色烘焙：下颌以下的头皮带（v>0.80）向颈皮有效色收敛——
     // 颈材质= skinAvg×0.96 色 × 调频贴图均值 ~0.80 ≈ 头皮的 0.775 倍亮度；
     // 头模底缘剪影两侧（头皮带 vs 颌裙环）从此是同一档明度，暗脊无处可立
-    const neckQ = 1 - sstep(0.80, 0.94, v) * 0.225;
+    // 轮25：0.225→0.16——特写平视机位里这条带露出小半指，旧值读成「颌下污渍」
+    const neckQ = 1 - sstep(0.80, 0.94, v) * 0.16;
     for (let px2 = 0; px2 < S; px2++) {
       const i4 = (py2 * S + px2) * 4;
       // 底皮调色到照片肤色
@@ -678,7 +682,8 @@ function compositeFace(M, job, img) {
           }
         }
       }
-      B[i4] = r * neckQ; B[i4 + 1] = g * neckQ; B[i4 + 2] = b * neckQ;
+      const liftQ = neckQ * (D.lift ?? 1);
+      B[i4] = Math.min(255, r * liftQ); B[i4 + 1] = Math.min(255, g * liftQ); B[i4 + 2] = Math.min(255, b * liftQ);
     }
   }
   // ---- 轮15·照片高频色斑合成铺满整头皮 ----
@@ -713,7 +718,9 @@ function compositeFace(M, job, img) {
     const eyeLen2 = Math.hypot(EYE_X, EYE_Y, EYE_Z);
     const phiE2 = Math.atan2(EYE_X, EYE_Z);
     const evy = (Math.acos(EYE_Y / eyeLen2) / Math.PI) * S;
-    const aoK = key === 'chalk' ? 0.7 : key === 'pale' ? 0.85 : 1;
+    // 轮25：老年脸 AO 减档 1→0.78——照片自带眶影+烘焙五层 AO 叠出「黑洞眼窝」
+    //（keeper 暗厅特写里眼窝深黑=怪物感帮凶）
+    const aoK = key === 'chalk' ? 0.7 : key === 'pale' ? 0.85 : key.startsWith('old') ? 0.78 : 1;
     xd.globalCompositeOperation = 'multiply';
     const soft = (px3, py3, rx3, ry3, a) => {
       xd.save();

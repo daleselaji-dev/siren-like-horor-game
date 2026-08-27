@@ -2205,8 +2205,10 @@ export class Humanoid {
     // 横幅经角膜/巩膜的低粗糙清漆层整片映在眼球上，读成硬边奶油斑（视角刀锋敏感、
     // 左右眼不对称、藏角膜后巩膜清漆继续反射——历轮二分「全不消」的原因）。
     // 湿层全改「模糊镜」：清漆减半+粗糙抬档——环境映影糊成柔和水光，锐利鬼影出局
-    const scleraMat = pick(Mtl('scleraWet', () => new THREE.MeshPhysicalMaterial({
-      color: 0xcfc2b1, roughness: 0.5, envMapIntensity: 0.18,
+    // 轮25：环反射 0.18→0.07——夜景 envMap（灰蓝天光）整面映在巩膜上，
+    // 0.6m 特写里眼球读成「灰蓝金属珠」（r24 keeper/runner 蓝珠眼真凶）
+    const scleraMat = pick(Mtl('scleraWet25', () => new THREE.MeshPhysicalMaterial({
+      color: 0xcfc2b1, roughness: 0.5, envMapIntensity: 0.07,
       clearcoat: 0.15, clearcoatRoughness: 0.5,
     })));
     // 虹膜盘材质：贴图带色环+瞳孔；emissive 通道保留给潮光（sightjack 发光）
@@ -2215,7 +2217,7 @@ export class Humanoid {
       // 轮24四稿：粗糙 0.6→0.75、环反射 0.3→0.12——正面暖光下虹膜盘的漫反射
       // 高光把深褐洗成灰蓝（emcee「雾眼」）；虹膜自己只出「色」，光交给角膜/光点
       map: irisTexture(irisTint), transparent: true, roughness: 0.75,
-      envMapIntensity: 0.06, emissive: 0x4a6a70, emissiveIntensity: 0, // 轮24八稿：0.12→0.06 虹膜不做镜
+      envMapIntensity: 0.02, emissive: 0x4a6a70, emissiveIntensity: 0, // 轮25：0.06→0.02 虹膜盘对天光 envMap 全盲——盘色只走贴图
       
       // 虹膜盘是正对相机的平面：镜面反射一大就整盘糊白（白珠眼回魂）——
       // 湿光交给角膜壳与捕捉光点，虹膜自己只出「色」
@@ -2256,8 +2258,10 @@ export class Humanoid {
       // 轮24四稿：环反射 0.5→0.38——暖聚光正面机位下角膜仍把虹膜洗成灰盘
       // 轮24八稿：粗糙 0.06→0.16、环反射 0.38→0.22、清漆糙 0.1→0.3——
       // 角膜是模糊的湿镜：横幅/招牌不许在眼球上映出硬边色块（D形奶油斑根治）
-      color: 0xffffff, transparent: true, opacity: 0.05, roughness: 0.16,
-      envMapIntensity: 0.22, clearcoat: 0.7, clearcoatRoughness: 0.3,
+      // 轮25：环反射 0.22→0.08、清漆 0.7→0.45——角膜壳把灰蓝夜光整片罩在
+      // 虹膜上=「蓝珠眼」另一半；湿感只留清漆余量+捕捉光点
+      color: 0xffffff, transparent: true, opacity: 0.04, roughness: 0.16,
+      envMapIntensity: 0.08, clearcoat: 0.45, clearcoatRoughness: 0.3,
       depthWrite: false,
     })));
     // 捕捉光点：角膜上永远亮着的一粒（暗厅里眼睛也得是「湿」的——活人证据第一条）
@@ -2518,28 +2522,39 @@ export class Humanoid {
       const hairHex = hairMat.color?.getHex?.() ?? 0x14161a;
       // 轮22二稿：发卡族色乘 ×1.3 与壳发贴图乘色(×1.25)亮度对齐——
       // 旧卡片按原始发色直乘，在壳上读成「焦黑贴片/尖刺」而不是同一头发
-      const strandM = Mtl('hairCardM_' + hairHex.toString(16), () => {
+      // 轮25：×1.3 亮度对齐只给深发——银灰发再乘 1.3 后，贴在脸缘/鬓角的
+      // 软 alpha 卡在肤色上读成「浅灰圆斑」（matron 颊侧/眉心斑块否决项）；
+      // 灰发卡反乘 0.85（发根绺影本来就比壳面深半档）
+      const greyHair = ((hairHex >> 16) & 255) > 0x48;
+      const cardMul = greyHair ? 0.85 : 1.3;
+      const strandM = Mtl('hairCardM25_' + hairHex.toString(16), () => {
         const m = new THREE.MeshStandardMaterial({
           map: M.textures.hairStrand, color: hairHex, alphaTest: 0.24,
           side: THREE.DoubleSide, roughness: 0.6, envMapIntensity: 0.7,
         });
-        m.color.multiplyScalar(1.3);
+        // 绺团卡长在壳面上：灰发卡不压暗（0.85 在银灰壳上读成深色鬃毛），
+        // 与壳同亮度只留纹理层次；贴肤卡(wisp/fringe)才需要压 0.85
+        m.color.multiplyScalar(greyHair ? 1.0 : cardMul);
         return m;
       });
-      const wispM = Mtl('hairWispM_' + hairHex.toString(16), () => {
+      const wispM = Mtl('hairWispM25_' + hairHex.toString(16), () => {
         const m = new THREE.MeshStandardMaterial({
           map: M.textures.hairWisp, color: hairHex, alphaTest: 0.18,
           side: THREE.DoubleSide, roughness: 0.65, envMapIntensity: 0.7,
         });
-        m.color.multiplyScalar(1.3);
+        m.color.multiplyScalar(cardMul);
         return m;
       });
       // 发际线绒边材质：软 alpha 混合（硬 alphaTest 的离散笔画贴裸皮=涂鸦感元凶）
-      const fringeM = Mtl('hairFringeM_' + hairHex.toString(16), () => new THREE.MeshStandardMaterial({
-        map: M.textures.hairFringe ?? M.textures.hairWisp, color: hairHex,
-        transparent: true, alphaTest: 0.03, depthWrite: false,
-        side: THREE.DoubleSide, roughness: 0.62, envMapIntensity: 0.7,
-      }));
+      const fringeM = Mtl('hairFringeM25_' + hairHex.toString(16), () => {
+        const m = new THREE.MeshStandardMaterial({
+          map: M.textures.hairFringe ?? M.textures.hairWisp, color: hairHex,
+          transparent: true, alphaTest: 0.03, depthWrite: false,
+          side: THREE.DoubleSide, roughness: 0.62, envMapIntensity: 0.7,
+        });
+        m.color.multiplyScalar(Math.min(1, cardMul));
+        return m;
+      });
       const addCard = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0, sx2 = 1) => {
         // 挂点随颅壳收窄同乘（卡片自身不变形）——碎发继续贴在缩窄后的壳面上
         const m = mkMesh(geo, mat, x * HX, 0.115 + y, z * HZ, sx2, 1, 1);
@@ -2553,7 +2568,9 @@ export class Humanoid {
         // 壳的光滑轮廓被锯齿卡打散，任何角度「泳帽穹顶」剪影不再成立
         // 轮25：盘发(bun)禁绺卡——盘起来的发是「梳顺抿光」的，颅顶散绺卡
         // 在 matron 特写里读成一头竖刺（父审灾难帧否决项）
-        if (hairStyle && hairStyle !== 'bun') {
+        // 轮25三稿：灰发同禁——银灰壳上深色绺卡边缘侧立读成「太阳穴乱线/
+        // 颅顶竖丝」（keeper 复拍残余伪影）；老年短发的层次交给壳沟槽贴图
+        if (hairStyle && hairStyle !== 'bun' && !greyHair) {
           const clumps = mkMesh(hairClumpCardsGeo(hairStyle, faceVariant, P), strandM, 0, 0.115, 0, HX, 1, HZ);
           clumps.castShadow = false;
           this.head.add(clumps);
@@ -2585,8 +2602,12 @@ export class Humanoid {
           // 加密排：中央两小片错位 + 两鬓过渡片——刘海是「一绺绺」，不是三块布
           addCard(hairCardGeo(0.036, 0.024, 6), fringeM, -0.017, hlAt(-0.017) + 0.008, 0.0775, -0.62, -0.2, 0.08);
           addCard(hairCardGeo(0.036, 0.024, 6), fringeM, 0.017, hlAt(0.017) + 0.009, 0.0775, -0.62, 0.2, -0.08);
-          addCard(hairCardGeo(0.03, 0.022, 6), fringeM, -0.054, hlAt(-0.054) + 0.006, 0.0645, -0.5, -0.72, 0.18);
-          addCard(hairCardGeo(0.03, 0.022, 6), fringeM, 0.054, hlAt(0.054) + 0.008, 0.0645, -0.5, 0.72, -0.18);
+          // 轮25：太阳穴过渡卡只给深发——灰发卡贴在明亮颞侧皮肤上
+          // 读成「褐色乱线补丁」（keeper 右太阳穴伪影）；深发有壳影衬着才成立
+          if (!greyHair) {
+            addCard(hairCardGeo(0.03, 0.022, 6), fringeM, -0.054, hlAt(-0.054) + 0.006, 0.0645, -0.5, -0.72, 0.18);
+            addCard(hairCardGeo(0.03, 0.022, 6), fringeM, 0.054, hlAt(0.054) + 0.008, 0.0645, -0.5, 0.72, -0.18);
+          }
         } else {
           // 盘发：发际线是「拢回去」的——低角度贴额扫向后（绒边，不压成刘海）
           addCard(hairCardGeo(0.055, 0.026, 5), fringeM, -0.024, 0.066, 0.074, -1.0, -0.3, 0.5);
@@ -2597,8 +2618,12 @@ export class Humanoid {
         // 鬓角（贴耳前，随不对称一高一低）+ 耳后补片——
         // 轮18：下移贴耳 + 换稀疏软 wisp（硬 alphaTest 密股卡在高发际颅型上
         // 顶端会戳出壳缘、贴在裸皮上读成「黑条码」贴纸）
-        addCard(hairCardGeo(0.03, 0.038, 5), wispM, -0.072, -0.004, 0.035, -0.14, -1.18, 0.1);
-        addCard(hairCardGeo(0.03, 0.038, 5), wispM, 0.072, -0.002, 0.035, -0.14, 1.18, -0.1);
+        // 轮25：photo 脸禁耳前鬓角卡——鬓角已烘在照片皮里，3D 卡叠上去
+        // 在亮肤侧光下读成「耳前黑色乱线」（keeper 侧照/正照太阳穴伪影否决项）
+        if (!this.photoKey) {
+          addCard(hairCardGeo(0.03, 0.038, 5), wispM, -0.072, -0.004, 0.035, -0.14, -1.18, 0.1);
+          addCard(hairCardGeo(0.03, 0.038, 5), wispM, 0.072, -0.002, 0.035, -0.14, 1.18, -0.1);
+        }
         addCard(hairCardGeo(0.028, 0.04, 5), wispM, -0.078, -0.014, -0.012, 0.05, -1.62, 0.12);
         addCard(hairCardGeo(0.028, 0.04, 5), wispM, 0.078, -0.012, -0.012, 0.05, 1.62, -0.12);
         // 颈窝碎发（两片错位）
@@ -2608,28 +2633,9 @@ export class Humanoid {
         // 旧方案是两片大卡打十字（0.05 高），逆光下读成「贴片玻璃」；
         // 改为短绒卡（长度减半 ~0.02，数量翻六倍）。根位走颅骨变形域精确求壳面：
         // 壳 = field(dir) × (r_orig/R)×1.02（conformSkull 同式），根部沉进壳面 1/4 卡高
-        if (hairStyle !== 'bun') { // 轮25：盘发颅顶必须抿光——顶心绒卡一并禁掉
-          const fld2 = makeSkullField(faceVariant, P, { bare: true });
-          const sp2 = { x: 0, y: 0, z: 0 };
-          for (let ci = 0; ci < 18; ci++) { // 轮24：12→18——顶心绒毛层加密
-            const az2 = (ci / 18) * Math.PI * 2 + (ci % 2) * 0.26 + P.asymPh * 0.8;
-            const el2 = 0.24 + (ci % 3) * 0.15;          // 距顶极角两圈（0.24/0.39/0.54 rad）
-            const ch2 = 0.007 + (ci % 3) * 0.0015;       // 轮25：再缩——绒毛不许立成刺
-            const dx2 = Math.sin(el2) * Math.sin(az2), dy2 = Math.cos(el2), dz2 = Math.sin(el2) * Math.cos(az2);
-            fld2(dx2, dy2, dz2, sp2);                    // 该方向的颅面点
-            // 壳共形倍率：cap 球心 (0,+0.03,-0.018) 抬高了原始顶点半径——按方向重建
-            const k2 = ((0.103 + 0.03 * dy2 - 0.018 * dz2) / SKULL_R) * 1.02;
-            const wsp = mkMesh(hairCardGeo(0.026 + (ci % 2) * 0.008, ch2, 3), fringeM,
-              (sp2.x * k2 + dx2 * ch2 * 0.25) * HX,
-              0.115 + sp2.y * k2 + dy2 * ch2 * 0.25,
-              (sp2.z * k2 + dz2 * ch2 * 0.25) * HZ);
-            wsp.rotation.order = 'YXZ';                  // 先方位后外倾再翻根
-            // 轮25：外倾 0.8→0.95——绒卡完全贴伏壳面顺毛流，剪影零尖刺
-            wsp.rotation.set(el2 * 0.85 + 0.95 + ((ci * 7) % 5) * 0.04, az2, Math.PI);
-            wsp.castShadow = false;
-            this.head.add(wsp);
-          }
-        }
+        // 轮25二稿：顶心绒卡环整层删除——压平/缩短之后它仍是 crown 剪影上
+        // 一圈悬浮「黑色碎片」（emcee/waiter/keeper 三帧顶轮廓全中招）；
+        // 顶部层次由壳沟槽+绺团噪声+压平绺卡承担，剪影必须干净
         // 轮23：顶心两根「不听话的长丝」删除——逆光剪影里读成「故障黑刺」，
         // 破坏轮廓的收益早被玩偶感罚没；碎发层次由贴壳短绒卡承担
         if (hairStyle === 'long') {
