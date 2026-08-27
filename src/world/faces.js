@@ -597,10 +597,12 @@ function compositeFace(M, job, img) {
             const hcr = (FACE_HAIR[key] >> 16) & 255, hcg = (FACE_HAIR[key] >> 8) & 255, hcb = FACE_HAIR[key] & 255;
             // 权重用宽 dz 门控（0.06-0.22）而非 frontW（0.14-0.48）——颞侧/耳上方的
             // 壳檐羽化带下也必须垫发根色，否则侧照读出「浅皮窗+黑丝条」
-            const hk = (1 - gate) * sstep(0.06, 0.22, dz) * 0.72;
-            r += (hcr * 1.25 - r) * hk;
-            g += (hcg * 1.25 - g) * hk;
-            b += (hcb * 1.25 - b) * hk;
+            // 轮24二稿：收敛 0.72→0.80、发根乘数 1.25→1.12——聚光下发际上的
+            // 「根皮」不许亮成米色楔块（face_a 刘海豁口）
+            const hk = (1 - gate) * sstep(0.06, 0.22, dz) * 0.80;
+            r += (hcr * 1.12 - r) * hk;
+            g += (hcg * 1.12 - g) * hk;
+            b += (hcb * 1.12 - b) * hk;
           }
           // 权重：朝前 × 椭圆 × 下巴截止 × 发际线 gate
           // 羽化带展宽三倍（0.72-0.98 → 0.52-1.0）：底皮→照片是长坡不是窄圈陡坎
@@ -649,6 +651,25 @@ function compositeFace(M, job, img) {
             }
             r += (pr - r) * w; g += (pg - g) * w; b += (pb - b) * w;
             WB[py2 * S + px2] = w;
+          }
+        }
+      }
+      // —— 轮24二稿·颞侧秃带根治：球面投影落在照片边界外/背半球的像素
+      // 从来不经过 hairGate 收敛——侧照里发壳羽化檐下露出一窗「裸色底皮 +
+      // 黑丝条」（emcee 侧脸秃带元凶）。为侧/后头皮补一条程序化发际线
+      //（额 0.415 → 颞 0.465 → 枕 0.585），线上向该脸发根色收敛 80% ——
+      {
+        const az = Math.abs(phi) / Math.PI; // 0=正前 1=正后
+        const sideK = sstep(0.24, 0.52, az);
+        if (sideK > 0 && v < 0.64) {
+          const vline = 0.415 + 0.05 * sstep(0.2, 0.5, az) + 0.12 * sstep(0.5, 1.0, az);
+          const above = 1 - sstep(vline - 0.03, vline + 0.025, v);
+          if (above > 0.003) {
+            const hcr = (FACE_HAIR[key] >> 16) & 255, hcg = (FACE_HAIR[key] >> 8) & 255, hcb = FACE_HAIR[key] & 255;
+            const hk = above * sideK * 0.80;
+            r += (hcr * 1.12 - r) * hk;
+            g += (hcg * 1.12 - g) * hk;
+            b += (hcb * 1.12 - b) * hk;
           }
         }
       }
