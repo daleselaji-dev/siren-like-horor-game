@@ -6,3 +6,6 @@ verify/*.png
 verify/*.jpg
 !verify/keep/
 verify/dbg/
+blender/export/
+*.blend1
+blender/__pycache__/

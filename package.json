@@ -64,6 +64,7 @@
   "devDependencies": {
     "electron": "^44.0.0",
     "electron-builder": "^26.15.3",
+    "gltfpack": "^1.2.0",
     "puppeteer-core": "^24.43.1",
     "vite": "^8.2.2"
   },
