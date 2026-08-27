@@ -1958,9 +1958,11 @@ export class Humanoid {
       // 加宽压扁(z 0.28→0.13)+再后沉 5mm：只留一道皮下软起伏，轮廓不再有独立剪影）
       if ((D.face === 'm' || D.face === 'gaunt' || D.face === 'old') && role !== 'matron') {
         // 轮18：顶点色 0.95→1.0（比颈面暗 5% 的球=近景一枚「灰色圆贴片」）+再沉 0.7mm
-        this.torso.add(mkMesh(G('adam', () => {
+        // 轮25：1.0→0.93——颌裙环接触影加深后，领口正中一颗全亮球
+        // 读成「领内亮珠」（keeper 取证帧）；喉结住在颌下阴影带里
+        this.torso.add(mkMesh(G('adam25', () => {
           const g2 = new THREE.SphereGeometry(0.012, 8, 6);
-          g2.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g2.attributes.position.count * 3).fill(1.0), 3));
+          g2.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g2.attributes.position.count * 3).fill(0.93), 3));
           return g2;
         }), neckMat, 0, 0.664 + (neckLen - 0.084), 0.0405, 0.66, 0.9, 0.13));
       }
@@ -2969,8 +2971,12 @@ export class Humanoid {
 
   setEyeIntensity(v) {
     // v: 0.5 常态 → 4 警戒。潮光是「湿反光」，不是霓虹。
+    // 轮25三稿：常态死区抬到 1.0——旧式 (v−0.5)×0.5 在初始化 v=0.7 时给虹膜
+    // 常亮 0.1 档青灰自发光（emissive 0x4a6a70），深褐虹膜在游戏内被洗成
+    // 「蓝珠眼」（charview 无 enemy 包装所以是棕的——历轮压不掉的真凶）；
+    // 潮光只归警戒态（v>1），峰值斜率补回原亮度
     this.eyeIntensity = v;
-    this.eyeMat.emissiveIntensity = Math.max(0, (v - 0.5) * 0.5);
+    this.eyeMat.emissiveIntensity = Math.max(0, (v - 1.0) * 0.55);
   }
 
   /** 近距 LOD：2m 内换高段数头模+法线细节层（滞回 2.1/2.9m 防抖）。

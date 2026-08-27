@@ -1583,10 +1583,12 @@ export function facadeWeatherTexture(size = 512, seed = 4451) {
   ctx.clearRect(0, 0, size, size);
   const rand = mulberry32(seed);
   // 蒙尘斑块：大而软的暗斑（低 alpha）——立面明度低频起伏
+  // 轮25二稿：alpha 全带 ×1.8——一稿取证夜景下整幅蒙尘读不出来，
+  // 立面仍被父审级读成「一整块」；雨夜灰楼的脏必须压得住月光级照度
   for (let i = 0; i < 26; i++) {
     const x = rand() * size, y = rand() * size, r = size * (0.06 + rand() * 0.16);
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    const a = 0.04 + rand() * 0.07;
+    const a = 0.08 + rand() * 0.12;
     g.addColorStop(0, `rgba(40,38,32,${a.toFixed(3)})`);
     g.addColorStop(1, 'rgba(40,38,32,0)');
     ctx.fillStyle = g;
@@ -1596,7 +1598,7 @@ export function facadeWeatherTexture(size = 512, seed = 4451) {
   for (let i = 0; i < 34; i++) {
     const x = rand() * size, w = 2 + rand() * 7, h = size * (0.12 + rand() * 0.3);
     const g = ctx.createLinearGradient(0, 0, 0, h);
-    const a = 0.08 + rand() * 0.12;
+    const a = 0.15 + rand() * 0.2;
     g.addColorStop(0, `rgba(34,32,28,${a.toFixed(3)})`);
     g.addColorStop(1, 'rgba(34,32,28,0)');
     ctx.fillStyle = g;
@@ -1609,7 +1611,7 @@ export function facadeWeatherTexture(size = 512, seed = 4451) {
     ctx.save();
     ctx.translate(x, y0);
     const g = ctx.createLinearGradient(0, 0, 0, h);
-    const a = 0.05 + rand() * 0.08;
+    const a = 0.09 + rand() * 0.13;
     g.addColorStop(0, `rgba(38,36,30,${a.toFixed(3)})`);
     g.addColorStop(1, 'rgba(38,36,30,0)');
     ctx.fillStyle = g;
@@ -1620,11 +1622,11 @@ export function facadeWeatherTexture(size = 512, seed = 4451) {
   {
     const g = ctx.createLinearGradient(0, size * 0.82, 0, size);
     g.addColorStop(0, 'rgba(52,44,34,0)');
-    g.addColorStop(1, 'rgba(52,44,34,0.20)');
+    g.addColorStop(1, 'rgba(52,44,34,0.34)');
     ctx.fillStyle = g;
     ctx.fillRect(0, size * 0.82, size, size * 0.18);
     for (let i = 0; i < 80; i++) {
-      ctx.fillStyle = `rgba(48,40,30,${(0.06 + rand() * 0.12).toFixed(3)})`;
+      ctx.fillStyle = `rgba(48,40,30,${(0.10 + rand() * 0.18).toFixed(3)})`;
       ctx.beginPath();
       ctx.arc(rand() * size, size * (0.86 + rand() * 0.14), 1 + rand() * 3, 0, 6.28);
       ctx.fill();
@@ -1643,8 +1645,8 @@ export function sillStreakTexture(size = 128, seed = 7717) {
   for (const xr of [0.12 + rand() * 0.08, 0.5 + (rand() - 0.5) * 0.2, 0.86 - rand() * 0.08]) {
     const x = xr * size, w = 3 + rand() * 6, h = size * (0.5 + rand() * 0.45);
     const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, `rgba(30,28,24,${(0.22 + rand() * 0.12).toFixed(3)})`);
-    g.addColorStop(0.5, `rgba(30,28,24,${(0.10 + rand() * 0.06).toFixed(3)})`);
+    g.addColorStop(0, `rgba(30,28,24,${(0.30 + rand() * 0.14).toFixed(3)})`);
+    g.addColorStop(0.5, `rgba(30,28,24,${(0.15 + rand() * 0.08).toFixed(3)})`);
     g.addColorStop(1, 'rgba(30,28,24,0)');
     ctx.fillStyle = g;
     ctx.fillRect(x - w / 2, 0, w, h);
