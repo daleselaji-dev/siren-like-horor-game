@@ -136,7 +136,27 @@ export async function run(page, h) {
       hum.animate('mc', 0.001, 0);
       g.hud.clearSubtitles();
     });
-    await frames(3);
+    // 轮21同步：退 1.15m 上身构图 + 司仪 13m 内酒店灯强制点亮（灯光预算随机黑帧修复）——
+    // 旧头侧 0.88m 机位手离镜头 0.3m，掌背贴黑音箱读成木手
+    await page.evaluate(() => {
+      const g = window.__game;
+      const hum = g.byId.emcee.body;
+      const V = g.player.pos.constructor;
+      const head = hum.headWorldPos(new V());
+      for (const hl of g.world.dynamic.hotelLights ?? []) {
+        if (hl.pl.position.distanceTo(head) < 13) hl.pl.visible = true;
+      }
+      const l = hum.armL.hand.getWorldPosition(new V());
+      const r = hum.armR.hand.getWorldPosition(new V());
+      const mx = (l.x + r.x) / 2, my = (l.y + r.y) / 2, mz = (l.z + r.z) / 2;
+      const cxr = mx + (head.x - mx) * 0.45, cyr = my + (head.y - my) * 0.45, czr = mz + (head.z - mz) * 0.45;
+      const dn = Math.hypot(0.56, 0.68);
+      const cam = g.engine.camera;
+      cam.position.set(cxr + (0.56 / dn) * 1.15, cyr + 0.04, czr + (0.68 / dn) * 1.15);
+      cam.lookAt(cxr, cyr, czr);
+      g.hud.clearSubtitles();
+    });
+    await frames(4);
     await h.shot('r20/emcee_stage');
     await page.evaluate(() => { window.__game.game.state = 'PLAY'; });
   }
