@@ -14,8 +14,13 @@ import urlPale from '../assets/faces/face_staff_pale.webp';
 import urlChalk from '../assets/faces/face_chalk.webp';
 
 // ---- 头模标定常量（与 humanoid.js 头部布局一致，均为「相对颅心」坐标）----
+// 轮20·纵向标定重排（挤脸根治）：旧 MOUTH_Y=-0.0405 使「眼线→嘴线」只有 38mm，
+// 而瞳距 65mm——照片脸投影上头时被竖向压扁 ~1.9 倍：鼻子缩成一截、嘴贴着鼻子、
+// 下巴空出一大块、额头显巨（「五官挤在脸中心一小块」的真正元凶）。
+// 现按真人人体测量重排：眼线→口裂 ≈66mm（局部 -0.0685）、口裂→颏 ≈35mm——
+// 照片竖向压缩降到 ~1.1（肉眼读不出），五官摊满整张脸
 const EYE_X = 0.0325, EYE_Y = -0.002, EYE_Z = 0.08;   // 眼球中心
-const MOUTH_Y = -0.0405, MOUTH_Z = 0.0862;            // 口裂中心
+const MOUTH_Y = -0.0685, MOUTH_Z = 0.0775;            // 口裂中心
 const R0 = 0.098;                                     // 前脸平均半径
 
 // 每张脸的照片标定（画面比例 0..1）：眼线 y / 左右瞳 x / 嘴线 y / 下巴 y
@@ -78,6 +83,7 @@ export function faceAnchor(key) {
   return (_anchors[key] = {
     browY: (cy - D.browY * S) / sy,
     noseY: (cy - D.noseY * S) / sy,
+    hairY: (cy - D.hairY * S) / sy, // 正中发际线（头局部米）——发壳前檐按此对位盖住烘焙边界
   });
 }
 
@@ -459,7 +465,8 @@ function compositeFace(M, job, img) {
   const hairGate = (spx, spy) => {
     const dxn = (spx - cx) / ioPx;
     const gy = (D.hairY + D.hairSag * dxn * dxn) * PS;
-    return sstep(gy + PS * 0.004, gy + PS * 0.042, spy);
+    // 轮20：羽化带加宽（0.042→0.058）——纵向重排放大了照片，发际过渡按比例放软
+    return sstep(gy - PS * 0.002, gy + PS * 0.058, spy);
   };
 
   // 颊部取色（肤色均值→睑色/底皮色调匹配）
@@ -540,7 +547,7 @@ function compositeFace(M, job, img) {
           const frontW = sstep(0.14, 0.48, dz);
           const gate = hairGate(spx, spy);
           // 发际以上的头皮压暗一档（发根阴影）：发壳羽化边下露出的头皮不是亮粉的秃皮
-          const rootDk = 1 - (1 - gate) * 0.13 * frontW;
+          const rootDk = 1 - (1 - gate) * 0.18 * frontW;
           r *= rootDk; g *= rootDk; b *= rootDk;
           // 权重：朝前 × 椭圆 × 下巴截止 × 发际线 gate
           // 羽化带展宽三倍（0.72-0.98 → 0.52-1.0）：底皮→照片是长坡不是窄圈陡坎

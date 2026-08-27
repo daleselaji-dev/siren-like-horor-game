@@ -207,7 +207,8 @@ function makeSkullField(variant, P, o = {}) {
   const fem = variant === 'f';
   // 轮17：头宽上限收 3%、颌收拢上限收 3 成——「头宽下颌尖」的倒三角脸出局
   const { headW, faceLen } = headBase(variant, P);
-  const jawT = (fem ? 0.29 : 0.25) + P.jaw * 0.07;
+  // 轮20二稿：下颌收拢减档（0.25→0.21）——重排后旧值把下半脸掐成倒三角
+  const jawT = (fem ? 0.27 : 0.21) + P.jaw * 0.06;
   const chinZ = 0.02 + P.chin * 0.017;
   const cheekAmp = 0.0035 + P.cheek * 0.007 + (old ? 0.0035 : 0);
   const hollowAmp = (old ? 0.009 : 0.002) + P.hollow * 0.007;
@@ -219,11 +220,13 @@ function makeSkullField(variant, P, o = {}) {
   const bare = !!o.bare; // 发壳/帽体共形：只要颅形，不要五官（鼻/唇/颏不许顶进发里）
   // —— 鼻（轮16 真几何）：鼻根凹/鼻梁脊/鼻尖球/鼻翼瓣/鼻孔凹腔/鼻小柱 全部是形体。
   // 鼻底线（方向空间）：照片脸经 o.dyN（米）对齐到照片鼻孔线
-  const yBase = (-0.0235 - P.noseL * 0.003 + (o.dyN ?? 0)) / (R * faceLen);
+  // 轮20·纵向重排：鼻底 -0.0235→-0.0415（眼线→鼻底 ≈40mm 真人档）——
+  // 与 faces.js MOUTH_Y=-0.0685 同一次标定，鼻/口/颏全体下移，五官摊满整脸
+  const yBase = (-0.0415 - P.noseL * 0.003 + (o.dyN ?? 0)) / (R * faceLen);
   const yTip = yBase + 0.088;             // 鼻尖（底线之上）
   const yRadix = 0.105;                   // 鼻根（眉间之下的凹点）
   const noseW = 0.155 + P.noseW * 0.055;  // 鼻翼半宽（方向空间）
-  const nProt = 0.018 + P.noseL * 0.008;  // 鼻尖突出量（米）——侧脸必须有鼻突
+  const nProt = 0.021 + P.noseL * 0.009;  // 鼻尖突出量（米）——侧脸必须有鼻突（轮20 加档）
   return (nx, ny, nz, out) => {
     let x = nx * R, y = ny * R * faceLen, z = nz * R;
     x *= headW;                          // 头侧收窄
@@ -239,30 +242,33 @@ function makeSkullField(variant, P, o = {}) {
     // 顶结节以下侧壁微平：颞侧是「面」不是「弧」
     x *= 1 - Math.exp(-((ny - 0.3) ** 2) * 5.5) * 0.04;
     // 下颌到下巴：分两段折线收拢——折点即下颌角，颊面到颌缘有明确的转折
+    // 轮20：折点随口/颏下移（tt 0.34→0.52，即 ny≈-0.58 口裂之下）——
+    // 旧折点压在新鼻底高度，会把脸在中段掐一刀
     if (ny < -0.12 && nz > -0.25) {
       const tt = Math.min(1, (-ny - 0.12) / 0.88);
-      const t = tt < 0.34 ? tt * 0.62 : 0.211 + (tt - 0.34) * 1.196;
+      // 折点 0.55（口裂之下）；折后走 1.5 次幂——颌体保宽到颏前才收（U 形颌，不是 V）
+      const t = tt < 0.55 ? tt * 0.42 : 0.231 + Math.pow((tt - 0.55) / 0.45, 1.5) * 0.769;
       x *= 1 - t * jawT;
       z = z * (1 - t * 0.2) + t * chinZ;
       y *= 1.03;
       // 折线上沿一道咬肌棱（亮棱让折线在侧光里读得出来）
-      const crease = Math.exp(-((tt - 0.3) ** 2) * 110) * Math.min(1, Math.abs(nx) * 2.4) * Math.max(0, nz + 0.35);
+      const crease = Math.exp(-((tt - 0.48) ** 2) * 110) * Math.min(1, Math.abs(nx) * 2.4) * Math.max(0, nz + 0.35);
       x += Math.sign(nx) * crease * 0.0028;
     }
     const axn = Math.abs(nx);
-    // 下颌角点（耳垂下前方的骨点）：侧面外凸出折线的「角」
-    const gon = Math.exp(-((ny + 0.42) ** 2) * 60 - ((axn - 0.68) ** 2) * 26) * Math.max(0, nz * 0.8 + 0.4);
-    x += Math.sign(nx) * gon * 0.005;
+    // 下颌角点（耳垂下前方的骨点）：侧面外凸出折线的「角」——随口线下移到 ny≈-0.62
+    const gon = Math.exp(-((ny + 0.62) ** 2) * 55 - ((axn - 0.68) ** 2) * 20) * Math.max(0, nz * 0.8 + 0.4);
+    x += Math.sign(nx) * gon * 0.0065;
     const front = Math.max(0, nz);
-    // 颧骨体（前凸+外扩——颊面从眶下折向颌缘的骨感转角）
-    const cheek = Math.exp(-((ny + 0.1) ** 2) * 16 - ((axn - 0.62) ** 2) * 18) * front;
+    // 颧骨体（前凸+外扩——颊面从眶下折向颌缘的骨感转角）：眶下一指（ny≈-0.16）
+    const cheek = Math.exp(-((ny + 0.16) ** 2) * 16 - ((axn - 0.62) ** 2) * 18) * front;
     x += Math.sign(nx) * cheek * cheekAmp;
     z += cheek * cheekAmp * 0.55;
     // 颧弓：颧骨体沿眼线向耳一条骨梁（侧脸的横向骨感，不是光蛋壳）
-    const zyg = Math.exp(-((ny + 0.05) ** 2) * 90) * _ss01(0.45, 0.8, axn) * Math.max(0, nz + 0.25);
+    const zyg = Math.exp(-((ny + 0.08) ** 2) * 90) * _ss01(0.45, 0.8, axn) * Math.max(0, nz + 0.25);
     x += Math.sign(nx) * zyg * 0.0032;
-    // 颊部凹陷（老年/失水/瘦脸）
-    const hollow = Math.exp(-((ny + 0.24) ** 2) * 20 - ((axn - 0.42) ** 2) * 26) * front;
+    // 颊部凹陷（老年/失水/瘦脸）：颧下颌上的软组织带（ny≈-0.38）
+    const hollow = Math.exp(-((ny + 0.38) ** 2) * 20 - ((axn - 0.42) ** 2) * 26) * front;
     x -= Math.sign(nx) * hollow * hollowAmp;
     z -= hollow * hollowAmp * 0.6;
     // 眉弓：眶上骨棱（外强内缓）——下缘就是眼窝顶，侧影第一凸
@@ -296,14 +302,16 @@ function makeSkullField(variant, P, o = {}) {
       noseZ -= 0.004 * Math.exp(-(((ny - (yRadix + 0.075)) / 0.055) ** 2) - ((nx / 0.1) ** 2));
       z += noseZ * fz;
       // —— 口周/唇床/颏：唇是从形体上长出来的 ——
-      z += Math.exp(-(((ny + 0.4) / 0.11) ** 2) - ((nx / 0.26) ** 2)) * fz * 0.0038;  // 吻部隆起
-      z += Math.exp(-(((ny + 0.372) / 0.032) ** 2) - ((nx / 0.17) ** 2)) * fz * 0.003;  // 上唇床
-      z += Math.exp(-(((ny + 0.445) / 0.038) ** 2) - ((nx / 0.14) ** 2)) * fz * 0.0036; // 下唇床
-      z -= Math.exp(-(((ny + 0.53) / 0.045) ** 2) - ((nx / 0.13) ** 2)) * fz * 0.0048;  // 颏唇沟
-      z += Math.exp(-(((ny + 0.655) / 0.1) ** 2) - ((nx / 0.15) ** 2)) * fz * 0.0068;   // 颏隆突
-      z -= Math.exp(-(((ny + 0.335) / 0.045) ** 2) - ((nx / 0.04) ** 2)) * fz * 0.002;  // 人中槽
-      // 法令纹（老年更深）
-      z -= Math.exp(-((axn - 0.24) ** 2) * 140 - ((ny + 0.3) ** 2) * 34) * front * (old ? 0.0042 : 0.0014);
+      // 轮20：整组随口裂线下移（口裂 ny≈-0.64、颏隆突 ny≈-0.885）——与
+      // faces.js MOUTH_Y / mouthG 落位同一次标定
+      z += Math.exp(-(((ny + 0.64) / 0.12) ** 2) - ((nx / 0.26) ** 2)) * fz * 0.0038;  // 吻部隆起
+      z += Math.exp(-(((ny + 0.605) / 0.035) ** 2) - ((nx / 0.17) ** 2)) * fz * 0.003;  // 上唇床
+      z += Math.exp(-(((ny + 0.695) / 0.04) ** 2) - ((nx / 0.14) ** 2)) * fz * 0.0036; // 下唇床
+      z -= Math.exp(-(((ny + 0.785) / 0.045) ** 2) - ((nx / 0.13) ** 2)) * fz * 0.0048;  // 颏唇沟
+      z += Math.exp(-(((ny + 0.885) / 0.09) ** 2) - ((nx / 0.15) ** 2)) * fz * 0.0068;   // 颏隆突
+      z -= Math.exp(-(((ny + 0.52) / 0.05) ** 2) - ((nx / 0.04) ** 2)) * fz * 0.002;  // 人中槽
+      // 法令纹（老年更深）：鼻翼旁斜向口角
+      z -= Math.exp(-((axn - 0.24) ** 2) * 140 - ((ny + 0.52) ** 2) * 30) * front * (old ? 0.0042 : 0.0014);
     }
     // 太阳穴微凹
     x -= Math.sign(nx) * Math.exp(-((ny - 0.25) ** 2) * 30 - ((axn - 0.85) ** 2) * 40) * 0.004;
@@ -408,7 +416,7 @@ function craniumGeo(variant, P, hd = false, dyN = 0) {
 function noseDyFor(P, photoKey) {
   const a = photoKey ? faceAnchor(photoKey) : null;
   if (!a) return 0;
-  const def = -0.0235 - P.noseL * 0.003; // 默认几何鼻底线（相对颅心，米）
+  const def = -0.0415 - P.noseL * 0.003; // 默认几何鼻底线（相对颅心，米）——轮20 纵向重排
   return Math.max(-0.008, Math.min(0.006, a.noseY - def));
 }
 
@@ -527,7 +535,7 @@ function lipsGeo(P) {
 function lipSeamGeo(P) {
   return G(`lipseam_${Math.round(P.mouthW * 6)}`, () => {
     const mw = 1.05 + P.mouthW * 0.45;
-    const w = 0.0205 * mw;
+    const w = 0.0185 * mw; // 轮20：口缝线不许伸出嘴角
     const pts = [];
     for (let i = 0; i <= 10; i++) {
       const t = i / 10 - 0.5;                                  // -0.5..0.5
@@ -917,9 +925,72 @@ function driftLimbGeo(r, len, key) {
   });
 }
 
-/** 手（轮19·方块指根治）：掌体+鱼际/小鱼际+四指三节指骨链+两节拇指。
- *  每指自掌指关节向外扇开（食指内收/小指外张），逐指粗细长短不同，
- *  高段数胶囊+关节球——0.4m 抬臂近景读成「一只分指的人手」，不是充气手套。
+/** 指管扫掠（轮20·木偶手根治核心）：沿关节折线的 CatmullRom 曲线扫出**一根连续
+ *  皮肤管**——粗细沿指渐收、指节处只有曲率没有缝，指尖收成软圆头。
+ *  分段胶囊+关节球的拼装从此废除：关节处不再有深色球/木节缝，屈曲是「弯」不是「铰」。 */
+function fingerSweep(pts, radii, radial = 10) {
+  const curve = new THREE.CatmullRomCurve3(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)), false, 'centripetal', 0.5);
+  const S = 20;                       // 沿指采样段数
+  const pos = [], uv = [], idx = [];
+  // 半径沿弧长平滑插值（radii 与 pts 一一对应，段内 smoothstep）
+  const radAt = (t) => {
+    const f = t * (radii.length - 1);
+    const i = Math.min(radii.length - 2, f | 0);
+    let k = f - i;
+    k = k * k * (3 - 2 * k);
+    return radii[i] + (radii[i + 1] - radii[i]) * k;
+  };
+  // 帧平行输运：法向沿管连续，不因指屈翻拧
+  let N = new THREE.Vector3(1, 0, 0);
+  const T = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+  const rings = [];
+  for (let i = 0; i <= S; i++) {
+    const t = i / S;
+    curve.getPointAt(t, C);
+    curve.getTangentAt(t, T);
+    N.addScaledVector(T, -N.dot(T)).normalize();
+    B.crossVectors(T, N);
+    rings.push({ c: C.clone(), n: N.clone(), b: B.clone(), r: radAt(t), t });
+  }
+  // 指尖圆头：沿末端切线追加三圈收拢 + 顶点圈
+  const last = rings[rings.length - 1];
+  for (const [dt, rk] of [[0.35, 0.86], [0.62, 0.58], [0.82, 0.26], [0.92, 0.04]]) {
+    rings.push({
+      c: last.c.clone().addScaledVector(T, last.r * dt),
+      n: last.n, b: last.b, r: last.r * rk, t: 1,
+    });
+  }
+  for (let i = 0; i < rings.length; i++) {
+    const rg = rings[i];
+    for (let j = 0; j <= radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      // 指腹微鼓（掌侧 +6%）：指头有「肉」，但没有任何一圈是独立的「节」
+      const squash = 1 + Math.sin(a) * 0.06;
+      pos.push(
+        rg.c.x + (rg.n.x * Math.cos(a) + rg.b.x * Math.sin(a)) * rg.r * squash,
+        rg.c.y + (rg.n.y * Math.cos(a) + rg.b.y * Math.sin(a)) * rg.r * squash,
+        rg.c.z + (rg.n.z * Math.cos(a) + rg.b.z * Math.sin(a)) * rg.r * squash);
+      uv.push(j / radial, rg.t);
+    }
+  }
+  const W = radial + 1;
+  for (let i = 0; i < rings.length - 1; i++) {
+    for (let j = 0; j < radial; j++) {
+      const a = i * W + j, b2 = a + 1, c2 = a + W, d = a + W + 1;
+      idx.push(a, c2, d, a, d, b2);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** 手（轮20·连续皮肤网格）：掌体+鱼际/小鱼际+四指+拇指——每根指是**一根**
+ *  fingerSweep 连续管（根部埋进掌体软过渡），全手同一皮肤材质；
+ *  关节球/分段胶囊全部废除——任何角度都读不出「木偶节」。
  *  curl: 'relax'|'open'|'flat'。几何为右手；左手用 mirroredHandGeo 取真镜像。 */
 function handGeo(curl = 'relax') {
   return G('hand_' + curl, () => {
@@ -929,39 +1000,38 @@ function handGeo(curl = 'relax') {
     parts.push(xform(new THREE.SphereGeometry(0.03, 12, 9), 0, -0.082, 0.007, 0.1, 0, 0, 1.02, 0.42, 0.42));
     parts.push(xform(new THREE.SphereGeometry(0.016, 10, 8), 0.02, -0.06, 0.011, 0.3, 0, 0.2, 1.0, 1.3, 0.62));
     parts.push(xform(new THREE.SphereGeometry(0.0125, 10, 8), -0.024, -0.06, 0.007, -0.15, 0, -0.1, 0.9, 1.35, 0.6));
-    const c1 = curl === 'open' ? 0.2 : curl === 'flat' ? 0.06 : 0.5;   // 近节屈
-    const c2 = curl === 'open' ? 0.2 : curl === 'flat' ? 0.07 : 0.58;  // 中节屈
-    const c3 = curl === 'open' ? 0.1 : curl === 'flat' ? 0.05 : 0.34;  // 远节屈
-    const R1 = [0.0066, 0.0069, 0.0064, 0.0054];   // 逐指近节半径（食/中/环/小）
+    const c1 = curl === 'open' ? 0.26 : curl === 'flat' ? 0.06 : 0.5;   // 近节屈
+    const c2 = curl === 'open' ? 0.22 : curl === 'flat' ? 0.07 : 0.58;  // 中节屈
+    const c3 = curl === 'open' ? 0.12 : curl === 'flat' ? 0.05 : 0.34;  // 远节屈
+    const R1 = [0.0066, 0.0069, 0.0064, 0.0054];   // 逐指基半径（食/中/环/小）
     const L1 = [0.033, 0.037, 0.034, 0.026];
     const L2 = [0.021, 0.024, 0.022, 0.016];
     const L3 = [0.015, 0.017, 0.016, 0.013];
     for (let i = 0; i < 4; i++) {
-      const splay = (i - 1.25) * 0.085;            // 指扇：自掌指关节向小指侧张开
+      // 指扇收半（0.085→0.05）：张开的手指是「并拢微分」，不是人偶的扇骨
+      const splay = (i - 1.25) * 0.05;
       const ss = Math.sin(splay), cs = Math.cos(splay);
       let px = -0.0235 + i * 0.0162, py = -0.088, pz = 0.008;
       const r1 = R1[i];
-      parts.push(xform(new THREE.SphereGeometry(r1 * 1.12, 10, 8), px, py, pz, 0, 0, 0, 1, 1.15, 1)); // 掌指关节
-      const seg = (a, len, rad) => {
+      const chain = [[px - ss * 0.014, py + 0.015, pz - 0.004]]; // 根：埋进掌缘软过渡
+      chain.push([px, py, pz]);
+      const seg = (a, len) => {
         const dx = ss * Math.cos(a), dy = -cs * Math.cos(a), dz = Math.sin(a);
-        parts.push(xform(new THREE.CapsuleGeometry(rad, len, 6, 12),
-          px + dx * (len * 0.5 + 0.003), py + dy * (len * 0.5 + 0.003), pz + dz * (len * 0.5 + 0.003), -a, 0, splay));
-        px += dx * (len + 0.006); py += dy * (len + 0.006); pz += dz * (len + 0.006);
+        px += dx * len; py += dy * len; pz += dz * len;
+        chain.push([px, py, pz]);
       };
-      seg(c1, L1[i], r1);                                              // 近节
-      parts.push(xform(new THREE.SphereGeometry(r1 * 0.94, 8, 7), px, py, pz)); // 近侧指间关节
-      seg(c1 + c2, L2[i], r1 * 0.88);                                  // 中节
-      parts.push(xform(new THREE.SphereGeometry(r1 * 0.84, 8, 7), px, py, pz)); // 远侧指间关节
-      seg(c1 + c2 + c3, L3[i], r1 * 0.78);                             // 远节
-      // 指尖软垫（微扁）——指头有「肉」，不是圆棍截断
-      parts.push(xform(new THREE.SphereGeometry(r1 * 0.8, 8, 7), px, py, pz, 0, 0, 0, 1, 1.1, 0.85));
+      seg(c1, L1[i]);                  // 近节
+      seg(c1 + c2, L2[i]);             // 中节
+      seg(c1 + c2 + c3, L3[i]);        // 远节（到指尖）
+      parts.push(fingerSweep(chain, [r1 * 1.3, r1 * 1.04, r1 * 0.92, r1 * 0.82, r1 * 0.7]));
     }
-    // 拇指两节：自鱼际斜出、向掌心对掌
-    parts.push(xform(new THREE.SphereGeometry(0.0086, 10, 8), 0.033, -0.052, 0.013));
-    parts.push(xform(new THREE.CapsuleGeometry(0.0071, 0.03, 6, 12), 0.0425, -0.066, 0.02, -0.42, 0, -0.58));
-    parts.push(xform(new THREE.SphereGeometry(0.0064, 8, 7), 0.0525, -0.0805, 0.0275));
-    parts.push(xform(new THREE.CapsuleGeometry(0.006, 0.021, 6, 12), 0.059, -0.09, 0.034, -0.6, 0, -0.66));
-    parts.push(xform(new THREE.SphereGeometry(0.0052, 8, 7), 0.0655, -0.0985, 0.0415, 0, 0, 0, 1, 1.1, 0.85));
+    // 拇指：一根连续管自鱼际斜出、向掌心对掌
+    parts.push(fingerSweep([
+      [0.026, -0.042, 0.008],
+      [0.035, -0.054, 0.014],
+      [0.0525, -0.0805, 0.0275],
+      [0.0655, -0.0985, 0.0415],
+    ], [0.0105, 0.0088, 0.0068, 0.0056]));
     return merged(parts);
   });
 }
@@ -1032,28 +1102,28 @@ function roeSealGeo() {
     const parts = [];
     let s = 12345;
     const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-    // 皮面深度（口周局部近似）：越偏离口心越靠后
-    const zSurf = (x, y) => 0.0888 - x * x * 2.6 - (y + 0.043) * (y + 0.043) * 1.9;
+    // 皮面深度（口周局部近似）：越偏离口心越靠后（轮20：随口裂线下移重标）
+    const zSurf = (x, y) => 0.0805 - x * x * 2.6 - (y + 0.0685) * (y + 0.0685) * 1.9;
     // 主串：沿口裂弧线密排（籽从缝里挤出来）——轮18：粒径再压 (≤2.4mm)、
     // 球心沉进皮下 3/4，露头只剩一粒软鼓——0.5m 读成口缝上的一线痂
     for (let i = 0; i < 12; i++) {
       const t = i / 11 - 0.5;
       const x = t * 0.046 + (rnd() - 0.5) * 0.002;
-      const y = -0.0405 - Math.cos(t * Math.PI) * 0.0015 + (rnd() - 0.5) * 0.0015;
+      const y = -0.0685 - Math.cos(t * Math.PI) * 0.0015 + (rnd() - 0.5) * 0.0015;
       const r = 0.0012 + rnd() * 0.0008;
       parts.push(xform(new THREE.SphereGeometry(r, 7, 5), x, y, zSurf(x, y) - r * 0.74));
     }
     // 下唇缘垂串：一小撮（蔓延是不对称的）
     for (let i = 0; i < 5; i++) {
       const x = -0.011 + (rnd() - 0.5) * 0.009;
-      const y = -0.047 - rnd() * 0.005;
+      const y = -0.075 - rnd() * 0.005;
       const r = 0.001 + rnd() * 0.0008;
       parts.push(xform(new THREE.SphereGeometry(r, 7, 5), x, y, zSurf(x, y) - r * 0.75));
     }
     // 左嘴角一小丛（最先钙化的地方）
     for (let i = 0; i < 4; i++) {
       const x = -0.024 - rnd() * 0.005;
-      const y = -0.040 + (rnd() - 0.5) * 0.006;
+      const y = -0.068 + (rnd() - 0.5) * 0.006;
       const r = 0.0012 + rnd() * 0.0009;
       parts.push(xform(new THREE.SphereGeometry(r, 7, 5), x, y, zSurf(x, y) - r * 0.72));
     }
@@ -1074,7 +1144,7 @@ function poreplateDiscGeo() {
 /** 岗亭员：投币口嘴——嘴的位置是一道钢缝（前探出面部表面，深根入头防碎片化） */
 function ticketSlotGeo() {
   return G('ticketSlot', () => merged([
-    xform(new THREE.BoxGeometry(0.056, 0.016, 0.02), 0, -0.038, 0.093, -0.06), // 钢框（唇床鼓起后前移）
+    xform(new THREE.BoxGeometry(0.056, 0.016, 0.02), 0, -0.0685, 0.086, -0.06), // 钢框（轮20：随口裂线下移）
   ]));
 }
 
@@ -1563,7 +1633,7 @@ export class Humanoid {
     // 抬到 0.0335..0.039 → 世界瞳距 60-70mm；skull 域 eyeNX 同步（除以 0.0882 换算）
     const eyeXoff = 0.0335 + P.eyeX * 0.0055;
     const eyeYoff = 0.113 + (P.eyeH - 0.5) * 0.006; // 眼睛在头高一半处（婴儿化=眼太高）
-    const eyeScl = 0.92 + P.eyeS * 0.12;
+    const eyeScl = 0.89 + P.eyeS * 0.10; // 轮20：眼球收一档——瞪珠感减半
     this.eyeSclY = eyeScl;
     this.eyeXoff = eyeXoff;
     // 眼球退进眼窝（z 0.0742→0.0726）——球体藏在眶缘/睑缘之内，只露睑裂那一条
@@ -1682,9 +1752,9 @@ export class Humanoid {
       const nostrilM = pick(Mtl('nostrilVoid', () => new THREE.MeshStandardMaterial({ color: 0x140c0a, roughness: 1 })));
       const nG = G('nostril', () => new THREE.SphereGeometry(0.0042, 8, 6));
       const noseW2 = 0.155 + P.noseW * 0.055; // 与变形域同一份鼻翼半宽（方向空间）
-      const nY = 0.115 - 0.0235 - P.noseL * 0.003 + noseDyFor(P, this.photoKey) + 0.002;
+      const nY = 0.115 - 0.0415 - P.noseL * 0.003 + noseDyFor(P, this.photoKey) + 0.002; // 轮20：随鼻底下移
       for (const s of [-1, 1]) {
-        const nm = mkMesh(nG, nostrilM, s * noseW2 * 0.45 * 0.089 * HX, nY, 0.0925 * HZ, 1.15, 0.6, 0.8);
+        const nm = mkMesh(nG, nostrilM, s * noseW2 * 0.45 * 0.089 * HX, nY, 0.0905 * HZ, 1.15, 0.6, 0.8);
         nm.rotation.x = 0.55;
         this.head.add(nm);
       }
@@ -1694,10 +1764,10 @@ export class Humanoid {
       const steelM = pick(Mtl('slotSteel', () => new THREE.MeshStandardMaterial({ color: 0x888c90, roughness: 0.3, metalness: 0.8 })));
       this.head.add(mkMesh(ticketSlotGeo(), steelM, 0, 0.115, 0, HX, 1, HZ));
       this.head.add(mkMesh(G('slotDark', () => new THREE.BoxGeometry(0.046, 0.006, 0.022)),
-        pick(Mtl('slotVoid', () => new THREE.MeshStandardMaterial({ color: 0x08090a, roughness: 1 }))), 0, 0.077, 0.095 * HZ));
+        pick(Mtl('slotVoid', () => new THREE.MeshStandardMaterial({ color: 0x08090a, roughness: 1 }))), 0, 0.0465, 0.088 * HZ));
       // 2m 细节：面板嵌进皮肉——磨旧钢板 + 四粒十字螺钉 + 卡半枚的硬币 + 皮肉增生环
       const plateM = pick(Mtl('slotPlate', () => new THREE.MeshStandardMaterial({ color: 0x6e7276, roughness: 0.44, metalness: 0.75 })));
-      const plate = mkMesh(G('slotPlateG', () => new THREE.BoxGeometry(0.072, 0.04, 0.006)), plateM, 0, 0.077, 0.0925 * HZ);
+      const plate = mkMesh(G('slotPlateG', () => new THREE.BoxGeometry(0.072, 0.04, 0.006)), plateM, 0, 0.0465, 0.0855 * HZ);
       plate.rotation.x = -0.06;
       this.head.add(plate);
       const screwM = pick(Mtl('slotScrew', () => new THREE.MeshStandardMaterial({ color: 0x9aa0a4, roughness: 0.3, metalness: 0.85 })));
@@ -1707,11 +1777,11 @@ export class Humanoid {
         return g;
       });
       for (const [sx2, sy2] of [[-0.029, 0.014], [0.029, 0.014], [-0.029, -0.014], [0.029, -0.014]]) {
-        this.head.add(mkMesh(screwG, screwM, sx2 * HX, 0.077 + sy2, 0.096 * HZ));
+        this.head.add(mkMesh(screwG, screwM, sx2 * HX, 0.0465 + sy2, 0.089 * HZ));
       }
       // 硬币：卡在缝里只进去一半——它在等下一枚
       const coinM = pick(Mtl('slotCoin', () => new THREE.MeshStandardMaterial({ color: 0xb09244, roughness: 0.35, metalness: 0.7 })));
-      const coin = mkMesh(G('slotCoinG', () => new THREE.CylinderGeometry(0.0095, 0.0095, 0.0022, 14)), coinM, 0.011 * HX, 0.0772, 0.1005 * HZ);
+      const coin = mkMesh(G('slotCoinG', () => new THREE.CylinderGeometry(0.0095, 0.0095, 0.0022, 14)), coinM, 0.011 * HX, 0.0467, 0.0935 * HZ);
       coin.rotation.z = 0.08;
       this.head.add(coin);
       // 皮肉增生环：皮肤从钢板四缘漫上来——面板不是戴的，是长的
@@ -1720,7 +1790,7 @@ export class Humanoid {
         g.scale(1.15, 0.72, 1);
         return g;
       });
-      this.head.add(mkMesh(swellG, lidSkin, 0, 0.077, 0.0885 * HZ)); // 半埋进吻部——皮肉是「漫」上钢板的
+      this.head.add(mkMesh(swellG, lidSkin, 0, 0.0465, 0.0815 * HZ)); // 半埋进吻部——皮肉是「漫」上钢板的
     } else {
       // 唇色：照片脸取自照片唇色均值；否则随皮池走（常人血色/员工青紫/老年暗淡/理骨员干灰）
       const lipCol = D.skin === 'pale' ? 0x83707a : D.skin === 'chalk' ? 0x93857c
@@ -1735,10 +1805,12 @@ export class Humanoid {
       this.mouthG = new THREE.Group();
       // 唇床（变形域）承担唇的「形」、照片唇色承担唇的「色」——
       // 湿唇件缩成贴床的一层薄壳，只贡献唇面湿高光与口裂缝，不再是浮在脸上的香肠
-      this.mouthG.position.set(0, 0.0745, 0.0862 * HZ);
+      // 轮20：随纵向重排下移到口裂线（0.115-0.0685），并再加宽一档（1.14→1.30）——
+      // 真人口裂宽 ~50mm；旧值在拉开的五官里读成「缩在中轴的小嘴」
+      this.mouthG.position.set(0, 0.0465, 0.0775 * HZ);
       this.mouthG.rotation.z = this.mouthBaseTilt;
-      // 轮19：嘴加宽一档（1.02→1.14）——瞳距拉开后嘴不能还缩在中轴上
-      this.mouthG.scale.set(1.14 * HX, 0.78, 0.62);
+      this.mouthG.scale.set(1.22 * HX, 0.72, 0.62); // 二稿：1.30 湿唇件在薄唇照片上读成香肠——收档
+      
       this.mouthG.add(mkMesh(lipsGeo(P), lipMat));
       this.mouthG.add(mkMesh(lipSeamGeo(P),
         pick(Mtl('lipSeam', () => new THREE.MeshStandardMaterial({ color: 0x301c18, roughness: 0.9 }))),
@@ -2284,7 +2356,7 @@ export class Humanoid {
       this.eyeGR.rotation.x = (this.sacP + drift * 0.4) * (1 - gw) + this.gzP * gw;
       // 嘴：上唇提（露凶）+ 嘴角单侧抽动
       if (this.mouthG) {
-        this.mouthG.position.y = 0.0745 + this.exN * 0.0034;
+        this.mouthG.position.y = 0.0465 + this.exN * 0.0034; // 轮20：口裂线随纵向重排下移
         this.mouthG.rotation.x = -this.exN * 0.22;
         this.mtwT -= dt;
         if (this.mtwT <= 0) {

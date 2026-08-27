@@ -124,7 +124,9 @@ export async function run(page, h) {
   console.log('[verify] r19 emcee body:', JSON.stringify(emCheck, (k, x) => (typeof x === 'number' ? +x.toFixed(4) : x)));
   assert(emCheck.fairOk, 'elbow fairing missing or not sleeve material');
   assert(emCheck.announce > 0.8, 'announce pose not at peak: ' + emCheck.announce);
-  assert(emCheck.handVertsL > 2500 && emCheck.handVertsR > 2500,
+  // 轮20：手换连续皮肤扫掠网格（关节球/分段胶囊废除）——顶点量级随之更新：
+  // 方块指到不了 1500；旧「胶囊+球」拼装 ~3000+（那是木偶手，已非法）
+  assert(emCheck.handVertsL > 1500 && emCheck.handVertsR > 1500,
     `hand mesh too coarse (block fingers): L=${emCheck.handVertsL} R=${emCheck.handVertsR}`);
   assert(emCheck.handMirrored, 'left hand is a rotated right hand (not mirrored)');
   for (const d of emCheck.skinNearElbow) {
