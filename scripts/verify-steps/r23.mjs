@@ -138,8 +138,9 @@ export async function run(page, h) {
     const cam = g.engine.camera;
     window.__origFov = cam.fov;
     cam.fov = 33; cam.updateProjectionMatrix();
-    cam.position.set(head.x + fwd.x * 0.56, head.y + 0.01, head.z + fwd.z * 0.56);
-    cam.lookAt(head.x, head.y - 0.03, head.z);
+    // headWorldPos 是颈枢轴——颅心/眼位在其上 ~0.13m，瞄点抬上去
+    cam.position.set(head.x + fwd.x * 0.60, head.y + 0.14, head.z + fwd.z * 0.60);
+    cam.lookAt(head.x, head.y + 0.11, head.z);
     g.hud.clearSubtitles();
   });
   await frames(3);
@@ -178,8 +179,8 @@ export async function run(page, h) {
     const fwd = new V(0, 0, 1).applyQuaternion(q).setY(0).normalize();
     const cam = g.engine.camera;
     cam.fov = 33; cam.updateProjectionMatrix();
-    cam.position.set(head.x + fwd.x * 0.56, head.y + 0.0, head.z + fwd.z * 0.56);
-    cam.lookAt(head.x, head.y - 0.04, head.z);
+    cam.position.set(head.x + fwd.x * 0.60, head.y + 0.13, head.z + fwd.z * 0.60);
+    cam.lookAt(head.x, head.y + 0.10, head.z);
     hum.constructor.viewer.copy(cam.position);
     hum.updateLOD();
     for (const hl of g.world.dynamic.hotelLights ?? []) {
