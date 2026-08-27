@@ -136,6 +136,14 @@ export async function run(page, h) {
       for (let i = 0; i < 6; i++) { hum.phase = 0.3; hum.animate('idle', 3, 0); }
       hum.phase = 0.3;
       hum.animate('idle', 0.001, 0);
+      // 眼球归零看镜头——扫视/近距追踪相位冻在侧视=「翻白眼/独眼金属环」；
+      // 0.6m 人像的验收标准是与镜头对视
+      hum.sacY = 0; hum.sacP = 0; hum.gzY = 0; hum.gzP = 0; hum.gazeOn = 0;
+      hum.eyeGL.rotation.set(0, 0, 0);
+      hum.eyeGR.rotation.set(0, 0, 0);
+      // 手持话筒（emcee）暂时收起——话筒线正好横穿脸颊
+      window.__micWasVisible = null;
+      if (hum.micG) { window.__micWasVisible = hum.micG.visible; hum.micG.visible = false; }
       // 朝向：巡逻者转向「下一个航点」——航点间连线必然是可走的开敞走廊，
       // 相机放在这条线上不会怼进墙里（matron 3F 走廊 0.6m 拍成壁纸的根治）
       const wps = e.def?.waypoints;
@@ -193,6 +201,8 @@ export async function run(page, h) {
       const g = window.__game;
       if (window.__shootRig) { for (const l of window.__shootRig) l.parent?.remove(l); window.__shootRig = null; }
       if (window.__wasEnabled === false) g.byId[cid].setEnabled(false);
+      const hum = g.byId[cid].body;
+      if (hum.micG && window.__micWasVisible !== null) hum.micG.visible = window.__micWasVisible;
       g.engine.camera.fov = window.__origFov; g.engine.camera.updateProjectionMatrix();
       g.game.state = 'PLAY';
     }, id);
@@ -227,8 +237,16 @@ export async function run(page, h) {
     cam.fov = 48; cam.updateProjectionMatrix();
     cam.position.set(cx + (0.9 / dn) * 2.3, cy + 0.2, cz + (0.45 / dn) * 2.3);
     cam.lookAt(cx, cy + 0.06, cz);
+    // 轮24五稿：中景也钉 HD 头模——2.3m 恰在 2.1m 换模线外，低模头在聚光下
+    // 渲成一块过曝白板（「lo-fi 舞台感」的脸部来源）；viewer 钉到头位强制换模
+    hum.constructor.viewer.copy(head);
+    hum.updateLOD();
     g.hud.clearSubtitles();
   });
+  await page.waitForFunction(() => {
+    const hum = window.__game.byId.emcee.body;
+    return hum._hd === true && hum.headHD && hum.headHD.visible;
+  }, { timeout: 15000, polling: 100 }).catch(() => {});
   await frames(4);
   await h.shot('r24/emcee_stage');
   await page.evaluate(() => {

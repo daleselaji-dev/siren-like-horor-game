@@ -636,8 +636,37 @@ export function buildTown(scene, M) {
 
     // —— 雨夜积水：路面镜洼（车灯/街灯在里面拉出倒影条）——
     {
+      // 轮24五稿·「篷布洼」根治：完美椭圆盘+匀色=取证广角里一块铺在地上的
+      // 蓝灰塑料布。给所有洼共用一张「杂形水线」alpha 贴图——边缘是带
+      // 两级谐波抖动的不规则水线+3cm 渐隐带；alphaTest 丢弃圈外像素，
+      // 模板写入跟着水形走（幻潮镜像层的「窗」保持正确）
+      const puddleAlphaTex = (() => {
+        const S = 128, c = document.createElement('canvas');
+        c.width = c.height = S;
+        const x = c.getContext('2d');
+        const img = x.createImageData(S, S);
+        for (let j = 0; j < S; j++) {
+          for (let i = 0; i < S; i++) {
+            const dx = (i + 0.5) / S * 2 - 1, dy = (j + 0.5) / S * 2 - 1;
+            const r = Math.hypot(dx, dy);
+            const a = Math.atan2(dy, dx);
+            const rim = 0.74 + 0.13 * Math.sin(a * 3 + 1.7) + 0.08 * Math.sin(a * 7 + 0.4)
+              + 0.04 * Math.sin(a * 13 + 2.9);
+            const t = Math.min(1, Math.max(0, (rim - r) / 0.10)); // 10% 渐隐带
+            const v = Math.round(t * t * (3 - 2 * t) * 255);
+            const o = (j * S + i) * 4;
+            img.data[o] = img.data[o + 1] = img.data[o + 2] = v;
+            img.data[o + 3] = 255;
+          }
+        }
+        x.putImageData(img, 0, 0);
+        const tex = new THREE.CanvasTexture(c);
+        tex.needsUpdate = true;
+        return tex;
+      })();
       const puddleM = new THREE.MeshStandardMaterial({
         color: 0x11171a, roughness: 0.04, metalness: 0.92, envMapIntensity: 1.8,
+        alphaMap: puddleAlphaTex, transparent: true, alphaTest: 0.04,
       });
       // 写模板=1：异化后幻潮镜像层（潮网/鱼影）只在洼内像素显形
       puddleM.stencilWrite = true;
@@ -651,6 +680,7 @@ export function buildTown(scene, M) {
       ]) {
         const p = new THREE.Mesh(puddleG, puddleM);
         p.rotation.x = -Math.PI / 2;
+        p.rotation.z = (px * 2.3) % (Math.PI * 2); // 共用水线贴图靠旋转错开轮廓
         p.scale.set(s, s * sq, 1);
         p.position.set(px, g(px, pz) + 0.056, pz);
         scene.add(p);
@@ -665,7 +695,9 @@ export function buildTown(scene, M) {
         color: 0x39434a, roughness: 0.05, metalness: 0.45, envMapIntensity: 2.4,
         // 微量天光自发光：水面反射的是「被镇灯照亮的雨云穹」——环贴图天顶偏暗，
         // 纯反射在俯视角永远是黑；这层恒定水光让洼读成「泛光的水皮」不是地洞
-        emissive: 0x2b343c, emissiveIntensity: 0.5,
+        // 轮24五稿：0.5→0.28——匀色自发光过档=「塑料布」；水光只垫底，反射说话
+        emissive: 0x2b343c, emissiveIntensity: 0.28,
+        alphaMap: puddleAlphaTex, transparent: true, alphaTest: 0.04,
       });
       plazaM.stencilWrite = true;
       plazaM.stencilRef = 1;
@@ -673,12 +705,13 @@ export function buildTown(scene, M) {
       dynamic.plazaPuddles = [];
       for (const [px, pz, s, sq, rot] of [
         // 酒店门前场（正门台阶前一片带状洼地）
-        [-4, -38, 2.6, 0.42, 0.3], [-9.5, -36.5, 1.7, 0.5, 1.2], [1.5, -36, 1.9, 0.46, 2.1],
+        // 轮24五稿：头两号巨洼收档（2.6/2.2→1.9/1.7）——取证近景里 3m 塑料布
+        [-4, -38, 1.9, 0.42, 0.3], [-9.5, -36.5, 1.7, 0.5, 1.2], [1.5, -36, 1.7, 0.46, 2.1],
         [-1.5, -40.5, 1.4, 0.55, 0.7], [-13, -39, 1.2, 0.5, 1.8], [5.5, -39.5, 1.5, 0.48, 0.2],
         // 主街→酒店的空场（street_vista 前景）
-        [-3, -20, 2.2, 0.4, 0.9], [3.5, -24, 1.6, 0.5, 1.5], [-8, -25, 1.9, 0.45, 0.4],
+        [-3, -20, 1.7, 0.4, 0.9], [3.5, -24, 1.6, 0.5, 1.5], [-8, -25, 1.7, 0.45, 0.4],
         [-1, -28.5, 1.5, 0.52, 2.4], [-11, -30, 1.3, 0.5, 1.0], [6, -30, 1.2, 0.55, 1.9],
-        [-5.5, -32.5, 2.0, 0.42, 0.6], [2, -17.5, 1.3, 0.5, 2.8], [-9, -17, 1.1, 0.55, 1.3],
+        [-5.5, -32.5, 1.7, 0.42, 0.6], [2, -17.5, 1.3, 0.5, 2.8], [-9, -17, 1.1, 0.55, 1.3],
         // 民居间的洼（hotel_wide 前景两侧）
         [-16, -33, 1.4, 0.48, 0.5], [9, -34, 1.3, 0.5, 1.6], [12, -27, 1.0, 0.55, 2.2],
       ]) {
