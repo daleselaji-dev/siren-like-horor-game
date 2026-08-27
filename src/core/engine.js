@@ -11,11 +11,14 @@ const FinalShader = {
   uniforms: {
     tDiffuse: { value: null },
     uTime: { value: 0 },
-    uGrain: { value: 0.05 },        // 颗粒强度
-    uVignette: { value: 1.12 },     // 暗角强度
-    uAberration: { value: 0.0009 }, // 色差
+    // 轮24·门3纪律：胶片壳层整体减弱——颗粒 0.05→0.03、暗角 1.12→0.85、
+    // 色差 0.0009→0.00045、黑位提升 0.015→0.010。低模糊不许再靠噪声遮羞，
+    // 几何与材质自己成立；取证模式另有 setFilmLook() 可再减半/关闭
+    uGrain: { value: 0.03 },        // 颗粒强度
+    uVignette: { value: 0.85 },     // 暗角强度
+    uAberration: { value: 0.00045 }, // 色差
     uDesat: { value: 0.12 },        // 去饱和
-    uLift: { value: 0.015 },        // 黑位提升(湿雾感)
+    uLift: { value: 0.010 },        // 黑位提升(湿雾感)
     uRedShift: { value: 0.0 },      // 血潮/受伤时整体偏红
     uPulse: { value: 0.0 },         // 心跳脉冲(视奸/共鸣)
     uDistort: { value: 0.0 },       // 桶形畸变(借来的眼睛不合自己的眼眶)
@@ -145,9 +148,9 @@ export class Engine {
     if (!lowspec) {
       this.bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.55,  // strength：只让灯火与眼点溢光
-        0.62,  // radius
-        0.78   // threshold
+        0.42,  // strength：轮24 0.55→0.42——月亮/灯箱把半张夜景糊成白雾的元凶
+        0.55,  // radius
+        0.84   // threshold：只让真正的灯火溢光
       );
       this.composer.addPass(this.bloomPass);
     }
@@ -173,6 +176,15 @@ export class Engine {
   /** 切换主渲染相机（视奸时切入他者视野） */
   setCamera(cam) {
     this.renderPass.camera = cam;
+  }
+
+  /** 胶片壳层强度（取证模式）：k=1 默认 / 0.5 减半 / 0 全关——
+   *  只缩放颗粒/暗角/色差三件「滤镜壳」，调色与曝光不动 */
+  setFilmLook(k = 1) {
+    const u = this.finalPass.uniforms;
+    u.uGrain.value = 0.03 * k;
+    u.uVignette.value = 0.85 * k;
+    u.uAberration.value = 0.00045 * k;
   }
 
   render(time) {

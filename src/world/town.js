@@ -241,6 +241,12 @@ export function buildTown(scene, M) {
     mat.vertexColors = true;
     mat.map.repeat.set(48, 48);
     mat.normalMap.repeat.set(48, 48);
+    // 轮24·湿地皮：整晚在下雨的镇子，地面必须「浸着水」——基础粗糙度压到 0.6
+    //（粗糙度图仍在上面调制干湿斑），环反射抬档：街灯/亮窗在泥面上拉出微弱倒光，
+    // 泥不再是一块无反射的哑光毯
+    mat.roughness = 0.6;
+    mat.metalness = 0.05;
+    mat.envMapIntensity = 1.8;
     const terrain = new THREE.Mesh(geo, mat);
     terrain.receiveShadow = true;
     scene.add(terrain);
@@ -648,6 +654,29 @@ export function buildTown(scene, M) {
         p.scale.set(s, s * sq, 1);
         p.position.set(px, g(px, pz) + 0.056, pz);
         scene.add(p);
+      }
+      // —— 轮24·空场/酒店前场积水群：街景纵深与 hotel_wide 取证线里最大的
+      // 「泥平板」区域铺镜洼链——夜空/亮窗/招牌在地上有了倒影层，
+      // 地面第一读是「雨后的湿场」，不是一块哑光泥毯 ——
+      dynamic.plazaPuddles = [];
+      for (const [px, pz, s, sq, rot] of [
+        // 酒店门前场（正门台阶前一片带状洼地）
+        [-4, -38, 2.6, 0.42, 0.3], [-9.5, -36.5, 1.7, 0.5, 1.2], [1.5, -36, 1.9, 0.46, 2.1],
+        [-1.5, -40.5, 1.4, 0.55, 0.7], [-13, -39, 1.2, 0.5, 1.8], [5.5, -39.5, 1.5, 0.48, 0.2],
+        // 主街→酒店的空场（street_vista 前景）
+        [-3, -20, 2.2, 0.4, 0.9], [3.5, -24, 1.6, 0.5, 1.5], [-8, -25, 1.9, 0.45, 0.4],
+        [-1, -28.5, 1.5, 0.52, 2.4], [-11, -30, 1.3, 0.5, 1.0], [6, -30, 1.2, 0.55, 1.9],
+        [-5.5, -32.5, 2.0, 0.42, 0.6], [2, -17.5, 1.3, 0.5, 2.8], [-9, -17, 1.1, 0.55, 1.3],
+        // 民居间的洼（hotel_wide 前景两侧）
+        [-16, -33, 1.4, 0.48, 0.5], [9, -34, 1.3, 0.5, 1.6], [12, -27, 1.0, 0.55, 2.2],
+      ]) {
+        const p = new THREE.Mesh(puddleG, puddleM);
+        p.rotation.x = -Math.PI / 2;
+        p.rotation.z = rot;
+        p.scale.set(s, s * sq, 1);
+        p.position.set(px, g(px, pz) + 0.045, pz);
+        scene.add(p);
+        dynamic.plazaPuddles.push(p);
       }
     }
 

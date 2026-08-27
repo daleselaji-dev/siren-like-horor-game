@@ -7,6 +7,7 @@
 // 输出挂载: locations.* / patrols.* / dynamic.crts / dynamic.mirrors / dynamic.hotel*
 import * as THREE from 'three';
 import { GEO } from './batcher.js';
+import { makeLightCone } from './materials.js';
 
 // 门牌/标牌小贴图（按文本缓存）
 const _plateCache = new Map();
@@ -688,12 +689,16 @@ export function buildHotel(ctx) {
       const cx2 = (a + b) / 2, w2 = b - a;
       box(M.concreteDark, cx2, y0 + 0.86, 11.62, w2 + 0.66, 0.13, 0.95);      // 挑板
       box(M.ironDark, cx2, y0 + 0.76, 11.17, w2 + 0.6, 0.06, 0.015);          // 板底檐下暗带
-      box(balcPanelM, cx2, y0 + 1.32, 12.05, w2 + 0.52, 0.82, 0.07);          // 正面栏板
-      box(M.concreteDark, cx2, y0 + 1.76, 12.05, w2 + 0.66, 0.07, 0.15);      // 栏板压顶
-      for (const s2 of [-1, 1]) {                                              // 侧板
-        box(balcPanelM, cx2 + s2 * (w2 / 2 + 0.24), y0 + 1.32, 11.62, 0.07, 0.82, 0.88);
+      // 轮24·栏板体量：正面板 0.07→0.12 厚 + 端柱两根 + 竖肋两道——
+      // 广角里栏板是有厚度的「水泥构件」，不再是一张浮片
+      box(balcPanelM, cx2, y0 + 1.32, 12.05, w2 + 0.52, 0.82, 0.12);          // 正面栏板
+      box(M.concreteDark, cx2, y0 + 1.78, 12.05, w2 + 0.72, 0.10, 0.26);      // 栏板压顶（加厚出挑）
+      for (const s2 of [-1, 1]) {
+        box(balcPanelM, cx2 + s2 * (w2 / 2 + 0.26), y0 + 1.34, 12.02, 0.14, 0.98, 0.20);  // 端柱
+        box(balcPanelM, cx2 + s2 * w2 * 0.17, y0 + 1.30, 12.115, 0.09, 0.78, 0.05);       // 竖肋
+        box(balcPanelM, cx2 + s2 * (w2 / 2 + 0.24), y0 + 1.32, 11.62, 0.11, 0.82, 0.88);  // 侧板（0.07→0.11）
       }
-      box(M.concreteDark, cx2, y0 + 1.02, 12.09, w2 + 0.52, 0.22, 0.012);     // 栏板根部雨渍带
+      box(M.concreteDark, cx2, y0 + 1.02, 12.12, w2 + 0.52, 0.22, 0.012);     // 栏板根部雨渍带
       if (deco === 1) {                                                        // 晾衣杆+挂物
         cyl(M.ironDark, cx2, y0 + 2.02, 11.75, 0.022, w2 + 0.2, 0.022, 0, 0, Math.PI / 2);
         box(sheetM, cx2 - w2 * 0.22, y0 + 1.62, 11.76, 0.62, 0.78, 0.02);
@@ -770,6 +775,18 @@ export function buildHotel(ctx) {
     // 檐底嵌筒灯三只 + 暖光
     for (const lxq of [-3.4, 0, 3.4]) cyl(M.tungsten, lxq, 3.26, 13.2, 0.14, 0.05, 0.14);
     addLight(0xffd9a0, 7, 7.5, 0, 2.9, 13.1, 0.5);
+    // 轮24·入口体积光：筒灯下三束暖光锥 + 灯笼红光晕锥——雨雾夜里
+    // 正门是「从光里走进去」的腔，不是一张亮贴纸（门3入口层次）
+    for (const lxq of [-3.4, 0, 3.4]) {
+      const cone = makeLightCone(0xffd9a0, 0.055, 0.16, 1.35, 3.3);
+      cone.position.copy(world(lxq, 3.24, 13.2));
+      scene.add(cone);
+    }
+    for (const px of [-3.4, 3.4]) {
+      const cone = makeLightCone(0xff6048, 0.04, 0.3, 1.0, 2.4);
+      cone.position.copy(world(px, 2.35, 12.6));
+      scene.add(cone);
+    }
     // 雨棚立柱（镜面不锈钢包柱 + 石柱础）
     for (const px of [-4.6, 4.6]) {
       cyl(M.mirror, px, 1.66, 13.9, 0.5, 3.44, 0.5);

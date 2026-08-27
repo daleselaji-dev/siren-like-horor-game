@@ -65,7 +65,8 @@ export class Sky {
           vec3 moonDir = normalize(vec3(-0.4, 0.35, -0.6));
           float md = max(dot(normalize(vDir), moonDir), 0.0);
           float disk = smoothstep(0.99938, 0.99972, md);
-          float halo = pow(md, 90.0) * 0.30 + pow(md, 14.0) * 0.10;
+          // 轮24：宽晕 0.10→0.05——广角对月时半边天糊成白雾（hotel_wide 泛白元凶）
+          float halo = pow(md, 90.0) * 0.26 + pow(md, 14.0) * 0.05;
           vec3 moonCol = mix(vec3(0.85, 0.89, 0.90), vec3(0.58, 0.70, 0.62), uBlood);
           // 月面暗斑（简单噪声侵蚀盘面）
           float mare = fbm(vDir.xz * 40.0 + vec2(3.7, 9.2));

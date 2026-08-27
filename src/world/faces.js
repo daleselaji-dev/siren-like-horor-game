@@ -595,7 +595,9 @@ function compositeFace(M, job, img) {
           // 不再是亮粉秃皮上悬一圈锯齿黑边（emcee/waiter「秃带+撕纸边」元凶）
           if (gate < 1) {
             const hcr = (FACE_HAIR[key] >> 16) & 255, hcg = (FACE_HAIR[key] >> 8) & 255, hcb = FACE_HAIR[key] & 255;
-            const hk = (1 - gate) * frontW * 0.72;
+            // 权重用宽 dz 门控（0.06-0.22）而非 frontW（0.14-0.48）——颞侧/耳上方的
+            // 壳檐羽化带下也必须垫发根色，否则侧照读出「浅皮窗+黑丝条」
+            const hk = (1 - gate) * sstep(0.06, 0.22, dz) * 0.72;
             r += (hcr * 1.25 - r) * hk;
             g += (hcg * 1.25 - g) * hk;
             b += (hcb * 1.25 - b) * hk;

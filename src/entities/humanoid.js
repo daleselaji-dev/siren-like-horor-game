@@ -633,14 +633,16 @@ function clipHairline(geo, anch, tight = false) {
   if (!col) return geo;
   // 背头（tight）：拢梳出的发际是一条干净的梳线——羽化带收到 8mm；
   // 其余发型 16mm 渐稀带
-  const f0 = tight ? 0.005 : 0.004, f1 = tight ? 0.013 : 0.020;
+  // 轮24：tight 羽化 8→13mm（背头梳线下的发根渐密），方位门控过渡放软
+  //（0.52-0.34→0.60-0.30）——裁剪扇区侧缘不再啃出「豁口」
+  const f0 = tight ? 0.005 : 0.004, f1 = tight ? 0.018 : 0.020;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
     const r = Math.hypot(x, y, z);
     if (r < 0.02 || z <= 0.005) continue;
     // 前向门控 × 方位门控：只裁「额前」窄扇区。鬓角/颞侧交给照片烘焙——
     // 上稿无 |x| 门控时，背头在耳上方被抛物线误裁出整片秃块（侧照穿帮元凶）
-    const w = _ss01(0.10, 0.40, z / r) * _ss01(0.52, 0.34, Math.abs(x) / r);
+    const w = _ss01(0.10, 0.40, z / r) * _ss01(0.60, 0.30, Math.abs(x) / r);
     if (w <= 0) continue;
     // 线位下移 3.5mm：壳檐压过照片发际的皮发交界，盖住烘焙侧的浅色头皮条
     const hl = anch.hairY - anch.hairSagK * x * x - 0.0035;
@@ -1969,18 +1971,21 @@ export class Humanoid {
       // 领筒前顶缘下压：真领子在喉前低、颈后高（band 全高露到颏下=牧师立领）。
       // fold 款压 16mm 露一段喉，band 款压 8mm（前面还有领结/领带结盖住）
       const dip = style === 'fold' ? 0.016 : 0.008;
-      this.torso.add(mkMesh(G('collarBand23' + style, () => {
-        const c = new THREE.CylinderGeometry(0.0565, 0.070, 0.058, 18, 2, true);
+      // 轮24：领筒下延 0.058→0.078（底半径 0.070→0.078）——旧筒底停在 0.612，
+      // 领折前开扇区下缘会露出颈裙外扩段的一线皮（face_a 领下橙色缝）；
+      // 现筒底压到 0.592 塞进衣身，领-颈-衣三件在任何俯仰角都闭合
+      this.torso.add(mkMesh(G('collarBand24' + style, () => {
+        const c = new THREE.CylinderGeometry(0.0565, 0.078, 0.078, 18, 2, true);
         const p = c.attributes.position;
         for (let i = 0; i < p.count; i++) {
           const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
           if (y <= 0) continue;
           const f = Math.max(0, z / Math.hypot(x, z));
-          p.setY(i, y - dip * f * f * (y / 0.029));
+          p.setY(i, y - dip * f * f * (y / 0.039));
         }
         c.computeVertexNormals();
         return c;
-      }), mat, 0, 0.641, 0.004));
+      }), mat, 0, 0.631, 0.004));
       const rim = mkMesh(G('collarRim23' + style, () => {
         const t = new THREE.TorusGeometry(0.0565, 0.0044, 6, 18);
         t.rotateX(Math.PI / 2);
@@ -2019,19 +2024,19 @@ export class Humanoid {
       cap.userData.noShadow = true;
       this.torso.add(cap);
       const lin = mkMesh(G('collarLining24' + style, () => {
-        const c = new THREE.CylinderGeometry(0.0555, 0.069, 0.056, 18, 1, true);
+        const c = new THREE.CylinderGeometry(0.0555, 0.076, 0.074, 18, 1, true);
         const p = c.attributes.position;
         for (let i = 0; i < p.count; i++) {
           const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
           if (y <= 0) continue;
           const f = Math.max(0, z / Math.hypot(x, z));
-          p.setY(i, y - dip * f * f * (y / 0.028));
+          p.setY(i, y - dip * f * f * (y / 0.037));
         }
         c.computeVertexNormals();
         return c;
       }), pick(Mtl('collarLiningM', () => new THREE.MeshStandardMaterial({
         color: 0x1a1512, roughness: 0.95, side: THREE.BackSide,
-      }))), 0, 0.641, 0.004);
+      }))), 0, 0.631, 0.004);
       lin.name = 'collarLining';
       lin.userData.noShadow = true;
       this.torso.add(lin);

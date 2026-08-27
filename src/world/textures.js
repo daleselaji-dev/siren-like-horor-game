@@ -1606,12 +1606,12 @@ export function buildTextureSet(lowspec = false) {
     stone: stoneTexture(21, hero),
     plaster: plasterTexture(33, hero),
     roof: roofTileTexture(44, mid),
-    sand: sandTexture(55, mid),
+    sand: sandTexture(55, hero), // 轮24：地面是取证广角里最大的面——512 糊成泥毯
     slab: slabTexture(66, mid),
     salt: saltTexture(77, small),
     rock: rockTexture(88, mid),
     asphalt: asphaltTexture(611, hero),
-    concrete: concreteTexture(631, mid),
+    concrete: concreteTexture(631, hero), // 轮24：勒脚/缘石/水泥件同升档
     corpseSkin: corpseSkinTexture(111, mid),
     clothNavy: clothTexture(122, [38, 46, 62], small),
     clothGrey: clothTexture(123, [58, 60, 58], small),
@@ -1628,7 +1628,7 @@ export function buildTextureSet(lowspec = false) {
     marble: marbleTexture(321, mid),
     wallpaper: wallpaperTexture(331, mid),
     paintedWall: paintedWallTexture(335, mid),
-    tile: tileTexture(341, mid),
+    tile: tileTexture(341, hero), // 轮24：酒店外墙主皮升 1024——广角瓷砖分格不再糊成灰纸
     ceiling: ceilingTexture(345, mid),
     veneer: veneerTexture(351, mid),
     curtain: curtainTexture(361, mid),

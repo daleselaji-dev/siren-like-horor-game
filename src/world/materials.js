@@ -49,7 +49,7 @@ export function buildMaterials(lowspec = false) {
   M.stone = std(T.stone, { normalScale: 1.5, envInt: 1.1 });
   M.plaster = std(T.plaster, { normalScale: 1.1, envInt: 0.55 });
   M.roof = std(T.roof, { normalScale: 1.6, envInt: 1.2 });
-  M.sand = std(T.sand, { normalScale: 1.0, envInt: 0.9 });
+  M.sand = std(T.sand, { normalScale: 1.4, envInt: 1.1 }); // 轮24：地皮法线抬档——雨夜地面要有「压出来的凹凸」
   M.slab = std(T.slab, { normalScale: 1.4, envInt: 1.4 });
   M.salt = std(T.salt, { envInt: 1.3 });
   M.rock = std(T.rock, { normalScale: 1.9, envInt: 1.1 });
@@ -119,7 +119,7 @@ export function buildMaterials(lowspec = false) {
   M.wallpaper = std(T.wallpaper, { normalScale: 0.9, envInt: 0.5 });
   M.hotelWall = std(T.paintedWall, { normalScale: 0.6, envInt: 0.75 });   // 前场乳白漆内墙：营业中的旧，不是废墟的旧
   M.serviceWall = std(T.paintedWall, { color: 0xaeb6ac, normalScale: 0.6, envInt: 0.5 }); // 后勤冷灰漆（上方配机关绿墙裙）
-  M.tile = std(T.tile, { normalScale: 0.8, envInt: 1.5 });
+  M.tile = std(T.tile, { normalScale: 1.45, envInt: 1.6 }); // 轮24：外墙瓷砖法线 0.8→1.45——砖缝在侧光下起真阴影
   M.veneer = std(T.veneer, { normalScale: 0.9, envInt: 1.0, roughness: 0.85 });
   M.veneerRed = std(T.veneer, { color: 0xb05540, normalScale: 0.9, envInt: 1.1, roughness: 0.8 }); // 红漆总台
   M.curtain = std(T.curtain, { normalScale: 1.4, envInt: 0.7 });
@@ -205,7 +205,8 @@ export function buildMaterials(lowspec = false) {
   // 逐房哈希决定亮灯（约两成暖光）/黑屋，后墙下半截压出家具暗带、竖条明暗当柜帘。
   // 走 onBeforeCompile 注在 opaque_fragment 前：世界空间取切线架，合批后依然成立；
   // 玻璃膜保留 45% 原 PBR 出射——房间是从一层反着夜色的玻璃后面看进去的
-  M.winRoom = new THREE.MeshStandardMaterial({ color: 0x11161a, roughness: 0.14, metalness: 0.55, envMapIntensity: 1.3 });
+  // 轮24：粗糙度 0.14→0.07、环反射 1.3→2.1——夜里的窗玻璃先是一面「反着天光的镜」，再是房间
+  M.winRoom = new THREE.MeshStandardMaterial({ color: 0x11161a, roughness: 0.07, metalness: 0.6, envMapIntensity: 2.1 });
   M.winRoom.onBeforeCompile = (sh) => {
     sh.vertexShader = ('varying vec3 vWrPos; varying vec3 vWrN;\n' + sh.vertexShader).replace(
       '#include <worldpos_vertex>',
@@ -248,7 +249,8 @@ export function buildMaterials(lowspec = false) {
             rc = base * 0.48;                                    // 侧墙
           }
           rc *= 1.0 - hp.z * 0.42;                               // 越深越暗
-          outgoingLight = outgoingLight * 0.45 + rc;
+          // 轮24：玻璃膜保留 0.45→0.62——立面亮暗层次的「反光层」立起来
+          outgoingLight = outgoingLight * 0.62 + rc * 0.95;
         }
       }
       #include <opaque_fragment>`);
