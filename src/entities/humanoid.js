@@ -626,9 +626,12 @@ function clipHairline(geo, anch, tight = false) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
     const r = Math.hypot(x, y, z);
     if (r < 0.02 || z <= 0.005) continue;
-    const w = _ss01(0.10, 0.40, z / r); // 前向门控：只裁额前/鬓角扇区
+    // 前向门控 × 方位门控：只裁「额前」窄扇区。鬓角/颞侧交给照片烘焙——
+    // 上稿无 |x| 门控时，背头在耳上方被抛物线误裁出整片秃块（侧照穿帮元凶）
+    const w = _ss01(0.10, 0.40, z / r) * _ss01(0.52, 0.34, Math.abs(x) / r);
     if (w <= 0) continue;
-    const hl = anch.hairY - anch.hairSagK * x * x;
+    // 线位下移 3.5mm：壳檐压过照片发际的皮发交界，盖住烘焙侧的浅色头皮条
+    const hl = anch.hairY - anch.hairSagK * x * x - 0.0035;
     const a = _ss01(hl + f0, hl + f1, y);
     col.setW(i, Math.min(col.getW(i), 1 - w * (1 - a)));
   }
@@ -869,7 +872,91 @@ function torsoRadiusAt(kind, y) {
   }
   return y < pts[0][1] ? pts[0][0] : pts[pts.length - 1][0];
 }
+// ===== 轮23·上装放样重建（路径A·身体） =====
+// 车削酒瓶躯干（旋转对称+高斯肩包）废除——西装/马甲/工装换环放样：
+//   逐环给出「半宽 rx / 半厚 rz / 超椭圆方度 k / 前胸鼓 pad / 背胛棱 boss」，
+//   肩段是**接近水平的肩峰台**（垫肩西装的肩线），胸背是有厚度的「箱体」，
+//   腰有收、下摆微张。剪影从任何角度读「穿西装的成年男人」，不再是保龄球瓶。
+const TORSO_SHOULDER_RX = 0.217; // 肩峰台半宽（metrics.shoulderW 与几何同源，不许各抄各的）
+function torsoRingsFor(kind) {
+  const S = TORSO_SHOULDER_RX;
+  // [y, rx, rz, k, pad(前胸鼓), boss(背胛棱)]
+  if (kind === 'vest') {
+    return [
+      [-0.06, 0.150, 0.116, 0.84, 0, 0],
+      [0.02, 0.146, 0.112, 0.84, 0, 0],
+      [0.12, 0.146, 0.112, 0.85, 0.01, 0.01],
+      [0.24, 0.156, 0.120, 0.86, 0.03, 0.03],
+      [0.34, 0.168, 0.126, 0.88, 0.05, 0.05],
+      [0.42, 0.184, 0.118, 0.90, 0.04, 0.06],
+      [0.48, 0.206, 0.107, 0.92, 0, 0.03],
+      [0.515, S, 0.098, 0.80, 0, 0],
+      [0.54, 0.204, 0.091, 0.80, 0, 0],
+      [0.562, 0.170, 0.084, 0.84, 0, 0],
+      [0.585, 0.115, 0.069, 0.88, 0, 0],
+      [0.605, 0.057, 0.053, 1.0, 0, 0],
+    ];
+  }
+  if (kind === 'work') {
+    return [
+      [-0.10, 0.172, 0.130, 0.80, 0, 0],
+      [-0.02, 0.166, 0.126, 0.80, 0, 0],
+      [0.08, 0.158, 0.120, 0.82, 0, 0],
+      [0.20, 0.162, 0.124, 0.84, 0.02, 0.03],
+      [0.33, 0.172, 0.128, 0.86, 0.04, 0.05],
+      [0.42, 0.186, 0.120, 0.88, 0.03, 0.06],
+      [0.48, 0.207, 0.108, 0.92, 0, 0.03],
+      [0.515, S, 0.099, 0.80, 0, 0],
+      [0.54, 0.204, 0.092, 0.80, 0, 0],
+      [0.562, 0.170, 0.085, 0.84, 0, 0],
+      [0.585, 0.116, 0.070, 0.88, 0, 0],
+      [0.605, 0.057, 0.053, 1.0, 0, 0],
+    ];
+  }
+  // suit（默认）：垫肩+驳领西装，下摆过臀
+  return [
+    [-0.145, 0.170, 0.127, 0.82, 0, 0],
+    [-0.06, 0.164, 0.124, 0.82, 0, 0],
+    [0.06, 0.152, 0.118, 0.84, 0, 0],
+    [0.20, 0.160, 0.124, 0.86, 0.02, 0.04],
+    [0.33, 0.172, 0.128, 0.88, 0.05, 0.05],
+    [0.42, 0.186, 0.120, 0.90, 0.04, 0.06],
+    [0.48, 0.208, 0.108, 0.92, 0, 0.03],
+    [0.515, S, 0.100, 0.80, 0, 0],
+    [0.54, 0.205, 0.094, 0.80, 0, 0],
+    [0.562, 0.172, 0.085, 0.84, 0, 0],
+    [0.585, 0.118, 0.070, 0.88, 0, 0],
+    [0.605, 0.058, 0.054, 1.0, 0, 0],
+  ];
+}
 function torsoGeo(kind) {
+  if (kind === 'satin' || kind === 'dress') return torsoLatheGeo(kind);
+  return G('torsoLoft23_' + kind, () => {
+    const rings = torsoRingsFor(kind).map(([y, rx, rz, k, pad, boss]) => ({
+      c: [0, y, 0], e1: [1, 0, 0], e2: [0, 0, 1],
+      rx, rz, k, pad, boss, v: (y + 0.15) / 0.76,
+    }));
+    const g = loftRings(rings, 30);
+    // 布身垂坠褶：胸线以下沿方位角低频起伏——衣料挂在身上有自己的褶落
+    const pos = g.attributes.position;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      const az = Math.atan2(v.x, v.z);
+      const drape = (Math.sin(az * 7 + 0.8) * 0.55 + Math.sin(az * 12 + 2.9) * 0.45)
+        * _ss01(0.44, 0.1, v.y) * 0.0024;
+      const rr = Math.hypot(v.x, v.z);
+      if (rr > 0.02) {
+        const kd = 1 + drape / rr;
+        v.x *= kd; v.z *= kd;
+      }
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    g.computeVertexNormals();
+    return g;
+  });
+}
+function torsoLatheGeo(kind) {
   return G('torso_' + kind, () => {
     const pts = torsoProfile(kind).map(([r, y]) => new THREE.Vector2(r, y));
     const g = new THREE.LatheGeometry(pts, 30, 0, Math.PI * 2);
@@ -878,14 +965,9 @@ function torsoGeo(kind) {
     const v = new THREE.Vector3();
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i);
-      // 轮19：肩部高斯加宽在 0.52 以上闸掉——旧高斯一直漫到领口，
-      // 颈根两侧顶出方肩台（waiter「肩过宽」元凶）；成人斜方肌是从颈根
-      // 斜落到肩峰的坡，不是领口下的横梁。峰值 1.3 保持在 0.48（肩宽铁律不动）
       const sh = Math.exp(-(((v.y - 0.478) / 0.098) ** 2)) * (1 - _ss01(0.52, 0.585, v.y));
       v.x *= 1 + sh * 0.3;
       v.z *= 0.7;
-      // 布身垂坠褶（去人偶感）：胸线以下沿方位角低频起伏——
-      // 衣料挂在身上有自己的褶落，不是喷在躯干上的漆面
       const az = Math.atan2(v.x, v.z);
       const drape = (Math.sin(az * 7 + 0.8) * 0.55 + Math.sin(az * 12 + 2.9) * 0.45)
         * _ss01(0.44, 0.1, v.y) * 0.0022;
@@ -901,34 +983,122 @@ function torsoGeo(kind) {
   });
 }
 
-/** 西装翻领（左右对称三角折面） */
-function lapelGeo() {
-  return G('lapel', () => {
-    const shape = new THREE.Shape();
-    shape.moveTo(0, 0); shape.lineTo(0.075, 0.22); shape.lineTo(0.028, 0.24);
-    shape.lineTo(-0.012, 0.1); shape.closePath();
-    const g = new THREE.ExtrudeGeometry(shape, { depth: 0.008, bevelEnabled: false });
+/** 放样躯干前缘 z(y)：与 torsoRingsFor 同源（rz*(1+pad)）——
+ *  驳头/白V/领带全部从这条曲线取形，贴衣不悬空 */
+const FRONT_FZ = {
+  vest: [[0.24, 0.1236], [0.34, 0.1323], [0.42, 0.1227], [0.48, 0.107], [0.515, 0.098], [0.54, 0.091], [0.562, 0.084], [0.585, 0.069], [0.605, 0.053]],
+  suit: [[0.20, 0.1265], [0.33, 0.1344], [0.42, 0.1248], [0.48, 0.108], [0.515, 0.100], [0.54, 0.094], [0.562, 0.085], [0.585, 0.070], [0.605, 0.054]],
+};
+function frontZAt(kind, y) {
+  const fz = FRONT_FZ[kind] ?? FRONT_FZ.suit;
+  if (y <= fz[0][0]) return fz[0][1];
+  for (let i = 0; i < fz.length - 1; i++) {
+    if (y >= fz[i][0] && y <= fz[i + 1][0]) {
+      const t = (y - fz[i][0]) / (fz[i + 1][0] - fz[i][0]);
+      return fz[i][1] + (fz[i + 1][1] - fz[i][1]) * t;
+    }
+  }
+  return fz[fz.length - 1][1];
+}
+// 超椭圆前身在 |x|<0.06 内近乎平板（k≈0.85 方截面）——曲率修正只留 0.18 档
+const frontCurve = (x) => 1 - 0.18 * Math.pow(x / 0.15, 2);
+
+/** 西装驳头（轮23·曲面版）：沿放样躯干前表面贴伏的三角面板（s=±1 左右）。
+ *  旧平板 Extrude 驳头下半埋进胸、上半悬空翘出——玩偶佩饰的老毛病 */
+function lapelGeo(s = 1) {
+  return G('lapel23s' + s, () => {
+    const rows = 8, cols = 4;
+    const A = [0.013, 0.610], B = [0.005, 0.372];   // 内缘：领口 → 扣位
+    const C = [0.060, 0.578], D = [0.030, 0.382];   // 外缘：肩前 → 扣位外
+    const pos = [], idxA = [];
+    for (let i = 0; i <= rows; i++) {
+      const t = i / rows;
+      const ix = A[0] + (B[0] - A[0]) * t, iy = A[1] + (B[1] - A[1]) * t;
+      const ox = C[0] + (D[0] - C[0]) * t + Math.sin(Math.PI * t) * 0.007; // 外缘微弓（翻驳线）
+      const oy = C[1] + (D[1] - C[1]) * t;
+      for (let j = 0; j <= cols; j++) {
+        const u = j / cols;
+        const x = (ix + (ox - ix) * u) * s;
+        const y = iy + (oy - iy) * u;
+        const z = frontZAt('suit', y) * frontCurve(x) + 0.0068 + 0.0022 * (1 - t);
+        pos.push(x, y, z);
+      }
+    }
+    for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
+      const a = i * (cols + 1) + j, b = a + cols + 1;
+      if (s > 0) idxA.push(a, b, a + 1, a + 1, b, b + 1);
+      else idxA.push(a, a + 1, b, a + 1, b + 1, b);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idxA);
+    g.computeVertexNormals();
     return g;
   });
 }
 
-/** 衬衫前胸 V 面（马甲/西装的白色三角） */
-function shirtVGeo() {
-  return G('shirtV', () => {
-    const shape = new THREE.Shape();
-    shape.moveTo(-0.055, 0.24); shape.lineTo(0.055, 0.24); shape.lineTo(0.0, 0.0);
-    shape.closePath();
-    return new THREE.ExtrudeGeometry(shape, { depth: 0.006, bevelEnabled: false });
+/** 衬衫前胸 V 面（轮23·曲面版）：沿放样躯干前表面贴弧上行，
+ *  顶缘塞进领折之下——白 V 从领口一路长到胸口，不再是悬在胸前的围嘴三角 */
+function shirtVGeo(kind = 'vest') {
+  return G('shirtV23_' + kind, () => {
+    const zAt = (y) => frontZAt(kind, y);
+    const yTop = 0.615, yBot = kind === 'vest' ? 0.315 : 0.36;
+    const wTop = kind === 'vest' ? 0.058 : 0.034;
+    const rows = 10, colsN = 8;
+    const pos = [], uvA = [], idxA = [];
+    for (let i = 0; i <= rows; i++) {
+      const t = i / rows, y = yBot + (yTop - yBot) * t;
+      const w = Math.max(0.005, wTop * Math.pow(t, 0.78));
+      for (let j = 0; j <= colsN; j++) {
+        const x = -w + (2 * w * j) / colsN;
+        const z = zAt(y) * frontCurve(x) + 0.0052;
+        pos.push(x, y, z); uvA.push(j / colsN, t);
+      }
+    }
+    for (let i = 0; i < rows; i++) for (let j = 0; j < colsN; j++) {
+      const a = i * (colsN + 1) + j, b = a + colsN + 1;
+      idxA.push(a, a + 1, b, a + 1, b + 1, b);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uvA, 2));
+    g.setIndex(idxA);
+    g.computeVertexNormals();
+    return g;
   });
 }
 
-/** 领带 */
+/** 领带（轮23·贴胸版）：结顶到领口正前，叶片沿放样躯干前表面逐段弯垂——
+ *  直板领带悬在胸前 2cm 是「玩偶佩饰」的老毛病 */
 function tieGeo() {
-  return G('tie', () => merged([
-    xform(new THREE.BoxGeometry(0.045, 0.05, 0.012), 0, -0.02, 0, 0, 0, 0.6),
-    xform(new THREE.BoxGeometry(0.05, 0.26, 0.01), 0, -0.18, -0.002),
-    xform(new THREE.ConeGeometry(0.032, 0.05, 4), 0, -0.33, -0.002, Math.PI, Math.PI / 4, 0),
-  ]));
+  return G('tie23', () => {
+    // 结：领口正前的小梯形块（上窄下宽），顶缘塞到领筒下
+    const knot = new THREE.BoxGeometry(0.034, 0.036, 0.013, 1, 2, 1);
+    {
+      const p = knot.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const t = (p.getY(i) + 0.018) / 0.036;      // 0 底 → 1 顶
+        p.setX(i, p.getX(i) * (1 - 0.28 * t));      // 顶收窄成结形
+        p.setZ(i, p.getZ(i) + frontZAt('suit', 0.598 + p.getY(i)) + 0.0075);
+      }
+      knot.computeVertexNormals();
+    }
+    // 叶片：沿前身弯垂的布条（上窄下宽收尖）
+    const blade = new THREE.BoxGeometry(0.044, 0.30, 0.007, 1, 12, 1);
+    {
+      const p = blade.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const yl = p.getY(i);                        // -0.15..0.15
+        const y = 0.428 + yl;                        // 世界 0.278..0.578
+        const t = (yl + 0.15) / 0.30;               // 0 底 → 1 顶
+        const wScl = t > 0.92 ? 0.75 : (0.72 + 0.40 * (1 - t)); // 顶端进结收窄
+        p.setX(i, p.getX(i) * wScl * (t < 0.08 ? (t / 0.08) * 0.7 + 0.3 : 1)); // 底端收尖
+        p.setZ(i, p.getZ(i) + frontZAt('suit', y) + 0.006);
+      }
+      blade.computeVertexNormals();
+    }
+    return merged([xform(knot, 0, 0.598, 0), xform(blade, 0, 0.428, 0)]);
+  });
 }
 
 /** 领结（侍应） */
@@ -965,10 +1135,10 @@ function knotButtonsGeo() {
 /** 胶皮围裙（理骨员）：包身弧面胸挡 + 喇叭裙摆 + 颈带（贴着躯干车削面走，不是悬空板） */
 function apronGeo() {
   return G('apron', () => merged([
-    // 胸挡：前向弧面壳
-    xform(new THREE.CylinderGeometry(0.152, 0.158, 0.28, 14, 1, true, -0.55, 1.1), 0, 0.41, 0.004, 0, 0, 0, 1, 1, 0.78),
+    // 胸挡：前向弧面壳（轮23：随放样躯干前胸鼓外让）
+    xform(new THREE.CylinderGeometry(0.156, 0.162, 0.28, 14, 1, true, -0.55, 1.1), 0, 0.41, 0.008, 0, 0, 0, 1, 1, 0.86),
     // 裙摆：过膝喇叭壳
-    xform(new THREE.CylinderGeometry(0.162, 0.2, 0.66, 16, 1, true, -0.72, 1.44), 0, -0.06, 0.004, 0, 0, 0, 1, 1, 0.8),
+    xform(new THREE.CylinderGeometry(0.166, 0.2, 0.66, 16, 1, true, -0.72, 1.44), 0, -0.06, 0.008, 0, 0, 0, 1, 1, 0.86),
     // 颈带
     xform(new THREE.CylinderGeometry(0.005, 0.005, 0.17, 6), -0.075, 0.58, 0.055, 0.45, 0, 0.55),
     xform(new THREE.CylinderGeometry(0.005, 0.005, 0.17, 6), 0.075, 0.58, 0.055, 0.45, 0, -0.55),
@@ -1645,12 +1815,16 @@ export class Humanoid {
       const crown = base + headOrg + (0.115 + 0.105 * fl) * 1.16 + 0.006; // 颅顶+发壳厚
       const chin = base + headOrg + (0.115 - 0.105 * fl * 1.03) * 1.16;
       const clav = base + 0.578;
-      const shR = torsoProfile(D.torso).reduce((m2, [r, y2]) => (Math.abs(y2 - 0.48) < 0.06 ? Math.max(m2, r) : m2), 0.14);
+      // 轮23：肩宽与几何同源——放样上装直接用肩峰台半宽（TORSO_SHOULDER_RX），
+      // 车削族（缎袄/连衣裙）沿用轮廓×高斯峰公式
+      const lofted = !(D.torso === 'satin' || D.torso === 'dress');
+      const shR = lofted ? 0
+        : torsoProfile(D.torso).reduce((m2, [r, y2]) => (Math.abs(y2 - 0.48) < 0.06 ? Math.max(m2, r) : m2), 0.14);
       this.metrics = {
         height: crown * hScale,
         headH: (crown - chin) * hScale,
         neckLen: (chin - clav) * hScale,
-        shoulderW: 2 * shR * 1.3 * shW * hScale,
+        shoulderW: lofted ? 2 * TORSO_SHOULDER_RX * shW * hScale : 2 * shR * 1.3 * shW * hScale,
       };
       this.metrics.headRatio = this.metrics.height / this.metrics.headH;
     }
@@ -1772,40 +1946,127 @@ export class Humanoid {
     // 「颈过长」的一半是错觉：真人锁骨以下的颈都埋在领子里。领筒上缘压到
     // 颏下 5cm（露肤仅一段喉），领口是一圈有厚度的布缘，不是零厚布纸筒
     const mkCollar = (mat, style = 'fold') => {
-      // 轮18：领筒随加宽颈柱扩径 4mm、上移 4mm——颈裙与领筒之间不再留一圈「壕沟」，
-      // 领口厚度环命名 collarRim 供 charshot 世界空间「颏-领口」断言取顶
-      // 轮19：随 +8% 颈柱再扩 4.5mm
-      this.torso.add(mkMesh(G('collarBand', () => new THREE.CylinderGeometry(0.059, 0.0765, 0.088, 16, 1, true)), mat, 0, 0.626, 0.004));
-      const rim = mkMesh(G('collarRim', () => {
-        const t = new THREE.TorusGeometry(0.059, 0.0044, 6, 18);
+      // 轮23·领体系瘦身：旧领筒（径 59/76.5mm×高 88mm）是一只「颈托巨环」，
+      // 顶着头读成加长的粗脖子（face_a「长颈」终审印象的真正来源一半在领不在颈）。
+      // 现收到真衬衫领档：径 52/64mm×高 56mm，领口顶仍钉在 0.67（颏下 3mm 铁律不动）
+      // 领径下限=颈柱顶径+4mm（颈 prof 顶 0.052——领必须包住颈，不许被皮顶穿）
+      // 领筒前顶缘下压：真领子在喉前低、颈后高（band 全高露到颏下=牧师立领）。
+      // fold 款压 16mm 露一段喉，band 款压 8mm（前面还有领结/领带结盖住）
+      const dip = style === 'fold' ? 0.016 : 0.008;
+      this.torso.add(mkMesh(G('collarBand23' + style, () => {
+        const c = new THREE.CylinderGeometry(0.0565, 0.070, 0.058, 18, 2, true);
+        const p = c.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+          if (y <= 0) continue;
+          const f = Math.max(0, z / Math.hypot(x, z));
+          p.setY(i, y - dip * f * f * (y / 0.029));
+        }
+        c.computeVertexNormals();
+        return c;
+      }), mat, 0, 0.641, 0.004));
+      const rim = mkMesh(G('collarRim23' + style, () => {
+        const t = new THREE.TorusGeometry(0.0565, 0.0044, 6, 18);
         t.rotateX(Math.PI / 2);
+        // 厚度环随领筒前顶缘同步下压（否则悬浮在凹口上方）
+        const p = t.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i), z = p.getZ(i);
+          const f = Math.max(0, z / Math.hypot(x, z));
+          p.setY(i, p.getY(i) - dip * f * f);
+        }
+        t.computeVertexNormals();
         return t;
       }), mat, 0, 0.67, 0.004);
       rim.name = 'collarRim';
       this.torso.add(rim);
       if (style === 'fold') {
-        // 翻领面：领筒外翻出的一圈坡面（2001 工装/衬衫的软翻领）。
-        // 轮19二稿：下摆 94.5→85.5mm、高 58→50mm——旧喇叭铺到肩上读成
-        //「灯罩斗篷」，把颈衬得更细（face_a 近景否决项之一）
-        this.torso.add(mkMesh(G('collarFold', () => new THREE.CylinderGeometry(0.066, 0.0855, 0.05, 16, 1, true)), mat, 0, 0.618, 0.004));
+        // 翻领面：领筒外翻出的坡面——轮23 二刀：**前开口**。全圈领折=高领毛衣漏斗，
+        // 真衬衫/夹克的翻领只包后颈与两侧，前面敞开露 V。开口 ±0.24π
+        this.torso.add(mkMesh(G('collarFold23o', () => new THREE.CylinderGeometry(0.061, 0.084, 0.036, 18, 1, true, Math.PI * 0.24, Math.PI * 1.52)), mat, 0, 0.632, 0.004));
+        // 领尖两片：开口两缘折向锁骨的小三角（衬衫领的「尖」），
+        // 贴伏在领折坡面上（rotateX 外倾角=坡面母线角，不悬浮不出黑缝）
+        const tipG = G('collarTip23', () => {
+          const s = new THREE.Shape();
+          s.moveTo(0, 0); s.lineTo(0.027, -0.004); s.lineTo(0.011, -0.033); s.closePath();
+          const g2 = new THREE.ExtrudeGeometry(s, { depth: 0.0018, bevelEnabled: false });
+          g2.rotateX(-0.62);
+          return g2;
+        });
+        for (const s of [-1, 1]) {
+          const tp = mkMesh(tipG, mat, s * 0.044, 0.648, 0.047, s < 0 ? -1 : 1, 1, 1);
+          tp.rotation.y = s * 0.66;
+          tp.userData.noShadow = true;
+          this.torso.add(tp);
+        }
       }
     };
     if (D.lapel) {
-      const lp = mkMesh(lapelGeo(), torsoMat, -0.012, 0.28, 0.112, 1, 1, 1); lp.rotation.set(0.12, 0.25, 0.06); this.torso.add(lp);
-      const rp = mkMesh(lapelGeo(), torsoMat, 0.012, 0.28, 0.112, -1, 1, 1); rp.rotation.set(0.12, -0.25, -0.06); this.torso.add(rp);
-      const sv = mkMesh(shirtVGeo(), shirtMat, 0, 0.27, 0.104); sv.rotation.x = 0.1; this.torso.add(sv);
+      // 驳头：贴放样前身的曲面三角面板。躯干网格带 (shW,1,chD) 逐种子缩放——
+      // 前身附件必须同步缩放，否则胸厚 chD>1 的个体驳头/白V被衣身吃掉（蛀边）
+      for (const s of [1, -1]) {
+        const lp = mkMesh(lapelGeo(s), torsoMat, 0, 0, 0, shW, 1, chD);
+        lp.userData.noShadow = true; this.torso.add(lp);
+      }
+      // 曲面白 V：贴放样躯干前表面，顶缘塞进领下
+      const svS = mkMesh(shirtVGeo('suit'), shirtMat, 0, 0, 0, shW, 1, chD);
+      svS.userData.noShadow = true; this.torso.add(svS);
       mkCollar(shirtMat, 'band');       // 白衬衫领贴颈（领口厚度环=衬衫布缘）
-      // 西装外领面：披在衬衫领外的一圈坡面（前低后高的驳领根）
-      this.torso.add(mkMesh(G('collarFoldSuit', () => new THREE.CylinderGeometry(0.0705, 0.1005, 0.06, 16, 1, true)), torsoMat, 0, 0.61, 0.002));
+      // 西装外领面：披在衬衫领外的后半圈坡面（前开让位驳头+领带结）。
+      // 上抬到 0.640：白衬衫领只露顶上一指宽（露全高=牧师立领）
+      this.torso.add(mkMesh(G('collarFoldSuit23o', () => new THREE.CylinderGeometry(0.0655, 0.090, 0.046, 18, 1, true, Math.PI * 0.17, Math.PI * 1.66)), torsoMat, 0, 0.640, 0.002));
+      // 轮23·前门襟（西装是「开襟的衣服」不是喷漆桶）：右盖左的门襟边一条 +
+      // 开缝阴影线一条 + 两粒包布扣——中景剪影里西装前身有了「衣」的构造线。
+      // 门襟条沿前身放样曲线取形（直盒会在弧面胸口两头悬空/中段埋肉）
+      {
+        const frontZ = (y) => {
+          // suit 环表前缘（含前胸鼓）的分段线性近似 +5mm 出布
+          const pts = [[-0.145, 0.127], [-0.06, 0.124], [0.06, 0.119], [0.20, 0.128], [0.33, 0.135], [0.42, 0.126]];
+          for (let i = 0; i < pts.length - 1; i++) {
+            if (y >= pts[i][0] && y <= pts[i + 1][0]) {
+              const t = (y - pts[i][0]) / (pts[i + 1][0] - pts[i][0]);
+              return pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t;
+            }
+          }
+          return y < 0 ? 0.127 : 0.126;
+        };
+        const stripG = (key, w, d) => G(key, () => {
+          const g = new THREE.BoxGeometry(w, 0.44, d, 1, 10, 1);
+          const p = g.attributes.position;
+          for (let i = 0; i < p.count; i++) {
+            const y = p.getY(i) + 0.13; // 条中心落 y=0.13
+            p.setZ(i, p.getZ(i) + frontZ(Math.max(-0.145, Math.min(0.42, y))) + 0.004);
+          }
+          g.computeVertexNormals();
+          return g;
+        });
+        const darkM = pick(Mtl('plackShade', () => new THREE.MeshStandardMaterial({ color: 0x0c0b0a, roughness: 0.95 })));
+        const btnM = pick(Mtl('suitBtn', () => new THREE.MeshStandardMaterial({ color: 0x191512, roughness: 0.5 })));
+        const btnG = G('suitBtnG', () => new THREE.SphereGeometry(0.0072, 8, 6));
+        for (const m of [
+          mkMesh(stripG('plackSeam23', 0.0036, 0.004), darkM, 0.010, 0.13, 0, 1, 1, chD),
+          mkMesh(stripG('plackEdge23', 0.013, 0.0065), torsoMat, 0.0195, 0.13, 0, 1, 1, chD),
+          mkMesh(btnG, btnM, 0.013, 0.245, (frontZ(0.245) + 0.006) * chD, 1, 1, 0.45),
+          mkMesh(btnG, btnM, 0.013, 0.155, (frontZ(0.155) + 0.006) * chD, 1, 1, 0.45),
+        ]) { m.userData.noShadow = true; this.torso.add(m); }
+      }
     }
     if (D.shirtV) {
-      const sv = mkMesh(shirtVGeo(), shirtMat, 0, 0.27, 0.102); sv.rotation.x = 0.1; this.torso.add(sv);
-      mkCollar(shirtMat, 'fold');       // 衬衫翻领（侍应）
+      // 轮23：曲面白 V 贴放样马甲前身（随躯干逐种子缩放），顶缘塞进前开领折之下
+      const svV = mkMesh(shirtVGeo('vest'), shirtMat, 0, 0, 0, shW, 1, chD);
+      svV.userData.noShadow = true; this.torso.add(svV);
+      mkCollar(shirtMat, 'fold');       // 衬衫翻领（侍应）——前开+领尖
     }
     if (D.torso === 'work' && !D.epaulet) mkCollar(torsoMat, 'fold'); // 工装夹克翻领（镇民/渔民/湿客/理骨员）
-    if (D.tie) this.torso.add(mkMesh(tieGeo(), pick(Mtl('tieRed', () => new THREE.MeshStandardMaterial({ color: 0x6e1414, roughness: 0.55 }))), 0, 0.562, 0.104));
-    // 轮19：领结随扩径领面前移（0.068→0.094）——不许埋进领筒只剩两只黑角
-    if (D.bowtie) this.torso.add(mkMesh(bowtieGeo(), pick(Mtl('bowtieBlk', () => new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.6 }))), 0, 0.615, 0.094));
+    if (D.tie) {
+      const tie = mkMesh(tieGeo(), pick(Mtl('tieRed', () => new THREE.MeshStandardMaterial({ color: 0x6e1414, roughness: 0.55 }))), 0, 0, 0, 1, 1, chD);
+      tie.userData.noShadow = true; this.torso.add(tie);
+    }
+    // 轮23：领结钉在领筒前面（领折已前开，蝶结落在开口正中不再埋进领面）
+    if (D.bowtie) {
+      const bt = mkMesh(bowtieGeo(), pick(Mtl('bowtieBlk', () => new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.6 }))), 0, 0.631, 0.077);
+      bt.userData.noShadow = true; this.torso.add(bt);
+    }
     if (D.knots) {
       this.torso.add(mkMesh(knotButtonsGeo(), pick(Mtl('knotGold', () => new THREE.MeshStandardMaterial({ color: 0xb8923e, roughness: 0.45, metalness: 0.4 }))), 0, 0, 0));
       mkCollar(torsoMat, 'band');       // 缎袄立领（盘扣领）
@@ -2382,7 +2643,7 @@ export class Humanoid {
       //（轮17：大腿/小腿各缩 7cm——腿长回到真人比，头身 1/7.4）
       hip.add(mkMesh(
         D.skirt ? limbGeo(0.074, 0.052, 0.33, 'thighSkin', 0.06, { peak: 0.35 })
-          : limbGeo(0.074, 0.0515, 0.345, 'thighPants', 0.06, { peak: 0.35, wrinkle: 0.0013 }),
+          : limbGeo(0.078, 0.054, 0.345, 'thighPants23', 0.06, { peak: 0.35, wrinkle: 0.0013 }),
         thighMat, 0, 0, 0, limbScl, 1, limbScl));
       const knee = new THREE.Group();
       knee.position.y = -0.35;
@@ -2395,7 +2656,7 @@ export class Humanoid {
       const fair = mkMesh(
         D.skirt
           ? jointPodGeo('kneePodSkin', { rMax: 0.052, up: 0.078, down: 0.072, wrinkle: 0.0004 })
-          : jointPodGeo('kneePod', { rMax: 0.054, up: 0.082, down: 0.077, wrinkle: 0.0016 }),
+          : jointPodGeo('kneePod23', { rMax: 0.0565, up: 0.082, down: 0.077, wrinkle: 0.0016 }),
         D.skirt ? skin : pantsMat, 0, 0, 0, limbScl, 1, limbScl);
       fair.name = 'kneePod';
       knee.add(fair);
@@ -2403,7 +2664,7 @@ export class Humanoid {
       knee.add(mkMesh(
         D.skirt ? limbGeo(0.052, 0.03, 0.31, 'shinSkin', 0.18, { peak: 0.3 })
           : D.shoe === 'boot' ? limbGeo(0.052, 0.049, 0.31, 'shinBoot', 0.05, { peak: 0.3 })
-            : limbGeo(0.052, 0.041, 0.32, 'shinPants', 0.08, { peak: 0.3, cuff: 0.006, wrinkle: 0.0015 }),
+            : limbGeo(0.055, 0.0435, 0.32, 'shinPants23', 0.08, { peak: 0.3, cuff: 0.007, wrinkle: 0.0015 }),
         D.skirt ? skin : (D.shoe === 'boot' ? rubber : pantsMat), 0, 0.01, 0, limbScl, 1, limbScl));
       const shoeMat = D.shoe === 'leather' ? leather : D.shoe === 'boot' ? rubber : clothShoe;
       const shoeG = D.shoe === 'leather' ? shoeGeo() : D.shoe === 'boot' ? bootGeo() : clothShoeGeo();
