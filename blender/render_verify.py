@@ -99,23 +99,26 @@ def setup_and_render(blend_path, out_dir, tag, name, samples, scale):
     sc.collection.objects.link(cam)
     sc.camera = cam
 
-    # 头位（估）：找 HeadPivot
-    head_z = None
+    # 头位（估）：找 HeadPivot（带驼背 y 偏移，机位必须跟着头走）
+    head_p = None
     top_z = 0.0
     for o in sc.objects:
         if o.name.startswith('HeadPivot'):
-            head_z = o.matrix_world.translation.z
+            head_p = o.matrix_world.translation.copy()
         if o.type == 'MESH':
             for c in o.bound_box:
                 top_z = max(top_z, (o.matrix_world @ Vector(c)).z)
-    if head_z is None:
-        head_z = max(0.6, top_z - 0.22)  # 场景件：以包围盒顶估「头位」
+    if head_p is None:
+        head_p = Vector((0, 0, max(0.6, top_z - 0.22)))  # 场景件：以包围盒顶估「头位」
+    hy, head_z = head_p.y, head_p.z
 
     views = {
         'full': {'loc': Vector((1.35, -2.6, 1.35)), 'aim': Vector((0, 0, 0.92)), 'lens': 42,
                  'res': (int(720 * scale), int(1080 * scale))},
-        'face': {'loc': Vector((0.16, -0.56, head_z + 0.02)), 'aim': Vector((0, 0, head_z + 0.02)), 'lens': 62,
+        'face': {'loc': Vector((0.16, hy - 0.56, head_z + 0.02)), 'aim': Vector((0, hy, head_z + 0.02)), 'lens': 62,
                  'res': (int(760 * scale), int(860 * scale))},
+        'prof': {'loc': Vector((0.55, hy - 0.06, head_z + 0.01)), 'aim': Vector((0, hy, head_z + 0.01)), 'lens': 62,
+                 'res': (int(700 * scale), int(820 * scale))},
         'back': {'loc': Vector((-1.1, 2.5, 1.5)), 'aim': Vector((0, 0, 1.0)), 'lens': 45,
                  'res': (int(640 * scale), int(960 * scale))},
     }
