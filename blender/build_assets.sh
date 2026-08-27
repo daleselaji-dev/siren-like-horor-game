@@ -28,7 +28,7 @@ echo "[build_assets] 3/3 gltfpack 压缩（meshopt EXT_meshopt_compression）"
 mkdir -p src/assets/models
 for f in blender/export/*.glb; do
   base="$(basename "$f")"
-  npx gltfpack -i "$f" -o "src/assets/models/$base" -cc
+  npx gltfpack -i "$f" -o "src/assets/models/$base" -cc -kn
   printf '  %s: %s → %s\n' "$base" "$(stat -c%s "$f")" "$(stat -c%s "src/assets/models/$base")"
 done
 rm -f blender/out/*.blend1

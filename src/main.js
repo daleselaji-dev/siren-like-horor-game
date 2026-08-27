@@ -21,6 +21,7 @@ import { Agenda } from './systems/agenda.js';
 import { Story, NOTES } from './systems/story.js';
 import { HUD } from './ui/hud.js';
 import { TitleSea } from './ui/title.js';
+import { HeroFigures } from './world/heroModels.js';
 
 // ---------------- 装配 ----------------
 // ?lowspec=1 → 低画质模式（无头验证 / 低配机器）：关阴影与 Bloom、降分辨率
@@ -38,6 +39,9 @@ const rain = new Rain(engine.scene, { lowspec: LOWSPEC, covers: world.dynamic.ra
 const ocean = new Ocean(engine.scene, M.textures, world);
 const sky = new Sky(engine.scene);
 world.waterLevel = () => ocean.level;
+
+// Blender 细模英雄件（bpy→GLB 管线）：车站守夜人/祠像/迎宾侍应/床单巷湿客
+const heroFigures = new HeroFigures(engine.scene, world, hud);
 
 const player = new Player(engine.camera, input, world, audio);
 player.setPosition(world.locations.spawn.x, world.locations.spawn.z, world.locations.spawn.yaw);
@@ -444,6 +448,14 @@ function loop() {
     sightjack.update(dt, elapsed);
     crt.update(dt, player.pos);
 
+    // Blender 英雄件微动画（呼吸/慢转头/祠像的「你看它就不动」）
+    heroFigures.update({
+      player, dt,
+      leaked: story.flags.leaked,
+      camera: engine.renderPass.camera,
+      state: game.state,
+    });
+
     // 世界
     ocean.update(dt);
     sky.update(dt, player.pos);
@@ -527,6 +539,6 @@ loop();
 // 供无头验证注入（THREE：取证脚本射线定凶/几何巡检用）
 window.__game = {
   engine, player, world, ocean, sky, input, enemies, byId, dog, birds, watchers,
-  floaters, gaze, guest, crt, agenda, M, THREE,
+  floaters, gaze, guest, crt, agenda, M, THREE, heroFigures,
   sightjack, stealth, tools, power, story, hud, audio, game,
 };
