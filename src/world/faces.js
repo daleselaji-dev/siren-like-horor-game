@@ -35,13 +35,13 @@ const FACE_DEFS = {
     url: urlMYoung, base: 'skin',
     eyeY: 0.433, eyeLX: 0.397, eyeRX: 0.620, mouthY: 0.708, chinY: 0.862,
     browY: 0.372, noseY: 0.593, hairY: 0.295, hairSag: 0.10,
-    mat: { envInt: 0.6, cc: 0.3, ccRough: 0.32, normalScale: 0.85, poreScale: 0.9 },
+    mat: { envInt: 0.48, cc: 0.2, ccRough: 0.4, normalScale: 1.0, poreScale: 1.0 },
   },
   f: {
     url: urlFYoung, base: 'skin',
     eyeY: 0.449, eyeLX: 0.400, eyeRX: 0.614, mouthY: 0.711, chinY: 0.845,
     browY: 0.378, noseY: 0.607, hairY: 0.180, hairSag: 0.33,
-    mat: { envInt: 0.6, cc: 0.32, ccRough: 0.3, normalScale: 0.75, poreScale: 0.8 },
+    mat: { envInt: 0.5, cc: 0.22, ccRough: 0.38, normalScale: 0.88, poreScale: 0.85 },
   },
   oldm: {
     url: urlMOld, base: 'skinOld',
@@ -59,8 +59,9 @@ const FACE_DEFS = {
     url: urlPale, base: 'skin',
     eyeY: 0.400, eyeLX: 0.407, eyeRX: 0.598, mouthY: 0.635, chinY: 0.714,
     browY: 0.352, noseY: 0.545, hairY: 0.295, hairSag: 0.13,
-    // 轮17：失血员工脸清漆再减档（0.26→0.16）+ 环反射 0.42——「蜡像壳」高光出局
-    mat: { envInt: 0.42, cc: 0.16, ccRough: 0.44, normalScale: 0.9, poreScale: 0.8 },
+    // 轮22：舞台顶光下仍读「蜡」——清漆 0.16→0.10、环反射 0.42→0.34、
+    // 毛孔法线 0.9→1.12：高光碎在毛孔里，皮不再是一层匀光的蜡壳
+    mat: { envInt: 0.34, cc: 0.10, ccRough: 0.52, normalScale: 1.12, poreScale: 0.95 },
   },
   chalk: {
     url: urlChalk, base: 'skinOld',
@@ -251,7 +252,8 @@ export function buildFaceMaterials(M, T, lowspec = false) {
       envMapIntensity: D.mat.envInt,
       clearcoat: D.mat.cc, clearcoatRoughness: D.mat.ccRough,
       // 绒毛边缘光（peach fuzz）：皮面掠射一层软散射——正是塑料没有的那层
-      sheen: 0.3, sheenRoughness: 0.55, sheenColor: new THREE.Color(0xffe2d0),
+      // 轮22：0.3→0.22 收半档——舞台顶光下 sheen 过强=整脸糊一层「蜡光膜」
+      sheen: 0.22, sheenRoughness: 0.62, sheenColor: new THREE.Color(0xffe2d0),
     });
     m.clearcoatNormalMap = T.skinPoreN;
     m.clearcoatNormalScale = new THREE.Vector2(D.mat.poreScale, D.mat.poreScale);
@@ -284,10 +286,10 @@ export function buildFaceMaterials(M, T, lowspec = false) {
       sheen: 0.22, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffe2d0),
       vertexColors: true,
     });
-    // 唇：湿润高光
+    // 唇：湿润高光（轮22：湿度收档——顶光下满唇镜面=蜡人唇）
     M.faceLipMats[key] = new THREE.MeshPhysicalMaterial({
-      color: 0xa66d5f, roughness: 0.44, envMapIntensity: 1.1,
-      clearcoat: 0.75, clearcoatRoughness: 0.18,
+      color: 0xa66d5f, roughness: 0.5, envMapIntensity: 0.9,
+      clearcoat: 0.6, clearcoatRoughness: 0.24,
     });
     M._faceBake.push({ key, D, cd, xd, cn, xn, mapTex, nTex, S, NS });
   }

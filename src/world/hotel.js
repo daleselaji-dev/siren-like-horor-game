@@ -454,11 +454,15 @@ export function buildHotel(ctx) {
   // 广角里第一读是「层层挑板的旧楼」；空调机组吊到挑板之下的阴影带里
   {
     const balcM = new THREE.MeshStandardMaterial({ color: 0x837d6f, roughness: 0.88 }); // 阳台抹灰（断言标记色）
+    // 轮22：挑板底阴影带（近黑贴墙条）——夜雾里挑板自身的投影读不出来，
+    // 把「板下那道黑」直接砌上墙：广角第一读是层层水平暗带切开的立面
+    const shadeM = new THREE.MeshStandardMaterial({ color: 0x101214, roughness: 1 });
     // 壁柱位 -12.5/-3.75/4.75/13.25（宽0.62）——挑板带只在柱间跑，竖构图不被切断
-    const bandAt = (a, b, y0) => {
+    const bandAt = (a, b, y0, zSh = 11.165) => {
       const cx2 = (a + b) / 2, w2 = b - a;
       box(balcM, cx2, y0 + 0.90, 11.58, w2, 0.13, 0.92);               // 通长挑板（出墙 0.9m）
       box(M.concreteDark, cx2, y0 + 0.835, 11.58, w2 + 0.04, 0.02, 0.96); // 板底滴水暗缝
+      box(shadeM, cx2, y0 + 0.60, zSh, w2 - 0.06, 0.44, 0.02);         // 板底阴影带（轮22）
       box(balcM, cx2, y0 + 1.42, 12.0, w2, 0.92, 0.07);                // 通长实心栏板
       box(M.concreteDark, cx2, y0 + 1.905, 12.0, w2 + 0.06, 0.06, 0.13);  // 扶手压顶
       for (const ex of [a + 0.035, b - 0.035]) {
@@ -470,9 +474,11 @@ export function buildHotel(ctx) {
       }
       box(M.concreteDark, cx2 + w2 * 0.22, y0 + 1.06, 12.045, 0.5, 0.5, 0.012);     // 栏板外挂雨渍
     };
-    // F2：雨棚占中央（|x|<7.7），两翼四段；F3：柱间五段通排（含中央）
-    for (const [a, b] of [[-16.6, -12.95], [-12.05, -8.1], [8.1, 12.8], [13.7, 16.6]]) bandAt(a, b, F2);
-    for (const [a, b] of [[-16.6, -12.95], [-12.05, -4.2], [-3.3, 4.3], [5.2, 12.8], [13.7, 16.6]]) bandAt(a, b, F3);
+    // 轮22：两端段让位给翼端挑楼塔（塔占 |x|>13.3）——带只跑塔间；
+    // F2：雨棚占中央（|x|<7.7），两翼两段；F3：柱间三段通排（含中央）
+    for (const [a, b] of [[-12.85, -8.1], [8.1, 12.85]]) bandAt(a, b, F2);
+    // 中央段阴影带贴在塔色竖块面上（面深 11.23，其余段贴瓷砖面 11.15）
+    for (const [a, b, zs] of [[-12.85, -4.2, undefined], [-3.3, 4.3, 11.245], [5.2, 12.85, undefined]]) bandAt(a, b, F3, zs);
     // 晾衣杆一根 + 搭着的旧布（有人住过的证据——2001 的阳台不是样板间）
     box(M.ironDark, 10.4, F2 + 1.62, 11.8, 2.3, 0.03, 0.03);
     box(M.clothRed, 9.9, F2 + 1.44, 11.8, 0.5, 0.36, 0.04);
@@ -605,6 +611,60 @@ export function buildHotel(ctx) {
     // 中央块两肋暗竖缝（与瓷砖身的交界读成「两栋体量拼接」，不是喷色）
     box(M.ironDark, -3.5, (F2 + ROOF + 0.32) / 2, 11.22, 0.05, ROOF + 0.32 - F2, 0.03);
     box(M.ironDark, 4.5, (F2 + ROOF + 0.32) / 2, 11.22, 0.05, ROOF + 0.32 - F2, 0.03);
+  }
+
+  // ================= 立面轮22：翼端挑楼塔 + 窗洞进深分档 + 住人亮窗 =================
+  // 门3轮21「有分色但仍读成一块灰砖」的体量级再拆：
+  //   ① 翼端各挑出一座**悬挑封窗阳台塔**（2F 起挑、出墙 0.95m、比主檐高一层的女儿墙）——
+  //      北立面在平面上真正断成「塔-带-中央-带-塔」五段，剪影两端各抬一级
+  //   ② 窗洞进深分三档：塔窗玻璃退 0.45m（深腔）/主立面退 0.19m/中央块 F2 两樘压成近黑深洞
+  //   ③ 住人亮窗四樘（暖帘光×3+冷电视光×1，自发光不吃灯预算）——夜里立面第一读
+  //      是「有人住的旧楼」，不是一张灰纸
+  {
+    const wingM2 = new THREE.MeshStandardMaterial({ color: 0xc4b69e, roughness: 0.85, envMapIntensity: 2.0 }); // 与翼端块同断言标记色
+    const frameM2 = new THREE.MeshStandardMaterial({ color: 0x37544a, roughness: 0.5, metalness: 0.25 });
+    const voidDeep = new THREE.MeshStandardMaterial({ color: 0x0d0f11, roughness: 1 });
+    const glowWarm = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffb26a, emissiveIntensity: 0.9, roughness: 1 });
+    const glowWarm2 = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffc07a, emissiveIntensity: 0.62, roughness: 1 });
+    const glowCool = new THREE.MeshStandardMaterial({ color: 0x10151a, emissive: 0x8fb4c8, emissiveIntensity: 0.5, roughness: 1 });
+    // —— 翼端挑楼塔（s=±1）：侧墩+层间腰板留出窗带，玻璃退进 0.45m 深腔 ——
+    for (const s of [-1, 1]) {
+      const wx = s * 15.25;
+      const fullH = ROOF + 1.9 - F2, fy = F2 + fullH / 2;
+      box(wingM2, wx - 1.5, fy, 11.42, 0.9, fullH, 1.05);              // 西墩
+      box(wingM2, wx + 1.5, fy, 11.42, 0.9, fullH, 1.05);              // 东墩
+      box(wingM2, wx, F2 + 0.5, 11.42, 3.9, 1.0, 1.05);                // 底腰板
+      box(wingM2, wx, (F2 + 2.5 + F3 + 1.0) / 2, 11.42, 3.9, F3 + 1.0 - F2 - 2.5, 1.05); // 层间腰板
+      box(wingM2, wx, (F3 + 2.5 + ROOF + 1.9) / 2, 11.42, 3.9, ROOF + 1.9 - F3 - 2.5, 1.05); // 顶腰板
+      box(M.concreteDark, wx, ROOF + 1.98, 11.42, 4.14, 0.16, 1.29);   // 塔顶压檐
+      box(wingM2, wx, ROOF + 2.16, 11.42, 3.0, 0.2, 0.8);              // 压檐上退台小帽（剪影再一级）
+      // 悬挑基座：暗圈梁 + 三只斜撑牛腿（塔是从 2F 楼板挑出去的，不是贴纸）
+      box(M.concreteDark, wx, F2 - 0.16, 11.4, 3.9, 0.32, 1.0);
+      for (const bx of [wx - 1.4, wx, wx + 1.4]) {
+        box(M.concreteDark, bx, F2 - 0.58, 11.26, 0.26, 0.62, 0.55, 0, 0.5, 0);
+      }
+      // 塔窗两层：深腔玻带（退 0.45m）+ 洞顶阴影 + 出挑台板 + 绿钢梃
+      for (const y0 of [F2, F3]) {
+        box(M.winRoom, wx, y0 + 1.75, 11.5, 2.04, 1.5, 0.05);          // 玻带（深腔）
+        box(voidDeep, wx, y0 + 2.42, 11.68, 2.06, 0.18, 0.5);          // 洞顶暗带
+        box(M.concreteDark, wx, y0 + 0.95, 11.82, 2.44, 0.1, 0.42);    // 出挑台板
+        box(frameM2, wx, y0 + 1.75, 11.56, 0.05, 1.5, 0.05);           // 竖中梃
+        box(frameM2, wx, y0 + 2.06, 11.56, 2.04, 0.05, 0.05);          // 亮子横梃
+      }
+      // 塔身雨渍（挑楼与主楼同一场雨里老去）
+      box(M.concreteDark, wx - 1.5, ROOF - 0.6, 11.955, 0.4, 1.8, 0.012);
+    }
+    // 东塔 2F 一樘亮着暖帘光（半幅窗帘拉着）；西塔 3F 一樘弱暖光
+    box(glowWarm, 15.75, F2 + 1.72, 11.62, 0.95, 1.42, 0.03);
+    box(glowWarm2, -15.72, F3 + 1.72, 11.62, 0.92, 1.42, 0.03);
+    // —— 主立面住人亮窗：暖帘光 F2 西翼一樘 + F3 东翼一樘；冷电视光 F3 西一樘 ——
+    box(glowWarm2, -10.9, F2 + 1.7, 11.005, 0.85, 1.3, 0.015);
+    box(glowWarm, 7.35, F3 + 1.72, 11.005, 0.9, 1.3, 0.015);
+    box(glowCool, -6.2, F3 + 1.7, 11.005, 0.8, 1.28, 0.015);
+    // —— 中央块 F2 两樘压成近黑深洞（第三档进深：没人住的黑腔）——
+    for (const [a, b] of [[-2.5, -0.5], [1.5, 3.5]]) {
+      box(voidDeep, (a + b) / 2, F2 + 1.7, 11.0, b - a - 0.1, 1.36, 0.012);
+    }
   }
 
   // ================= 正门：进深门斗 + 体积雨棚 + 灯箱 + 玻璃门 =================

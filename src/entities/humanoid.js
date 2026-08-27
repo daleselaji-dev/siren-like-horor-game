@@ -684,8 +684,10 @@ function hairGeo(style = 'crop', variant = 'm', P = null) {
     }
     // 先犁发绺再过变形域：沟槽随壳面一起贴颅；外扩收薄到 1.4%——发是「层」不是「壳」；
     // 变形域之后再揉绺团噪声（噪声要落在最终壳面上，不被共形抹平）
-    return hairClumpNoise(conformSkull(hairGrooves(merged(parts), style === 'long' ? 1.4 : 1),
-      variant, FP, { fadeLow: style === 'long', inflate: 1.014 }), style === 'long' ? 0.7 : 1);
+    // 轮22：沟槽/绺团双双加深（1→1.6/1→1.5）——几何起伏配合发绺贴图+碎发卡层，
+    // 三层一起把「光滑头盔」拆掉
+    return hairClumpNoise(conformSkull(hairGrooves(merged(parts), style === 'long' ? 1.4 : 1.6),
+      variant, FP, { fadeLow: style === 'long', inflate: 1.014 }), style === 'long' ? 0.7 : 1.5);
   });
 }
 
@@ -700,6 +702,59 @@ function hairCardGeo(w, h, curve = 5) {
     }
     g.computeVertexNormals();
     return g;
+  });
+}
+
+/** 分层碎发卡层（轮22·去头盔主件）：三圈发绺卡瓦片式伏贴在壳面上
+ *  （顶圈/颞圈/枕圈，前脸发际带跳过）——壳的轮廓被碎发卡的锯齿 alpha 打散，
+ *  「光滑穹顶剪影」从几何层面不存在。全部卡片合并为单网格（一只头一次 draw）。
+ *  根位走颅骨变形域精确求壳面（与 conformSkull 同式）。 */
+function hairClumpCardsGeo(style, variant, P) {
+  return G(`hairClumps_${style}_${variant}_${P.key}`, () => {
+    const fld = makeSkullField(variant, P, { bare: true });
+    const sp = { x: 0, y: 0, z: 0 };
+    const parts = [];
+    // [极角, 片数]：bun 收拢只留顶两圈；long 有帘只留顶圈
+    const rings = style === 'long' ? [[0.45, 8], [0.8, 10]]
+      : style === 'bun' ? [[0.45, 8], [0.8, 10]]
+        : [[0.42, 8], [0.78, 11], [1.1, 13]];
+    let ci = 0;
+    // 轮22二稿：欧拉角外翘（读成「故障黑尖刺」）废除——
+    // 瓦片式切向标架：卡片贴伏壳面、发梢顺坡向下（毛流方向），
+    // 梢部绕自身横轴外抬 12-22°——剪影是「层层压覆的发绺」不是辐射尖刺
+    const m4 = new THREE.Matrix4(), mR = new THREE.Matrix4();
+    const N = new THREE.Vector3(), T = new THREE.Vector3(), X = new THREE.Vector3(), Y = new THREE.Vector3();
+    for (const [el, n] of rings) {
+      for (let k = 0; k < n; k++) {
+        ci++;
+        const az = ((k + (ci % 2) * 0.5) / n) * Math.PI * 2 + P.asymPh * 0.8;
+        const frontness = Math.cos(az); // +1 = 正前（发际带留给绒边卡，不许压到额头）
+        if (el > 0.65 && frontness > 0.44) continue;
+        if (el > 1.0 && frontness > 0.05) continue;
+        const dx = Math.sin(el) * Math.sin(az), dy = Math.cos(el), dz = Math.sin(el) * Math.cos(az);
+        fld(dx, dy, dz, sp);
+        const k2 = ((0.103 + 0.03 * dy - 0.018 * dz) / SKULL_R) * 1.03;
+        const w = 0.034 + ((ci * 5) % 3) * 0.007;
+        const h = 0.03 + ((ci * 3) % 3) * 0.008;
+        const g = hairCardGeo(w, h, 3).clone();
+        N.set(dx, dy, dz);                                     // 壳面外法向（球近似）
+        T.set(Math.cos(el) * Math.sin(az), -Math.sin(el), Math.cos(el) * Math.cos(az)); // 顺坡向下
+        Y.copy(T).negate();                                    // 卡片根边朝坡上（发从根垂向梢）
+        X.crossVectors(Y, N).normalize();
+        m4.makeBasis(X, Y, N);
+        // 梢部外抬（负角=梢离壳）+ 面内微旋（毛流参差）
+        m4.multiply(mR.makeRotationX(-(0.2 + ((ci * 7) % 4) * 0.05)));
+        m4.multiply(mR.makeRotationZ(((ci * 11) % 5 - 2) * 0.06));
+        // 根边压进壳面下、梢端探出壳缘——中心顺坡下移 0.3h
+        m4.setPosition(
+          sp.x * k2 + T.x * h * 0.3 + dx * 0.001,
+          sp.y * k2 + T.y * h * 0.3 + dy * 0.001,
+          sp.z * k2 + T.z * h * 0.3 + dz * 0.001);
+        g.applyMatrix4(m4);
+        parts.push(g);
+      }
+    }
+    return merged(parts);
   });
 }
 
@@ -913,6 +968,65 @@ function limbGeo(r1, r2, len, key, bulge = 0.1, opts = {}) {
       pts.push(new THREE.Vector2(r1 + (r2 - r1) * t + muscle + flare + wrk, -t * len));
     }
     const g = new THREE.LatheGeometry(pts, 16);
+    g.computeVertexNormals();
+    return g;
+  });
+}
+
+/** 一体袖山臂管（轮22·肩球根除）：肩头是袖管自身收拢的布圆顶——
+ *  独立缝球（shoulderCap）废除，从任何抬臂角度肩上读到的都是「一条布袖的袖山」，
+ *  不存在与躯干并排的光球剪影。圆顶方肩过渡（q³）模拟垫肩西装的肩线。 */
+function sleeveArmGeo(key, o = {}) {
+  const {
+    rTop = 0.052, rCuff = 0.0405, len = 0.312, dome = 0.055,
+    wrinkle = 0.0032, muscle = 0.09, peak = 0.42,
+  } = o;
+  return G(key, () => {
+    const pts = [];
+    const N = 36;
+    const p = Math.log(0.5) / Math.log(peak);
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const y = dome - t * (dome + len);
+      let r;
+      if (y >= 0) {
+        const q2 = y / dome;
+        r = rTop * Math.sqrt(Math.max(0.0001, 1 - q2 * q2 * q2 * 0.999));
+      } else {
+        const s = -y / len;
+        r = rTop + (rCuff - rTop) * s + Math.sin(Math.PI * Math.pow(s, p)) * rTop * muscle;
+        // 布褶环（端部窗归零——袖口圆缘不破）
+        if (wrinkle) {
+          r += (Math.sin(s * 23 + 1.3) * 0.6 + Math.sin(s * 45 + 4.2) * 0.4)
+            * wrinkle * Math.sin(Math.PI * Math.min(1, s * 1.08));
+        }
+      }
+      pts.push(new THREE.Vector2(Math.max(0.0006, r), y));
+    }
+    const g = new THREE.LatheGeometry(pts, 18);
+    g.computeVertexNormals();
+    return g;
+  });
+}
+
+/** 闭合关节布荚（轮22·肘/膝球根除）：两端收拢的褶皱布包骑在关节上
+ *  （updateJointFairings 每帧对分转角）。与旧「开口布管+内芯缝球」的本质区别：
+ *  荚体两端闭合、荚径大于两侧管径——深屈从下方看不到管口环/缝隙/内芯盘的
+ *  三层同心圆，任何角度读到的都是一团布包着的关节头。 */
+function jointPodGeo(key, o = {}) {
+  const { rMax = 0.047, up = 0.08, down = 0.078, wrinkle = 0.0028, radial = 16 } = o;
+  return G(key, () => {
+    const pts = [];
+    const N = 26;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;                        // 0 上端极 → 1 下端极（下端=关节外侧肘头）
+      const y = up - t * (up + down);
+      const e = Math.sin(Math.PI * Math.pow(t, 0.9));
+      let r = rMax * Math.pow(Math.max(0.0001, e), 0.58); // 中段饱满、两端快收
+      if (wrinkle) r += (Math.sin(t * 26 + 0.7) * 0.55 + Math.sin(t * 53 + 3.1) * 0.45) * wrinkle * e;
+      pts.push(new THREE.Vector2(Math.max(0.0006, r), y));
+    }
+    const g = new THREE.LatheGeometry(pts, radial);
     g.computeVertexNormals();
     return g;
   });
@@ -1453,8 +1567,17 @@ export class Humanoid {
     // ---- 骨架枢轴（与 v2 兼容：pelvis/torso/neck/head + 肩肘髋膝）----
     this.pelvis = new THREE.Group(); this.pelvis.position.y = 0.82; this.group.add(this.pelvis);
     this.torso = new THREE.Group(); this.torso.position.y = 0.10; this.pelvis.add(this.torso);
-    const neckLen = 0.084; // 轮21：再降 8mm——颏底压到领口环顶 ±5mm 内，露颈只剩「领以上一点点」
-    // （0.082 时 face_b/c 颏底越过领口环顶 10-11mm 触「颏埋进领」下限，回抬 2mm）
+    // 轮22：颈长逐种子解算（旧 0.084 常量废除）——直接扫该种子头模网格的颏底顶点，
+    // 反解出「颏底恒落在领口环顶(0.6744)下 3mm」的颈长：长脸种子不再露 8mm 裸颈柱、
+    // 短脸种子不再把颏埋进领筒。领口从公式上顶住下颌，露颈忽长忽短双向出局
+    const faceVariant = D.face === 'gaunt' ? 'gaunt' : D.face === 'old' ? 'old' : D.face;
+    const photoKey = D.photo;
+    let chinLocal = Infinity;
+    {
+      const hp = headGeo(faceVariant, P, false, photoKey ?? null).attributes.position;
+      for (let i = 0; i < hp.count; i++) { const y = hp.getY(i); if (y < chinLocal) chinLocal = y; }
+    }
+    const neckLen = Math.min(0.098, Math.max(0.058, 0.6714 - 0.58 - (0.115 + chinLocal) * 1.16));
     this.neck = new THREE.Group(); this.neck.position.y = 0.58; this.torso.add(this.neck);
     this.head = new THREE.Group(); this.head.position.y = neckLen; this.neck.add(this.head);
     this.head.scale.setScalar(1.16); // 头高 0.25-0.257m 档：1.87m 骨架 ÷ 7.28-7.48 头
@@ -1481,8 +1604,9 @@ export class Humanoid {
     {
       const fl = headBase(D.face, P).faceLen; // 与颅骨雕刻域同一份基频
       const base = 0.82 + 0.10;
-      const crown = base + 0.670 + (0.115 + 0.105 * fl) * 1.16 + 0.006;   // 颅顶+发壳厚（轮21：随 neckLen -8mm）
-      const chin = base + 0.670 + (0.115 - 0.105 * fl * 1.03) * 1.16;
+      const headOrg = 0.58 + neckLen + 0.006; // 轮22：随逐种子颈长
+      const crown = base + headOrg + (0.115 + 0.105 * fl) * 1.16 + 0.006; // 颅顶+发壳厚
+      const chin = base + headOrg + (0.115 - 0.105 * fl * 1.03) * 1.16;
       const clav = base + 0.578;
       const shR = torsoProfile(D.torso).reduce((m2, [r, y2]) => (Math.abs(y2 - 0.48) < 0.06 ? Math.max(m2, r) : m2), 0.14);
       this.metrics = {
@@ -1533,7 +1657,8 @@ export class Humanoid {
         g2.computeVertexNormals();
         return g2;
       });
-      const nkMesh = mkMesh(nkG, neckMat, 0, 0.6, 0.005);
+      // 轮22：颈裙随逐种子颈长整柱平移——顶段始终埋进颌裙环，不露管口
+      const nkMesh = mkMesh(nkG, neckMat, 0, 0.6 + (neckLen - 0.084), 0.005);
       nkMesh.name = 'neckSkirt';
       this.torso.add(nkMesh);
       // 颌裙环（轮15·下颌-颈接缝根治）：挂在 head 组上、随头转的一圈「皮领」——
@@ -1577,7 +1702,7 @@ export class Humanoid {
           const g2 = new THREE.SphereGeometry(0.012, 8, 6);
           g2.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g2.attributes.position.count * 3).fill(1.0), 3));
           return g2;
-        }), neckMat, 0, 0.672, 0.0405, 0.66, 0.9, 0.13));
+        }), neckMat, 0, 0.664 + (neckLen - 0.084), 0.0405, 0.66, 0.9, 0.13));
       }
     }
     // 轮18·斜方肌过渡：颈根—肩峰两道衣料包着的斜坡（capsule 斜置）。
@@ -1669,11 +1794,10 @@ export class Humanoid {
     }
 
     // ---- 头（逐种子面孔；近距 LOD 由 updateLOD 惰性换高模） ----
-    const faceVariant = D.face === 'gaunt' ? 'gaunt' : D.face === 'old' ? 'old' : D.face;
+    // faceVariant/photoKey 已在颈长解算处求出（轮22）
     this.faceVariant = faceVariant;
     this.P = P;
     // 生图烘焙脸皮：头皮换成照片投影材质（球面 UV 对齐眼嘴）；小件同调纯色
-    const photoKey = D.photo;
     const headSkin = (photoKey && M.faceMats?.[photoKey]) ? pick(M.faceMats[photoKey]) : skin;
     const lidSkin = (photoKey && M.faceLids?.[photoKey]) ? pick(M.faceLids[photoKey]) : skin;
     this.skinMat = headSkin;
@@ -1920,13 +2044,22 @@ export class Humanoid {
     }
     // 发（角色可有发型池：同角色不同人不同头）——发壳与该种子的颅骨共形；
     // 壳材质开顶点色 RGBA：壳檐 alpha 羽化到头皮（发际线是「渐稀」，不是「切口」）
-    const shellMat = Mtl('hairShellA_' + hairMat.uuid, () => {
+    const shellMat = Mtl('hairShellB_' + hairMat.uuid, () => {
       const m = hairMat.clone();
       m.vertexColors = true;
       m.transparent = true;
       // 轮18·去头盔：壳发必须哑光——烤漆高光是「泳帽壳」读感的第一元凶
       m.roughness = Math.max(m.roughness ?? 0.8, 0.93);
       m.envMapIntensity = 0.35;
+      // 轮22：壳面贴平铺发绺（map+bump 同图）——壳色被逐绺明暗打碎、
+      // 高光沿绺断条；「一整块均色塑料壳」从贴图层面不存在
+      if (M.textures?.hairShell) {
+        m.map = M.textures.hairShell;
+        m.bumpMap = M.textures.hairShellBump ?? M.textures.hairShell;
+        m.bumpScale = 0.6;
+        // 贴图均值 ~0.78：色乘回一档，发色总亮度与旧纯色壳持平
+        m.color.multiplyScalar(1.25);
+      }
       return m;
     });
     const hairStyle = D.hairChoices ? D.hairChoices[seed % D.hairChoices.length] : D.hair;
@@ -1936,14 +2069,24 @@ export class Humanoid {
     // 发丝卡片：发际线/鬓角/颈窝贴 alpha 发丝 + 顶部逆光碎发——壳发边缘不再是「头盔口」
     if (M.textures?.hairStrand && !ghost) {
       const hairHex = hairMat.color?.getHex?.() ?? 0x14161a;
-      const strandM = Mtl('hairCardM_' + hairHex.toString(16), () => new THREE.MeshStandardMaterial({
-        map: M.textures.hairStrand, color: hairHex, alphaTest: 0.24,
-        side: THREE.DoubleSide, roughness: 0.6, envMapIntensity: 0.7,
-      }));
-      const wispM = Mtl('hairWispM_' + hairHex.toString(16), () => new THREE.MeshStandardMaterial({
-        map: M.textures.hairWisp, color: hairHex, alphaTest: 0.18,
-        side: THREE.DoubleSide, roughness: 0.65, envMapIntensity: 0.7,
-      }));
+      // 轮22二稿：发卡族色乘 ×1.3 与壳发贴图乘色(×1.25)亮度对齐——
+      // 旧卡片按原始发色直乘，在壳上读成「焦黑贴片/尖刺」而不是同一头发
+      const strandM = Mtl('hairCardM_' + hairHex.toString(16), () => {
+        const m = new THREE.MeshStandardMaterial({
+          map: M.textures.hairStrand, color: hairHex, alphaTest: 0.24,
+          side: THREE.DoubleSide, roughness: 0.6, envMapIntensity: 0.7,
+        });
+        m.color.multiplyScalar(1.3);
+        return m;
+      });
+      const wispM = Mtl('hairWispM_' + hairHex.toString(16), () => {
+        const m = new THREE.MeshStandardMaterial({
+          map: M.textures.hairWisp, color: hairHex, alphaTest: 0.18,
+          side: THREE.DoubleSide, roughness: 0.65, envMapIntensity: 0.7,
+        });
+        m.color.multiplyScalar(1.3);
+        return m;
+      });
       // 发际线绒边材质：软 alpha 混合（硬 alphaTest 的离散笔画贴裸皮=涂鸦感元凶）
       const fringeM = Mtl('hairFringeM_' + hairHex.toString(16), () => new THREE.MeshStandardMaterial({
         map: M.textures.hairFringe ?? M.textures.hairWisp, color: hairHex,
@@ -1959,6 +2102,13 @@ export class Humanoid {
         return m;
       };
       if (!D.cap) {
+        // 轮22·分层碎发卡层：三圈发绺卡瓦片式伏在壳上（单网格一次 draw）——
+        // 壳的光滑轮廓被锯齿卡打散，任何角度「泳帽穹顶」剪影不再成立
+        if (hairStyle) {
+          const clumps = mkMesh(hairClumpCardsGeo(hairStyle, faceVariant, P), strandM, 0, 0.115, 0, HX, 1, HZ);
+          clumps.castShadow = false;
+          this.head.add(clumps);
+        }
         // 前发际线：绒边贴图卡片（顶带近实接壳檐、向下稀疏成绒毛梢）——
         // 中央一片 + 左右两小片，硬笔画换软绒边，裸皮上不再是「涂鸦」
         if (hairStyle !== 'bun') {
@@ -2100,37 +2250,31 @@ export class Humanoid {
       const shoulder = new THREE.Group();
       shoulder.position.set(0.194 * shW * side, 0.49 - this.gait.droop * 0.03 * side, 0);
       this.torso.add(shoulder);
-      // 袖山（去球关节读感）：斜切椭球顺着三角肌走向塌进肩线——
-      // 不再是躯干旁边并排一颗光球，是袖管从肩缝里「长」出来的布肩
-      // 轮19二稿：再压扁（0.66→0.58）+ 内塌下沉——斜方肌坡棱削薄后
-      // 袖山不许接棒变成下一代「肩球」
-      const capM = mkMesh(G('shoulderCap', () => new THREE.SphereGeometry(0.05, 14, 11)), torsoMat,
-        -0.026 * side, -0.034, 0, 0.96 * limbScl, 0.58, 0.86 * limbScl);
-      capM.rotation.z = 0.52 * side;
-      shoulder.add(capM);
-      // 袖管过肘 12mm（管-管重叠盖住缝球）：屈肘时张口被袖管自己的延伸接住
-      shoulder.add(mkMesh(limbGeo(0.05, 0.0405, 0.312, 'upperArm', 0.1, { peak: 0.42, wrinkle: 0.002 }), torsoMat, 0, 0, 0, limbScl, 1, limbScl));
+      // 轮22·肩球物理根除：独立缝球（shoulderCap 椭球）删除——袖管换成
+      // 「袖山圆顶+管身」一体放样（sleeveArmGeo）：肩头是袖管自己收拢的布圆顶，
+      // 任何抬臂角度肩上只有袖山布面，不存在能读成球窝的独立球件剪影。
+      // 袖管过肘 12mm（管-管重叠）：屈肘张口被袖管自身延伸接住
+      const sleeve = mkMesh(sleeveArmGeo('sleeveArm'), torsoMat, 0, 0, 0, limbScl, 1, limbScl);
+      sleeve.name = 'sleeveArm';
+      shoulder.add(sleeve);
       const elbow = new THREE.Group();
       elbow.position.y = -0.3;
       shoulder.add(elbow);
       const foreMat = D.drift ? drift : D.gloves ? rubber : (D.torso === 'dress' ? skin : torsoMat);
-      // 肘缝球压扁收窄——藏进两侧管径之内，任何角度不越出袖管剪影（球节人偶根治）。
-      // 材质永远跟袖管（不跟前臂）且上收 6mm 进袖端：裸前臂角色抬臂时看到的是
-      // 「圆布袖口 + 从袖内长出的前臂」，不是深色袖端顶一颗皮肤球（木偶肘元凶）
-      const elbowCapMat = D.drift ? drift : D.gloves ? rubber : torsoMat;
-      // 轮21：肘垫撑满肘罩管口——0.94/0.64 的瘪垫在深屈肘（持麦臂）从下方看
-      // 是「布管开口环 + 缝隙 + 内芯圆盘」三层同心圆（机械承窝读法）；
-      // 撑到 1.06/0.78 后管口被垫体填实，看到的是布包肘头
-      elbow.add(mkMesh(G('elbowCap', () => new THREE.SphereGeometry(0.0385, 10, 8)), elbowCapMat, 0, 0.006, 0, 1.06 * limbScl, 0.78, 1.06 * limbScl));
-      // 轮18·肘部铰接袖罩：一节骑在关节上的褶皱布管，animate 每帧转到上下臂
-      // 夹角的平分线上——屈肘任意角度肘点都在袖内，外侧看到的是布褶堆不是缝球
-      //（「场内司仪抬臂=球关节人偶」的否决项根治）；浮木臂/裸臂裙装不套布罩
-      let fair = null;
-      if (!D.drift && D.torso !== 'dress') {
-        fair = mkMesh(limbGeo(0.0452, 0.0444, 0.126, 'elbowFair', 0.03, { wrinkle: 0.0028 }),
-          elbowCapMat, 0, 0.063, 0, limbScl, 1, limbScl);
-        elbow.add(fair);
-      }
+      // 轮22·肘球物理根除：缝球（elbowCap）+开口布罩（elbowFair 管）全部废除——
+      // 关节上骑一只**两端闭合**的褶皱布荚（jointPodGeo），animate 每帧转到上下臂
+      // 夹角平分线：深屈从下方看不到「管口环+缝隙+内芯盘」同心圆，肘点永远是布包肘头；
+      // 裙装裸臂用皮肤肘荚（鹰嘴软鼓包），胶皮手套用胶荚，浮木臂外照样套布荚（袖口布堆）
+      const podMat = D.gloves ? rubber : (D.torso === 'dress' ? skin : torsoMat);
+      // 轮22二稿：荚径回收到袖口径+3mm（0.047→0.044）——荚要「藏在袖里」只在
+      // 屈肘时露出布鼓包；上一稿荚径超袖口 6.5mm，直臂垂放读成「戴着护肘」
+      const fair = mkMesh(
+        D.torso === 'dress'
+          ? jointPodGeo('elbowPodSkin', { rMax: 0.0405, up: 0.072, down: 0.068, wrinkle: 0.0006 })
+          : jointPodGeo('elbowPod', { rMax: 0.044, up: 0.075, down: 0.072, wrinkle: 0.002 }),
+        podMat, 0, 0, 0, limbScl, 1, limbScl);
+      fair.name = 'elbowPod';
+      elbow.add(fair);
       if (D.drift) {
         elbow.add(mkMesh(driftLimbGeo(0.045, 0.24, 'foreDrift'), drift, 0, 0, 0));
       } else {
@@ -2187,15 +2331,18 @@ export class Humanoid {
       const knee = new THREE.Group();
       knee.position.y = -0.35;
       hip.add(knee);
-      // 膝缝球压扁收窄——藏进裤管剪影之内
-      knee.add(mkMesh(G('kneeCap', () => new THREE.SphereGeometry(0.05, 11, 9)), D.skirt ? skin : pantsMat, 0, 0.004, 0, 0.94 * limbScl, 0.64, 0.94 * limbScl));
-      // 轮18·膝部铰接裤罩（同肘罩机制）：行走/坐姿屈膝时膝点永远在裤内
-      let fair = null;
-      if (!D.skirt) {
-        fair = mkMesh(limbGeo(0.0565, 0.0555, 0.15, 'kneeFair', 0.03, { wrinkle: 0.0024 }),
-          pantsMat, 0, 0.075, 0, limbScl, 1, limbScl);
-        knee.add(fair);
-      }
+      // 轮22·膝球物理根除（同肘荚机制）：缝球+开口裤罩废除——两端闭合的褶皱布荚
+      // 骑在膝上（updateJointFairings 对分），行走/坐姿任何屈膝角度膝点都是布包膝头；
+      // 裙装裸膝用皮肤荚（髌骨软鼓包）
+      // 轮22二稿：膝荚径回收到裤管径+2.5mm（0.058→0.054）——上一稿超管径 6.5mm
+      // 直立时在裤管上鼓出一圈「护膝」，腿读成分段人偶腿
+      const fair = mkMesh(
+        D.skirt
+          ? jointPodGeo('kneePodSkin', { rMax: 0.052, up: 0.078, down: 0.072, wrinkle: 0.0004 })
+          : jointPodGeo('kneePod', { rMax: 0.054, up: 0.082, down: 0.077, wrinkle: 0.0016 }),
+        D.skirt ? skin : pantsMat, 0, 0, 0, limbScl, 1, limbScl);
+      fair.name = 'kneePod';
+      knee.add(fair);
       // 小腿三型：裸腿(腓肠肌肌腹+细踝)/胶靴筒(近直)/裤管(微锥+裤脚外扩盖住鞋口)
       knee.add(mkMesh(
         D.skirt ? limbGeo(0.052, 0.03, 0.31, 'shinSkin', 0.18, { peak: 0.3 })

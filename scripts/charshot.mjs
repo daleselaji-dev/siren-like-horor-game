@@ -61,7 +61,9 @@ try {
       if (!skipNeck.has(m.name)) {
         const lim = dressNeck.has(m.name) ? 0.10 : 0.04;
         if (m.exposedNeck > lim) err.push(`exposedNeck=${(m.exposedNeck * 1000).toFixed(0)}mm>${lim * 1000}mm`);
-        if (m.exposedNeck < -0.01) err.push(`exposedNeck=${(m.exposedNeck * 1000).toFixed(0)}mm<-10mm(颏埋进领)`);
+        // 轮22：颈长逐种子解算后目标=「领口顶住下颌」（颏底压领口环顶下 ~3mm），
+        // 姿态微倾的残差 ±7mm——下限放到 −14mm（再往下才是「颏吞进领筒」）
+        if (m.exposedNeck < -0.014) err.push(`exposedNeck=${(m.exposedNeck * 1000).toFixed(0)}mm<-14mm(颏埋进领)`);
         if (m.neckHeadRatio < 0.47) err.push(`neck/head=${m.neckHeadRatio.toFixed(2)}<0.47`);
       }
       if (m.headWH > 0.80) err.push(`headW/H=${m.headWH.toFixed(2)}>0.80`);

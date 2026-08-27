@@ -1059,6 +1059,50 @@ export function hairStrandsTexture(w = 192, h = 128, seed = 6161, sparse = false
   return c;
 }
 
+/** 发壳平铺贴图（轮22·去头盔）：不透明平铺的「梳过的碎发」——
+ *  竖向发绺明暗条（三档粗细）+ 低频绺团色块 + 高频糙点。
+ *  画成中灰由材质 color 乘出发色；配合 bumpMap 复用同图，
+ *  壳面高光被逐绺打碎——光滑烤漆穹顶从贴图层面不存在。 */
+export function hairShellTexture(size = 256, seed = 8181) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const x = c.getContext('2d');
+  const rand = mulberry32(seed);
+  x.fillStyle = '#c8c8c8';
+  x.fillRect(0, 0, size, size);
+  // 低频绺团（横向明暗大块——壳上的「层」）
+  for (let i = 0; i < 26; i++) {
+    const bx = rand() * size, by = rand() * size;
+    const bw = size * (0.12 + rand() * 0.2), bh = size * (0.05 + rand() * 0.1);
+    x.fillStyle = rand() < 0.5 ? 'rgba(70,70,70,0.16)' : 'rgba(235,235,235,0.13)';
+    x.beginPath();
+    x.ellipse(bx, by, bw, bh, (rand() - 0.5) * 0.5, 0, Math.PI * 2);
+    x.fill();
+  }
+  // 竖向发绺条（贴图 v 轴 = 壳面纵向）——两侧 wrap 连续（画三份错位）
+  for (let i = 0; i < 240; i++) {
+    const bx = rand() * size;
+    const sway = (rand() - 0.5) * size * 0.1;
+    const dark = rand() < 0.55;
+    const a = 0.1 + rand() * 0.3;
+    x.strokeStyle = dark ? `rgba(40,40,40,${a.toFixed(2)})` : `rgba(230,230,230,${(a * 0.8).toFixed(2)})`;
+    x.lineWidth = 0.6 + rand() * (dark ? 2.2 : 1.2);
+    for (const ox of [-size, 0, size]) {
+      x.beginPath();
+      x.moveTo(bx + ox, -2);
+      x.bezierCurveTo(bx + ox + sway * 0.3, size * 0.33, bx + ox + sway * 0.8, size * 0.66, bx + ox + sway, size + 2);
+      x.stroke();
+    }
+  }
+  // 高频糙点
+  for (let i = 0; i < 700; i++) {
+    const a = 0.05 + rand() * 0.12;
+    x.fillStyle = rand() < 0.5 ? `rgba(30,30,30,${a.toFixed(2)})` : `rgba(240,240,240,${a.toFixed(2)})`;
+    x.fillRect(rand() * size, rand() * size, 1 + rand() * 1.6, 1 + rand() * 3);
+  }
+  return c;
+}
+
 /** 胶皮（理骨员围裙/长手套/胶靴）：哑光微皱 + 磨亮棱线 + 骨粉扑痕 */
 export function rubberTexture(seed = 415, size = 256) {
   const fbm = makeFbm(seed, 4);
@@ -1613,6 +1657,13 @@ export function buildTextureSet(lowspec = false) {
   set.lash = toTex(lashStrokesTexture(), { aniso, clamp: true });
   set.hairStrand = toTex(hairStrandsTexture(192, 128, 6161, false), { aniso, clamp: true });
   set.hairWisp = toTex(hairStrandsTexture(192, 128, 7273, true), { aniso, clamp: true });
+  // 发壳平铺发绺：u 绕头 3 圈、v 纵向 1.6——绺宽落在 1-2cm 档；
+  // bump 用同画布另建线性实例（sRGB 色图直接当 bump 会被二次解码）
+  {
+    const hairShellCanvas = hairShellTexture(256, 8181);
+    set.hairShell = toTex(hairShellCanvas, { srgb: true, aniso, repeat: [3, 1.6] });
+    set.hairShellBump = toTex(hairShellCanvas, { srgb: false, aniso, repeat: [3, 1.6] });
+  }
   set.hairFringe = toTex(hairlineFringeTexture(), { aniso, clamp: true });
   set.hairCurtain = toTex(hairCurtainTexture(), { aniso, clamp: true });
   // 前帘双层：内实（绺芯缎带+密股）/ 外散（稀股大摆）——沿宽 4/3 绺
