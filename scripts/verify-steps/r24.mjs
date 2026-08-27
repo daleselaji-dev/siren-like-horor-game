@@ -136,11 +136,19 @@ export async function run(page, h) {
       for (let i = 0; i < 6; i++) { hum.phase = 0.3; hum.animate('idle', 3, 0); }
       hum.phase = 0.3;
       hum.animate('idle', 0.001, 0);
-      // 眼球归零看镜头——扫视/近距追踪相位冻在侧视=「翻白眼/独眼金属环」；
+      // 眼球归零看镜头——扫视/近距追踪相位冻在侧视=「翻白眼」；
       // 0.6m 人像的验收标准是与镜头对视
       hum.sacY = 0; hum.sacP = 0; hum.gzY = 0; hum.gzP = 0; hum.gazeOn = 0;
       hum.eyeGL.rotation.set(0, 0, 0);
       hum.eyeGR.rotation.set(0, 0, 0);
+      // 眨眼保险钉：暂停瞬间若冻在半眨（左右错拍——单眼睑翻下），钉回睁眼位
+      hum.blinkPh = -1; hum.blinkT = 9;
+      hum.lidL.rotation.x = hum.lidBaseL;
+      hum.lidR.rotation.x = hum.lidBaseR;
+      hum.lidLoL.rotation.x = hum.lidLoBase;
+      hum.lidLoR.rotation.x = hum.lidLoBase;
+      hum.eyeL.scale.y = hum.eyeSclY;
+      hum.eyeR.scale.y = hum.eyeSclY;
       // 手持话筒（emcee）暂时收起——话筒线正好横穿脸颊
       window.__micWasVisible = null;
       if (hum.micG) { window.__micWasVisible = hum.micG.visible; hum.micG.visible = false; }

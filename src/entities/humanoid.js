@@ -2280,22 +2280,42 @@ export class Humanoid {
     // 「上睑半垂的普通邻居」而非「瞪圆的玩偶」；挂点 z 随眼球退窝同移
     this.lidBaseL = -0.37 + P.droopL * 0.10;
     this.lidBaseR = -0.37 + P.droopR * 0.10;
-    this.lidL = mkMesh(lidGeo(), lidSkin, -eyeXoff * HX, eyeYoff + 0.002, 0.0721 * HZ, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
+    // 轮24五稿·「单片眼镜」根治：眼球缩径退窝后睑壳还留在 ×1.1 的旧轨道上，
+    // 睑缘环与眼球面之间张开 2-3mm 环缝——俯视角穿缝看到睑壳被照亮的内面
+    // （奶油色竖条）+完整睑缘环悬在眼球外（emcee 左眼「独眼金属环」真凶，
+    // 刀锋视角条件、差 1-2° 就不复现）。睑壳 1.1→1.04 收拢贴球 + 挂点 z 内收
+    this.lidL = mkMesh(lidGeo(), lidSkin, -eyeXoff * HX, eyeYoff + 0.002, 0.0716 * HZ, eyeScl * 1.04, eyeScl * 1.04, eyeScl * 1.04);
     this.lidL.rotation.x = this.lidBaseL;
-    this.lidR = mkMesh(lidGeo(), lidSkin, eyeXoff * HX, eyeYoff + 0.002, 0.0721 * HZ, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
+    this.lidR = mkMesh(lidGeo(), lidSkin, eyeXoff * HX, eyeYoff + 0.002, 0.0716 * HZ, eyeScl * 1.04, eyeScl * 1.04, eyeScl * 1.04);
     this.lidR.rotation.x = this.lidBaseR;
+    // 睑内衬（BackSide 暗壳）：睑与眼球间的缝隙从任何角度只能读成眶内阴影，
+    // 不许再漏出被聚光点亮的睑壳内皮
+    {
+      const innerM = pick(Mtl('lidInnerM', () => new THREE.MeshStandardMaterial({
+        color: 0x2a1c14, roughness: 0.92, side: THREE.BackSide,
+      })));
+      for (const lid of [this.lidL, this.lidR]) {
+        const inner = new THREE.Mesh(lidGeo(), innerM);
+        inner.scale.setScalar(0.985);
+        inner.userData.noShadow = true;
+        lid.add(inner);
+      }
+    }
     // 睑缘厚度带（轮17）：上睑壳口一圈 1mm 圆环——眼皮是有「厚度」的皮盖，
     // 不是零厚度蛋壳切口；随睑一起眨（挂在睑网格下），色比睑面深半档=睑缘线
     {
       const rimG = G('lidRimBand24', () => {
-        // 轮24：睑缘管径 1.0→1.4mm——眼皮是有厚度的皮盖；近景睑缘一条实在的「肉线」
-        const t = new THREE.TorusGeometry(0.0135, 0.0014, 5, 20);
+        // 轮24：睑缘管径加粗——眼皮是有厚度的皮盖；近景睑缘一条实在的「肉线」
+        // 轮24五稿：1.4→1.1mm 收半档——睑壳收拢贴球后 1.4mm 管在近景读成
+        // 悬在眼球上方的一根「铅笔」
+        const t = new THREE.TorusGeometry(0.0135, 0.0011, 5, 20);
         t.rotateX(Math.PI / 2);           // 环面绕 y 轴（壳口纬线）
         t.translate(0, 0.0008, 0);        // 落到 0.52π 壳口纬度（轮23 随壳弧加宽下移）
         return t;
       });
-      const rimM = pick(Mtl('lidRimM', () => new THREE.MeshStandardMaterial({
-        color: 0x8d6a56, roughness: 0.72, envMapIntensity: 0.5,
+      const rimM = pick(Mtl('lidRimM24', () => new THREE.MeshStandardMaterial({
+        // 轮24五稿：0x8d6a56→0x77584a——暖聚光下亮成米色横杆；睑缘线比睑面深一档
+        color: 0x77584a, roughness: 0.78, envMapIntensity: 0.4,
       })));
       for (const lid of [this.lidL, this.lidR]) {
         const rim = new THREE.Mesh(rimG, rimM);
@@ -2309,9 +2329,10 @@ export class Humanoid {
     // 轮23：随加宽带体上抬（-0.58→-0.665）——下睑缘托到虹膜下缘
     // 轮24：-0.665→-0.70 下睑缘再托高 1mm + 挂点随眼球退窝同移
     this.lidLoBase = Math.PI - 0.70;
-    this.lidLoL = mkMesh(lidLoGeo(), lidSkin, -eyeXoff * HX, eyeYoff - 0.0026, 0.0706 * HZ, eyeScl * 1.03, eyeScl * 0.8, eyeScl * 1.03);
+    // 轮24五稿：下睑带同步收拢（1.03→1.0）——随眼球缩径贴面
+    this.lidLoL = mkMesh(lidLoGeo(), lidSkin, -eyeXoff * HX, eyeYoff - 0.0026, 0.0706 * HZ, eyeScl * 1.0, eyeScl * 0.8, eyeScl * 1.0);
     this.lidLoL.rotation.x = this.lidLoBase;
-    this.lidLoR = mkMesh(lidLoGeo(), lidSkin, eyeXoff * HX, eyeYoff - 0.0026, 0.0706 * HZ, eyeScl * 1.03, eyeScl * 0.8, eyeScl * 1.03);
+    this.lidLoR = mkMesh(lidLoGeo(), lidSkin, eyeXoff * HX, eyeYoff - 0.0026, 0.0706 * HZ, eyeScl * 1.0, eyeScl * 0.8, eyeScl * 1.0);
     this.lidLoR.rotation.x = this.lidLoBase;
     this.head.add(this.lidLoL, this.lidLoR);
     // 睫毛：上睑缘窄弯带（贴图两端 alpha 渐隐——内外眦无贴片尖角）
