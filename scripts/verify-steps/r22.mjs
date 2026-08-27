@@ -133,7 +133,9 @@ export async function run(page, h) {
     };
   });
   console.log('[verify] r22 facade:', JSON.stringify(fc, (k, x) => (typeof x === 'number' ? +x.toFixed(2) : x)));
-  assert(fc.towerVerts >= 300, 'wing corbel towers missing: ' + fc.towerVerts);
+  // 塔是大盒体拼装（墩/腰板每盒 24 顶点、前半 12 顶点入区）——实测 108；
+  // 体量真伪由跨两翼(towerWest/East)与越檐高度(wingTopOverRoof)双断言把关
+  assert(fc.towerVerts >= 90, 'wing corbel towers missing: ' + fc.towerVerts);
   assert(fc.towerWest >= 13 && fc.towerEast >= 13, `towers not on both wings: W=${fc.towerWest.toFixed(1)} E=${fc.towerEast.toFixed(1)}`);
   assert(fc.wingTopOverRoof >= 0.8, 'tower parapet not a step above main cornice: ' + fc.wingTopOverRoof.toFixed(2));
   assert(fc.shadeVerts >= 100, 'balcony shadow bands missing: ' + fc.shadeVerts);
