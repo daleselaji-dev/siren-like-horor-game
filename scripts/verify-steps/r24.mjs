@@ -165,7 +165,14 @@ export async function run(page, h) {
       hum.group.updateMatrixWorld(true);
       const V = g.player.pos.constructor;
       const head = hum.headWorldPos(new V());
-      const fwd = new V(Math.sin(e.yaw), 0, Math.cos(e.yaw));
+      // 轮24七稿：机位沿「头部世界朝向」取位而非身体 yaw——idle 收敛后头仍带
+      // 躯干残余偏转（emcee ~15°），远侧眼落进极掠射视角=「单片眼镜」伪影；
+      // 正对脸取位，两眼近正视，与镜头对视本来就是 0.6m 人像的验收标准
+      const hq = new g.THREE.Quaternion();
+      hum.head.getWorldQuaternion(hq);
+      const fwd = new V(0, 0, 1).applyQuaternion(hq);
+      fwd.y = 0;
+      fwd.normalize();
       const side = new V(fwd.z, 0, -fwd.x);
       const cam = g.engine.camera;
       window.__origFov = window.__origFov ?? cam.fov;

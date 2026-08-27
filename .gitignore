@@ -5,3 +5,4 @@ release/*
 verify/*.png
 verify/*.jpg
 !verify/keep/
+verify/dbg/

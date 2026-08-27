@@ -524,9 +524,9 @@ function loop() {
 }
 loop();
 
-// 供无头验证注入
+// 供无头验证注入（THREE：取证脚本射线定凶/几何巡检用）
 window.__game = {
   engine, player, world, ocean, sky, input, enemies, byId, dog, birds, watchers,
-  floaters, gaze, guest, crt, agenda, M,
+  floaters, gaze, guest, crt, agenda, M, THREE,
   sightjack, stealth, tools, power, story, hud, audio, game,
 };

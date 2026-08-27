@@ -39,6 +39,10 @@ function irisTexture(base = 0x5a3a22) {
   const x = c.getContext('2d');
   const cxy = S / 2, R = S * 0.485;
   const br = (base >> 16) & 255, bg = (base >> 8) & 255, bb = base & 255;
+  // 轮24七稿：整幅先铺不透明暗底——旧画布盘外全透明，虹膜冠最外 1.5% 采到
+  // 透明像素=掠射角下露出一线亮巩膜（「单片眼镜」帮凶之一）
+  x.fillStyle = 'rgb(14,10,7)';
+  x.fillRect(0, 0, S, S);
   // 底：虹膜体径向渐变（瞳缘略亮的琥珀内圈 → 主色 → 限缘前变深）
   const g0 = x.createRadialGradient(cxy, cxy, S * 0.1, cxy, cxy, R);
   g0.addColorStop(0, `rgb(${Math.min(255, br + 30)},${Math.min(255, bg + 20)},${bb + 6})`);
@@ -2185,6 +2189,10 @@ export class Humanoid {
       // 虹膜盘是正对相机的平面：镜面反射一大就整盘糊白（白珠眼回魂）——
       // 湿光交给角膜壳与捕捉光点，虹膜自己只出「色」
       depthWrite: false,
+      // 轮24七稿·单片眼镜根治：极掠射视角下虹膜冠近缘越过「地平线」被背面剔除，
+      // 露出一指宽的暖光巩膜柱（限缘环框成「单片眼镜」）；双面渲染让冠缘背面
+      // 以暗虹膜色补上这条缝
+      side: THREE.DoubleSide,
     })).clone();
     if (ghost) this.eyeMat.opacity = 0.5;
     const eyeG = G('eyeball', () => new THREE.SphereGeometry(0.0125, 14, 11));
