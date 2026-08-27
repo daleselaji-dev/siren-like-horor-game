@@ -714,10 +714,11 @@ function hairClumpCardsGeo(style, variant, P) {
     const fld = makeSkullField(variant, P, { bare: true });
     const sp = { x: 0, y: 0, z: 0 };
     const parts = [];
-    // [极角, 片数]：bun 收拢只留顶两圈；long 有帘只留顶圈
+    // [极角, 片数]：bun 收拢只留顶两圈；long 有帘只留顶圈；
+    // crop 补第四圈枕后环（el 1.38，前向滤掉）——侧照枕后弧线不再是光滑球缘
     const rings = style === 'long' ? [[0.45, 8], [0.8, 10]]
       : style === 'bun' ? [[0.45, 8], [0.8, 10]]
-        : [[0.42, 8], [0.78, 11], [1.1, 13]];
+        : [[0.42, 8], [0.78, 11], [1.1, 13], [1.38, 12]];
     let ci = 0;
     // 轮22二稿：欧拉角外翘（读成「故障黑尖刺」）废除——
     // 瓦片式切向标架：卡片贴伏壳面、发梢顺坡向下（毛流方向），

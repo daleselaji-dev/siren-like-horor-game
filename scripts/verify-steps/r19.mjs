@@ -58,7 +58,8 @@ export async function run(page, h) {
   });
   console.log('[verify] r19 massing:', JSON.stringify(fc));
   assert(fc.attic >= 90, 'central attic volume missing: ' + fc.attic);
-  assert(fc.balcony >= 500, 'balcony band modules missing: ' + fc.balcony);
+  // 轮22：两端段让位给翼端挑楼塔（带只跑塔间）——带件顶点 520→480，阈值同步 400
+  assert(fc.balcony >= 400, 'balcony band modules missing: ' + fc.balcony);
   assert(fc.grill >= 100, 'AC grills missing: ' + fc.grill);
 
   // ---------- 断言②：大巴司机=真 humanoid 烘焙体（不是灰筒） ----------
