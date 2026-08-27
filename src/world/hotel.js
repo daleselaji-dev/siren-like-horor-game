@@ -667,6 +667,81 @@ export function buildHotel(ctx) {
     }
   }
 
+  // ================= 立面轮23：真阳台带 + 亮窗群 + 1F 店面分色 =================
+  // 门3轮22「仍是 PS1 灰楼」的照片级三刀：
+  //   ① 北立面 2F/3F 逐间**真阳台**（挑板 0.95m + 水泥栏板 + 侧privacy板 + 压顶 +
+  //      板底檐下暗带 + 晾衣杆/床单/杂物）——广角里每层长出一排凹凸与投影，
+  //      「多层进深/阳台阴影」不再靠贴纸；
+  //   ② 亮窗群加密：暖帘光/弱暖光/荧光冷绿/电视蓝四种光温 12 樘错落——
+  //      夜景照片的第一读是「亮着的窗」；
+  //   ③ 1F 店面带墨绿釉面砖分色（90s 县镇酒店标配裙面）——楼体纵向三段
+  //      「墨绿裙面-米瓷砖身-塔色顶」，不再一色到顶
+  {
+    const balcPanelM = new THREE.MeshStandardMaterial({ color: 0x8f8a76, roughness: 0.88 });
+    const glazeGreenM = new THREE.MeshStandardMaterial({ color: 0x2d4a3e, roughness: 0.34, metalness: 0.08, envMapIntensity: 1.6 });
+    const sheetM = new THREE.MeshStandardMaterial({ color: 0xb9c2bd, roughness: 0.95 });
+    const shirtM2 = new THREE.MeshStandardMaterial({ color: 0x6d7f96, roughness: 0.95 });
+    let bs = 11;
+    const brnd = () => (bs = (bs * 16807) % 2147483647) / 2147483647;
+    /** 一间阳台：挑板+栏板+侧板+压顶+板底暗带+可选晾衣/杂物 */
+    const balcony = (a, b, y0, deco = 0) => {
+      const cx2 = (a + b) / 2, w2 = b - a;
+      box(M.concreteDark, cx2, y0 + 0.86, 11.62, w2 + 0.66, 0.13, 0.95);      // 挑板
+      box(M.ironDark, cx2, y0 + 0.76, 11.17, w2 + 0.6, 0.06, 0.015);          // 板底檐下暗带
+      box(balcPanelM, cx2, y0 + 1.32, 12.05, w2 + 0.52, 0.82, 0.07);          // 正面栏板
+      box(M.concreteDark, cx2, y0 + 1.76, 12.05, w2 + 0.66, 0.07, 0.15);      // 栏板压顶
+      for (const s2 of [-1, 1]) {                                              // 侧板
+        box(balcPanelM, cx2 + s2 * (w2 / 2 + 0.24), y0 + 1.32, 11.62, 0.07, 0.82, 0.88);
+      }
+      box(M.concreteDark, cx2, y0 + 1.02, 12.09, w2 + 0.52, 0.22, 0.012);     // 栏板根部雨渍带
+      if (deco === 1) {                                                        // 晾衣杆+挂物
+        cyl(M.ironDark, cx2, y0 + 2.02, 11.75, 0.022, w2 + 0.2, 0.022, 0, 0, Math.PI / 2);
+        box(sheetM, cx2 - w2 * 0.22, y0 + 1.62, 11.76, 0.62, 0.78, 0.02);
+        box(shirtM2, cx2 + w2 * 0.18, y0 + 1.75, 11.76, 0.34, 0.5, 0.02);
+      } else if (deco === 2) {                                                 // 堆杂物
+        box(M.concreteDark, cx2 + w2 * 0.2, y0 + 1.12, 11.5, 0.5, 0.4, 0.4, 0.3);
+        box(M.ironDark, cx2 - w2 * 0.24, y0 + 1.05, 11.55, 0.4, 0.26, 0.34, -0.2);
+      }
+    };
+    // 2F：中央两黑腔窗与门斗雨棚区跳过；3F：六间全排
+    for (const [a, b] of [[-11.5, -9.5], [-7, -5], [6, 8], [10.5, 12.5]]) balcony(a, b, F2, Math.floor(brnd() * 3));
+    for (const [a, b] of [[-11.5, -9.5], [-7, -5], [-2.5, -0.5], [1.5, 3.5], [6, 8], [10.5, 12.5]]) balcony(a, b, F3, Math.floor(brnd() * 3));
+    // —— 亮窗群（自发光薄片贴窗洞内缝，不吃灯预算）——
+    const glowA = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffb26a, emissiveIntensity: 1.1, roughness: 1 });   // 暖帘光
+    const glowB = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffc07a, emissiveIntensity: 0.65, roughness: 1 });  // 弱暖光
+    const glowF = new THREE.MeshStandardMaterial({ color: 0x101512, emissive: 0xbfe0c8, emissiveIntensity: 0.55, roughness: 1 });  // 荧光管冷绿
+    const glowT = new THREE.MeshStandardMaterial({ color: 0x10151a, emissive: 0x8fb4c8, emissiveIntensity: 0.5, roughness: 1 });   // 电视蓝
+    // [材质, cx, y0(层), 宽, 高偏移]——错落在各窗樘（部分藏在阳台栏板后：光从栏板上沿溢出）
+    const glows = [
+      [glowA, 6.6, F2, 0.9], [glowB, 11.4, F2, 0.85],
+      [glowB, -1.8, F3, 0.85], [glowF, 2.3, F3, 0.8], [glowB, 11.2, F3, 0.9],
+      [glowA, -10.6, F3, 0.92], [glowF, -14.6, F2, 0.8],
+    ];
+    for (const [gm, gx, gy, gw] of glows) box(gm, gx, gy + 1.7, 11.008, gw, 1.3, 0.012);
+    // 东立面 3F 两樘（斜视图里侧脸也亮着）
+    box(glowB, 17.008, F2 + 5.1, 0.8, 0.012, 1.3, 0.9);
+    box(glowF, 17.008, F2 + 5.1, 6.1, 0.012, 1.3, 0.8);
+    // —— 1F 店面墨绿釉面裙带（绕开窗/门洞的贴面）——
+    // 北左段（洞 -15.5..-13 / -12..-9.5）
+    for (const [x1, x2] of [[-16.85, -15.5], [-13, -12], [-9.5, -6.35]]) {
+      box(glazeGreenM, (x1 + x2) / 2, 1.62, 11.17, x2 - x1, 2.0, 0.02);
+    }
+    // 北右段（洞 12..14.5）
+    for (const [x1, x2] of [[6.35, 12], [14.5, 16.85]]) {
+      box(glazeGreenM, (x1 + x2) / 2, 1.62, 11.17, x2 - x1, 2.0, 0.02);
+    }
+    // 窗下裙板（洞下沿 0.62..0.9 补齐一皮）
+    for (const [x1, x2] of [[-15.5, -13], [-12, -9.5], [12, 14.5]]) {
+      box(glazeGreenM, (x1 + x2) / 2, 0.76, 11.17, x2 - x1, 0.28, 0.02);
+    }
+    // 东西山墙 1F 裙带（斜视可读的分色包角）
+    box(glazeGreenM, -17.17, 1.62, 0, 0.02, 2.0, 21.9);
+    box(glazeGreenM, 17.17, 1.62, -1.5, 0.02, 2.0, 18.5);
+    // 裙带压顶铜线（分色的「界」）
+    box(M.brass, -11.6, 2.64, 11.18, 10.5, 0.05, 0.03);
+    box(M.brass, 11.6, 2.64, 11.18, 10.5, 0.05, 0.03);
+  }
+
   // ================= 正门：进深门斗 + 体积雨棚 + 灯箱 + 玻璃门 =================
   // 轮16门3：门脸从墙皮里长出 1.5m——玻璃门退在门斗腔里，雨棚是一只有檐口板带的
   // 「盒子」压在两墩一排柱上，不再是一片悬空薄板

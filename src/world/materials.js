@@ -232,8 +232,11 @@ export function buildMaterials(lowspec = false) {
           float hitT = min(min(kk.x, kk.y), kk.z);
           vec3 hp = cpos + rd * hitT;
           float h1 = wrHash(cell);
-          float lit = step(0.78, h1);
-          vec3 warm = vec3(0.5, 0.33, 0.14) * (0.55 + 0.45 * wrHash(cell + 7.0));
+          // 轮23：亮房 22%→38%，亮度×1.6，两成亮房偏荧光冷绿——
+          // 夜里整楼立面第一读是「住满人的县镇酒店」，不是一张黑玻璃纸
+          float lit = step(0.62, h1);
+          vec3 warm = vec3(0.5, 0.33, 0.14) * (0.55 + 0.45 * wrHash(cell + 7.0)) * 1.6;
+          if (wrHash(cell + 13.0) > 0.8) warm = vec3(0.30, 0.42, 0.34) * 1.35;
           vec3 base = mix(vec3(0.045, 0.058, 0.07), warm, lit);
           vec3 rc;
           if (hitT == kk.z) {
