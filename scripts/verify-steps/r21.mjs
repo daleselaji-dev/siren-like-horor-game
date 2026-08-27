@@ -83,7 +83,7 @@ export async function run(page, h) {
     g.engine.scene.traverse((o) => {
       if (!o.isMesh) return;
       const hex = o.material?.color?.getHex?.();
-      if (hex === 0x82786a) {
+      if (hex === 0xc4b69e) {
         wing += o.geometry.attributes.position.count;
         o.updateWorldMatrix(true, false);
         const p = o.geometry.attributes.position;

@@ -505,7 +505,7 @@ export function buildHotel(ctx) {
   //   ② 立面颜色分层：勒脚深（暗水泥裙 1.25m）/ 墙身浅（瓷砖）/ 檐口另一色（暗赭带）
   //   ③ 塔身用抹灰另色（0x8f8a80 断言标记色保持）——中央体与两翼不同皮
   {
-    const atticM = new THREE.MeshStandardMaterial({ color: 0x8f8a80, roughness: 0.9 });  // 塔身抹灰（断言标记色）
+    const atticM = new THREE.MeshStandardMaterial({ color: 0x8f8a80, roughness: 0.9, envMapIntensity: 1.3 }); // 塔身抹灰（断言标记色）
     const cornM = new THREE.MeshStandardMaterial({ color: 0x5e4a40, roughness: 0.92 });  // 檐口暗赭带（断言标记色）
     const plinthM = new THREE.MeshStandardMaterial({ color: 0x4c4844, roughness: 0.95 }); // 勒脚暗裙（断言标记色）
     // —— 塔体：x -8.7..8.7 / z -10.3..10.4 / ROOF..ROOF+3.4 ——
@@ -576,8 +576,11 @@ export function buildHotel(ctx) {
   //   「暖灰翼端块(另色出墙6cm+端头女儿墙抬升) | 瓷砖身 | 塔色中央竖块(与4F塔同皮贯通到雨棚)」
   // 广角第一读=三种墙皮三级天际线，不再是一整张灰纸上贴窗
   {
-    const wingM = new THREE.MeshStandardMaterial({ color: 0x82786a, roughness: 0.88 });  // 翼端暖灰抹灰（断言标记色）
-    const ctrM = new THREE.MeshStandardMaterial({ color: 0x8f8a80, roughness: 0.9 });    // 中央竖块＝塔身同色（贯通）
+    // 翼端暖砂抹灰（断言标记色）——轮21二稿：0x82786a 在夜景灰雾里与瓷砖身几乎同灰阶；
+    // 且裸建材质 envMapIntensity 默认 1.0 低于瓷砖的 1.5（夜里环境光是主光源之一）。
+    // 提亮到暖砂白 + envInt 2.0：广角夜景「亮翼端-中灰瓷砖身-塔色中央」三段明度差第一眼可读
+    const wingM = new THREE.MeshStandardMaterial({ color: 0xc4b69e, roughness: 0.85, envMapIntensity: 2.0 });
+    const ctrM = new THREE.MeshStandardMaterial({ color: 0x8f8a80, roughness: 0.9, envMapIntensity: 1.3 }); // 中央竖块＝塔身同色（贯通）
     // —— 西翼端块（外墙皮出 6cm，窗洞保留成深腔）——
     wallX(wingM, -17.15, -12.81, 11.04, 1.3, F2, [{ from: -15.5, to: -13, top: 1.3 }]);
     wallX(wingM, -17.15, -12.81, 11.04, F2, F3, [{ from: -15.5, to: -13.5, sill: 1.0, top: 2.4 }]);
