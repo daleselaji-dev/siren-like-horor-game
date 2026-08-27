@@ -292,7 +292,7 @@ def build_clothed_torso(spec, m, mats, seed):
     path, widths, depths, yoffs = [], [], [], []
     for z in zs:
         w, d = prof(max(z, m['hip'] - 0.02))
-        flare = max(0.0, (m['hip'] - z) / 0.16) * 0.014  # 下摆散
+        flare = max(0.0, (m['hip'] - z) / 0.16) * 0.022  # 下摆散
         widths.append(w + pad + flare)
         depths.append(d + pad + flare * 0.7)
         path.append(Vector((0, 0, z)))
@@ -315,15 +315,18 @@ def build_clothed_torso(spec, m, mats, seed):
             da = abs(a - TAU / 4)
             r += 0.012 * math.exp(-(da / 0.10) ** 2) * frontness
             r -= 0.005 * math.exp(-((da - 0.16) / 0.05) ** 2) * frontness
-        # 腰部横褶（背/侧明显）——幅度要大到柔光渲染下仍可读，否则又是光滑锥筒
-        r += 0.016 * math.exp(-((t - waist_t) / 0.09) ** 2) * math.sin(z * 120 + a * 2) * (0.3 + backness)
+            # 长垂褶：胸下到下摆的 4-5 道低频竖褶（长褶才是「布」；碎波是高尔夫球）
+            r += 0.020 * math.sin(a * 4.3 + wrk[3] * 6) * smoothstep(max(0.0, waist_t + 0.22 - t) / 0.55) * (0.5 + 0.5 * backness)
+            r += 0.013 * math.sin(a * 2.6 + wrk[7] * 6 + 1.3) * smoothstep(max(0.0, waist_t + 0.30 - t) / 0.60) * frontness
+        # 腰部横向堆褶（背/侧明显）——低频大幅，柔光下仍可读
+        r += 0.020 * math.exp(-((t - waist_t) / 0.10) ** 2) * math.sin(z * 46 + a * 2 + wrk[9] * 5) * (0.35 + backness)
         # 肩胛两瓣（背面上部）
         r += 0.016 * math.exp(-((t - 0.78) / 0.10) ** 2) * backness * math.exp(-((abs(a - 3 * TAU / 4) - 0.5) / 0.28) ** 2)
-        # 腋下→前胸斜拉褶（袖根牵出的放射纹）
-        r += 0.011 * math.exp(-((t - 0.72) / 0.14) ** 2) * math.sin(a * 6 + z * 60 + wrk[(i + 9) % 48] * 5) * (0.3 + 0.7 * frontness)
+        # 腋下→前胸斜拉褶（袖根牵出的放射纹，低频化）
+        r += 0.012 * math.exp(-((t - 0.72) / 0.14) ** 2) * math.sin(a * 4 + z * 26 + wrk[(i + 9) % 48] * 5) * (0.3 + 0.7 * frontness)
         # 布面低频不匀
-        r += 0.015 * (wrk[int(a / TAU * 24) % 24] - 0.5) * (1 - t * 0.4)
-        r += 0.011 * math.sin(a * 5 + z * 33 + wrk[(i * 3 + 1) % 48] * 7) * (0.4 + 0.6 * backness)
+        r += 0.014 * (wrk[int(a / TAU * 24) % 24] - 0.5) * (1 - t * 0.4)
+        r += 0.009 * math.sin(a * 3 + z * 18 + wrk[(i * 3 + 1) % 48] * 7) * (0.4 + 0.6 * backness)
         return r
     bm = bmesh.new()
     rings = tube(bm, path, widths, depths, ring_n=ring_n, cap_start=True, cap_end=True,
@@ -394,30 +397,34 @@ def build_clothed_torso(spec, m, mats, seed):
             except ValueError:
                 pass
     else:
-        # 棉袄披领：贴着躯干顶的一圈厚滚边（略锥形收向颈）
+        # 棉袄披领：贴着躯干顶的一圈厚滚边（略锥形收向颈——顶缘贴颈皮 4mm 内）
         zc2 = m['shoulder'] + 0.010
         yo2 = stoop_off(spec, m, zc2)
         tube(bm, [Vector((0, yo2, zc2 - 0.010)), Vector((0, yo2 - 0.002, zc2 + 0.012)),
                   Vector((0, yo2 - 0.004, zc2 + 0.026))],
-             [neck_r + 0.016, neck_r + 0.010, neck_r + 0.005],
-             [neck_r + 0.015, neck_r + 0.009, neck_r + 0.004], ring_n=18)
+             [neck_r + 0.012, neck_r + 0.007, neck_r + 0.004],
+             [neck_r + 0.011, neck_r + 0.006, neck_r + 0.003], ring_n=22)
     collar = finish_mesh('Collar', bm, [mats['coat']], subsurf=collar_subsurf)
     extras.append(collar)
     if outfit == 'waiter':
-        # 黑领结：两翼 + 中结，贴在立领正前
-        yf = yo - (neck_r + 0.018)
+        # 黑领结：贴在立领正前下缘的扁蝶结（两翼楔形外窄内宽 + 小方结）
+        # r14 教训：厚方块骑在领带正中读成两颗「黑土豆」——要扁、要贴、要在喉位
+        yf = yo - (stand + 0.0042)
+        zbow = zc + 0.002
         for sgn in (-1, 1):
             bm = bmesh.new()
             r = bmesh.ops.create_cube(bm, size=1)
             for v in r['verts']:
-                v.co = Vector((v.co.x * 0.030, v.co.y * 0.010, v.co.z * (0.016 + 0.008 * (0.5 + sgn * v.co.x))))
-                v.co += Vector((sgn * 0.020, yf, zc + 0.010))
+                wing_t = 0.5 + sgn * v.co.x   # 0=中心端 1=外端
+                v.co = Vector((v.co.x * 0.021, v.co.y * 0.0035,
+                               v.co.z * (0.0075 + 0.0045 * (1 - wing_t))))
+                v.co += Vector((sgn * 0.0145, yf - 0.001 * (1 - wing_t), zbow))
             extras.append(finish_mesh('BowWing', bm, [mats['shoe']], subsurf=1))
         bm = bmesh.new()
         r = bmesh.ops.create_cube(bm, size=1)
         for v in r['verts']:
-            v.co = Vector((v.co.x * 0.009, v.co.y * 0.009, v.co.z * 0.012))
-            v.co += Vector((0, yf - 0.002, zc + 0.010))
+            v.co = Vector((v.co.x * 0.0055, v.co.y * 0.0045, v.co.z * 0.0075))
+            v.co += Vector((0, yf - 0.0022, zbow))
         extras.append(finish_mesh('BowKnot', bm, [mats['shoe']], subsurf=1))
 
     # —— 前襟扣 ——
@@ -665,8 +672,8 @@ def build_legs(spec, m, mats):
     bloat = spec.get('bloat', 0.0)
     objs = []
     for side in (-1, 1):
-        hx = side * m['hipw'] * 0.60
-        thigh_r = 0.058 * m['H'] / 1.72 * (1 + bloat * 0.15)
+        hx = side * m['hipw'] * 0.56
+        thigh_r = 0.055 * m['H'] / 1.72 * (1 + bloat * 0.15)
         knee_r = 0.040 * m['H'] / 1.72 * (1 + bloat * 0.18)
         calf_r = 0.044 * m['H'] / 1.72 * (1 + bloat * 0.2)
         ankle_r = 0.027 * m['H'] / 1.72 * (1 + bloat * 0.25)
@@ -712,7 +719,7 @@ def build_feet(spec, m, mats):
     S = (1 + (bloat * 0.3 if bare else 0)) * m['H'] / 1.72
     objs = []
     for side in (-1, 1):
-        hx = side * m['hipw'] * 0.60
+        hx = side * m['hipw'] * 0.56
         if bare:
             key = 'FootMeta' + ('L' if side < 0 else 'R')
             mb = bpy.data.metaballs.new(key)
@@ -871,11 +878,12 @@ def assemble_character(spec):
         # 睑缘线（睫毛读法）与内眦泪阜
         'lidline': flat_mat(name + '_lidline',
                             tuple(srgb_to_linear(float(np.clip(c * 0.42, 0, 1))) for c in skin_rgb), rough=0.55),
-        'caruncle': flat_mat(name + '_caruncle', (srgb_to_linear(0.50), srgb_to_linear(0.22), srgb_to_linear(0.20)),
-                             rough=0.35),
+        'caruncle': flat_mat(name + '_caruncle', (srgb_to_linear(0.36), srgb_to_linear(0.19), srgb_to_linear(0.17)),
+                             rough=0.45),
         'hair': flat_mat(name + '_hair', spec.get('hair_rgb', (0.09, 0.08, 0.07)), rough=0.85),
         'hair_dk': flat_mat(name + '_hairdk', tuple(c * 0.55 for c in spec.get('hair_rgb', (0.09, 0.08, 0.07))), rough=0.92),
-        'hair_lt': flat_mat(name + '_hairlt', tuple(min(1, c * 1.7 + 0.03) for c in spec.get('hair_rgb', (0.09, 0.08, 0.07))), rough=0.8),
+        'hair_lt': flat_mat(name + '_hairlt', tuple(min(1, c * (1.25 if wet else 1.7) + (0.008 if wet else 0.03))
+                                                    for c in spec.get('hair_rgb', (0.09, 0.08, 0.07))), rough=0.8),
         'brow': flat_mat(name + '_brow', spec.get('brow_rgb', tuple(c * 0.7 for c in spec.get('hair_rgb', (0.09, 0.08, 0.07)))), rough=0.9),
         'coat': flat_mat(name + '_coat', spec.get('coat_rgb', (0.30, 0.32, 0.34)),
                          rough=0.42 if wet else 0.88, bump=0.10 if wet else 0.16, bump_scale=230.0),
@@ -922,14 +930,17 @@ def assemble_character(spec):
         tray.location = wr_l + Vector((0.02, -0.05, 0.035))
         parts.append(tray)
     if spec.get('kelp'):
+        # 海藻：从肩缝里垂下来贴胸的湿扁带（r14 的锥管上端露出肩面读成绿刺）
         rng = rng_stream(seed + 99)
         for i in range(3):
             x0 = (-1 if i % 2 else 1) * (0.05 + rng.random() * 0.07)
-            z0 = m['shoulder'] + 0.01
+            z0 = m['shoulder'] - 0.012
             L = 0.26 + rng.random() * 0.30
             bm = bmesh.new()
-            pth = [Vector((x0 + math.sin(t * 4 + i) * 0.015, -0.045 - t * 0.02, z0 - L * t)) for t in np.linspace(0, 1, 4)]
-            tube(bm, pth, [0.026, 0.021, 0.015, 0.006], [0.005, 0.0045, 0.003, 0.0015], ring_n=6,
+            pth = [Vector((x0 + math.sin(t * 4 + i) * 0.018, -0.052 - t * 0.028 - math.sin(t * 7 + i * 2) * 0.006,
+                           z0 - L * t)) for t in np.linspace(0, 1, 6)]
+            tube(bm, pth, [0.018, 0.020, 0.017, 0.013, 0.009, 0.004],
+                 [0.0035, 0.0032, 0.0028, 0.0024, 0.0018, 0.0010], ring_n=8,
                  cap_start=True, cap_end=True)
             parts.append(finish_mesh('Kelp%d' % i, bm, [mats['kelp']], subsurf=1))
 

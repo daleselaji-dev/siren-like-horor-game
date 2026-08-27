@@ -63,7 +63,7 @@ SPECS = {
         'head_pitch': 0.10, 'head_yaw': 0.08,
         'head': {'age': 0.40, 'bloat': 1.0, 'lid': 0.76, 'mouth_open': 0.75, 'hollow': 0.0,
                  'asym': 0.015, 'rx': 0.082, 'ry': 0.097, 'rz': 0.109},
-        'eye_film': 0.75, 'iris': (0.30, 0.34, 0.34),
+        'eye_film': 0.60, 'iris': (0.30, 0.34, 0.34),
         'anomaly': 'drowned',
     },
 }

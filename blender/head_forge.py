@@ -351,10 +351,10 @@ EYE_R = 0.0122
 
 
 def eye_anchor(field, sgn):
-    """眼球中心：眶面往里退，球从眼裂里探出来。"""
+    """眼球中心：眶面往里退，球从眼裂里探出来。泡胀者眶周软组织外涌，球要沉更深。"""
     d = field.eye_dirs[sgn]
     surf = field.pos(d)
-    return surf + Vector(d) * (-EYE_R * 0.38) + Vector((0, 0.0015, 0))
+    return surf + Vector(d) * (-EYE_R * (0.38 + 0.30 * field.bloat)) + Vector((0, 0.0015, 0))
 
 
 def gaze_dir(sgn):
@@ -464,9 +464,9 @@ def build_lids(field, sgn, mats):
         for lp in fce.loops:
             d = lp.vert.co.normalized()
             lp[uvl].uv = (uu + d.dot(sidev) * 0.012 * sgn, vv + d.dot(up2) * 0.012)
-    # 泪阜：内眦里的一粒淡红小丘
+    # 泪阜：内眦里的一粒淡红小丘（小而钝，大了/艳了在近景读成红点）
     inner = on_sphere(-phi_max - 0.045, -0.01, EYE_R * 1.005)
-    ret = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=EYE_R * 0.14)
+    ret = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=EYE_R * 0.095)
     for v in ret['verts']:
         v.co = Vector((v.co.x, v.co.y * 0.7, v.co.z * 0.8)) + inner
         for lp2 in v.link_loops:
@@ -500,7 +500,7 @@ def build_brow(field, sgn, mats):
         zz = LM['brow_z'] - 0.045 + 0.10 * math.sin(t * math.pi) ** 0.8 - t * t * 0.10
         cl = math.sqrt(max(0.0, 1 - zz * zz))
         d = Vector((math.sin(lon) * cl, -math.cos(lon) * cl, zz)).normalized()
-        p = field.pos(d) + field.normal(d) * 0.0008
+        p = field.pos(d) + field.normal(d) * 0.0004
         nrm = field.normal(d)
         # 毛流：眉头向上、眉身向外、眉梢向外下
         flow = (Vector((sgn * (0.35 + t * 0.75), -0.15, 0.55 - t * 1.05)).normalized())
@@ -541,11 +541,12 @@ def _hairline_z(lon, style):
     return 0.42 * max(0.0, front) ** 1.5 + 0.10 - 0.50 * max(0.0, -front)
 
 
-def _shell_lift_arr(field, D, style):
+def _shell_lift_arr(field, D, style, wet=False):
     """发壳厚度场（壳/卡同源）：底厚 + 绺团噪声起伏 + 顺梳向的条状沟壑。
-    D: (N,3) 单位方向。返回 (N,) 米制 lift（发际线以下平滑降为负=沉入头内）。"""
+    D: (N,3) 单位方向。返回 (N,) 米制 lift（发际线以下平滑降为负=沉入头内）。
+    wet：湿发贴伏——绺团/条纹幅度大减（湿发是抿平的，碎口交给垂绺卡）。"""
     sd = field.seed
-    lift = 0.0026 if style == 'slick' else 0.0038
+    lift = 0.0026 if style == 'slick' else (0.0028 if wet else 0.0038)
     clump = vnoise3(D * 9.0, sd + 77)
     # 顺梳向条状沟壑：对短发≈经度向条纹（发丝束的走向感），中频+高频两层
     strand = vnoise3(np.stack([D[:, 0] * 26.0, D[:, 1] * 26.0, D[:, 2] * 5.0], axis=1), sd + 78)
@@ -555,8 +556,8 @@ def _shell_lift_arr(field, D, style):
     hl = hl + 0.009 * np.sin(lon * 7 + sd) + 0.005 * np.sin(lon * 13 + sd * 2)
     t = np.clip((D[:, 2] - hl + 0.02) / 0.09, 0, 1)
     t = t * t * (3 - 2 * t)
-    amp = 1.0 if style != 'slick' else 0.45
-    lf = (lift * (0.50 + 1.05 * clump) + 0.0016 * (strand - 0.5) * 2 * amp +
+    amp = 0.45 if style == 'slick' else (0.30 if wet else 1.0)
+    lf = (lift * (0.50 + (0.35 if wet else 1.05) * clump) + 0.0016 * (strand - 0.5) * 2 * amp +
           0.0008 * (fine - 0.5) * 2 * amp + 0.002)
     return -0.002 + lf * t
 
@@ -593,7 +594,7 @@ def build_scalp(field, spec, mats):
         return None
     D /= np.linalg.norm(D, axis=1, keepdims=True)
     base = field.unit_pos(D) * np.array([field.rx, field.ry, field.rz])
-    lifts = _shell_lift_arr(field, D, style)
+    lifts = _shell_lift_arr(field, D, style, wet=spec.get('anomaly') == 'drowned')
     for v, p, d, lf in zip(bm.verts, base, D, lifts):
         v.co = Vector(p) + Vector(d) * float(lf)
     uvl = bm.loops.layers.uv.verify()
@@ -690,7 +691,10 @@ def build_hair_cards(field, spec, mats, count=560):
         for i2, q in enumerate(pts):
             wk = w0 * (1 - 0.85 * (i2 / segs) ** 1.3)   # 梢部收尖
             rows.append((bm.verts.new(q - side * wk), bm.verts.new(q + side * wk)))
-        mi = int(rng.choice([0, 0, 0, 1, 1, 2]))   # 发色抖动：基/深/浅
+        if style == 'slick':
+            mi = int(rng.choice([0, 0, 0, 1]))     # 油头抿光：不掺亮卡（霜白挑染出戏）
+        else:
+            mi = int(rng.choice([0, 0, 0, 1, 1, 2]))   # 发色抖动：基/深/浅
         if edge_zone and front > 0.15:
             mi = int(rng.choice([0, 1, 1, 1]))     # 前额发际卡压深：亮卡在额头上读成碎瓷片
         for i2 in range(segs):
@@ -759,22 +763,24 @@ def build_hair_cards(field, spec, mats, count=560):
 
 
 def build_nape_wisps(field, spec, mats):
-    """光头/戴帽老者：颈后与耳上的灰白碎发。"""
+    """光头/戴帽老者：颈后与耳上的灰白碎发——短茬贴皮。
+    r14 教训：长绺垂到肩上，灰发受光读成「白围巾」。"""
     rng = np.random.default_rng(field.seed + 65)
     bm = bmesh.new()
-    for i in range(70):
-        u = math.pi + (rng.random() - 0.5) * 2.4   # 后侧
-        zz = -0.32 + rng.random() * 0.42
+    for i in range(46):
+        u = math.pi + (rng.random() - 0.5) * 2.2   # 后侧
+        zz = -0.30 + rng.random() * 0.36
         cl = math.sqrt(max(0.0, 1 - zz * zz))
         d = Vector((math.sin(u) * cl, -math.cos(u) * cl, zz))
-        p = field.pos(d) + field.normal(d) * 0.0015
         nrm = field.normal(d)
-        dirv = (Vector((d.x * 0.4, 0.3, -1.0)) + Vector((rng.random() - 0.5, rng.random() - 0.5, 0)) * 0.5).normalized()
-        L = 0.014 + rng.random() * 0.014
+        p = field.pos(d) + nrm * 0.0007
+        dirv = (Vector((d.x * 0.3, 0.15, -1.0)) + Vector((rng.random() - 0.5, rng.random() - 0.5, 0)) * 0.4).normalized()
+        dirv = (dirv - nrm * dirv.dot(nrm) * 0.85).normalized()
+        L = 0.006 + rng.random() * 0.007
         side = dirv.cross(nrm).normalized()
-        w = 0.002
-        q1 = p + dirv * L * 0.6
-        q2 = q1 + (dirv + Vector((0, 0, -0.5))).normalized() * L * 0.4
+        w = 0.0010
+        q1 = p + dirv * L * 0.6 + nrm * 0.0002
+        q2 = q1 + (dirv + Vector((0, 0, -0.4))).normalized() * L * 0.4
         a = bm.verts.new(p - side * w)
         b = bm.verts.new(p + side * w)
         c2 = bm.verts.new(q1 + side * w * 0.6)
@@ -894,19 +900,26 @@ def build_calcified_nodules(field, mats):
         for v in ret['verts']:
             v.co += off
 
-    # 唇缘环：椭圆轮廓（上唇缘略高，下唇缘略低），沿弧长密排
-    n_ring = 34
+    # 唇缘环：椭圆轮廓（上唇缘略高，下唇缘略低），沿弧长密排小粒——
+    # r14 教训：粒径 1.3-2.7mm 的环读成「泡沫甜甜圈」；鱼籽要 0.8-1.6mm 且紧贴唇缘
+    n_ring = 46
     for i in range(n_ring):
-        ang = i / n_ring * TAU + rng.random() * 0.08
-        lon = math.cos(ang) * (0.155 + rng.random() * 0.02)
-        zz = LM['seam_z'] + math.sin(ang) * (0.062 + rng.random() * 0.014)
-        put(lon, zz, 0.0013 + rng.random() * 0.0014)
-    # 口缝封条：沿缝一列（略越过嘴角），粒大一档——「被封死」的读法在这里
-    for i in range(11):
-        tt = (i / 10 - 0.5) * 2
-        lon = tt * 0.15 + (rng.random() - 0.5) * 0.014
-        zz = LM['seam_z'] + (rng.random() - 0.5) * 0.014
-        put(lon, zz, 0.0017 + rng.random() * 0.0015)
+        ang = i / n_ring * TAU + rng.random() * 0.06
+        lon = math.cos(ang) * (0.150 + rng.random() * 0.016)
+        zz = LM['seam_z'] + math.sin(ang) * (0.052 + rng.random() * 0.010)
+        put(lon, zz, 0.0008 + rng.random() * 0.0008)
+    # 口缝封条：沿缝一列（略越过嘴角），粒大半档——「被封死」的读法在这里
+    for i in range(15):
+        tt = (i / 14 - 0.5) * 2
+        lon = tt * 0.17 + (rng.random() - 0.5) * 0.012
+        zz = LM['seam_z'] + (rng.random() - 0.5) * 0.012
+        put(lon, zz, 0.0011 + rng.random() * 0.0009)
+    # 缝上零星二代粒（正在长的）
+    for i in range(9):
+        ang = rng.random() * TAU
+        lon = math.cos(ang) * (0.10 + rng.random() * 0.09)
+        zz = LM['seam_z'] + math.sin(ang) * (0.03 + rng.random() * 0.035)
+        put(lon, zz, 0.0005 + rng.random() * 0.0005)
     me = bpy.data.meshes.new('Calc')
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me)
@@ -915,20 +928,21 @@ def build_calcified_nodules(field, mats):
 
 
 def build_salt_crystals(field, mats):
-    """守夜镇民：右颊向颈的盐霜晶簇。"""
+    """守夜镇民：右颊向颌缘的盐霜晶簇（沿颊侧带状爬，半没进皮——
+    r14 教训：撒到下颌缘以下会悬空在颈锥外读成漂浮白珠）。"""
     rng = np.random.default_rng(field.seed + 93)
     bm = bmesh.new()
-    for i in range(34):
+    for i in range(42):
         t = rng.random()
-        lon = 0.55 + rng.random() * 0.45
-        zz = -0.10 - t * 0.52 + (rng.random() - 0.5) * 0.12
+        lon = 0.52 + rng.random() * 0.40
+        zz = -0.06 - t * 0.38 + (rng.random() - 0.5) * 0.10
         cl = math.sqrt(max(0.0, 1 - zz * zz))
         d = Vector((math.sin(lon) * cl, -math.cos(lon) * cl, zz))
         p = field.pos(d)
         nrm = field.normal(d)
-        r = 0.0008 + rng.random() * 0.0016
+        r = 0.0006 + rng.random() * 0.0013
         ret = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=r)
-        off = p + nrm * (r * 0.25)
+        off = p - nrm * (r * 0.30)   # 半没进皮（长在皮里，不是撒在皮上）
         sq = 0.5 + rng.random()
         for v in ret['verts']:
             v.co = Vector((v.co.x, v.co.y, v.co.z * sq)) + off
