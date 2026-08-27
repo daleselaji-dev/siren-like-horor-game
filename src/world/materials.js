@@ -69,7 +69,9 @@ export function buildMaterials(lowspec = false) {
   // ===== 蚀湾 · 人物 =====
   M.skin = skinPhys(T.skin, { envInt: 0.6, cc: 0.3, ccRough: 0.32 });
   // 深压下失血的脸——湿但不能蜡：清漆减档+粗糙度抬升（轮17 蜡壳肤根治）
-  M.skinPale = skinPhys(T.skin, { color: 0xd8dee0, envInt: 0.55, cc: 0.3, ccRough: 0.34, rimK: 0.35 });
+  // 轮20三稿：冷蓝白 0xd8dee0 与暖米照片脸失配（舞台光下手比脸白一档=蜡手），
+  // 失血感改走「灰米降饱和」——仍苍白，但与脸皮同族
+  M.skinPale = skinPhys(T.skin, { color: 0xd6ccc2, envInt: 0.5, cc: 0.26, ccRough: 0.38, rimK: 0.35 });
   // 肤色池：2 张底皮 × 色调乘子——人群不再共享同一张皮
   M.skinTones = [
     M.skin,
@@ -87,8 +89,8 @@ export function buildMaterials(lowspec = false) {
   // 失血皮池（酒店员工：报数员/侍应/岗亭员）——湿、青、油光浮起
   M.skinPales = [
     M.skinPale,
-    skinPhys(T.skinB, { color: 0xd2dce2, envInt: 0.6, cc: 0.32, ccRough: 0.32 }),
-    skinPhys(T.skinOld, { color: 0xd8dcd4, normalScale: 1.0, envInt: 0.55, cc: 0.28, ccRough: 0.34 }),
+    skinPhys(T.skinB, { color: 0xd0c8c2, envInt: 0.55, cc: 0.28, ccRough: 0.36 }),
+    skinPhys(T.skinOld, { color: 0xd4ccc0, normalScale: 1.0, envInt: 0.5, cc: 0.24, ccRough: 0.38 }),
   ];
   // 骨粉白垩皮（理骨员：干、白、粗糙——像常年裹着一层粉；几乎无油）
   M.skinChalk = skinPhys(T.skinOld, { color: 0xe2e4da, normalScale: 1.25, envInt: 0.4, cc: 0.05, ccRough: 0.7, poreScale: 1.4, rimK: 0.18 });

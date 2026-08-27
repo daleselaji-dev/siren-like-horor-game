@@ -255,6 +255,9 @@ export function buildFaceMaterials(M, T, lowspec = false) {
     });
     m.clearcoatNormalMap = T.skinPoreN;
     m.clearcoatNormalScale = new THREE.Vector2(D.mat.poreScale, D.mat.poreScale);
+    // 轮20三稿：pale 反照率乘暖暗底（0.95/0.91/0.88）——舞台顶光下中间调不再溢出成
+    // 「蜡白扁脸」，眉眼鼻口的对比保得住；只动 pale，常人脸不受影响
+    if (key === 'pale') m.color.setHex(0xf2e8e0);
     // 背光透光近似：耳缘/鼻翼掠射角一层暖红叠在 sheen 上（受光门控，暗处不亮）
     applySkinRim(m, key === 'chalk' ? 0.25 : key === 'pale' ? 0.4 : 0.7);
     M.faceMats[key] = m;

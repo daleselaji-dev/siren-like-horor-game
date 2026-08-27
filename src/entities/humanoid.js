@@ -1008,12 +1008,16 @@ function handGeo(curl = 'relax') {
     const L1 = [0.029, 0.032, 0.0295, 0.023];
     const L2 = [0.018, 0.021, 0.019, 0.014];
     const L3 = [0.013, 0.015, 0.0135, 0.0115];
+    // 轮20三稿：逐指屈度梯度（食指最直→小指最弯）——四指同角的「机械梳齿」出局；
+    // 真人张手是一道屈度瀑布，不是四根平行签
+    const FK = [0.78, 0.9, 1.08, 1.3];
     for (let i = 0; i < 4; i++) {
-      // 指扇收半（0.085→0.05）：张开的手指是「并拢微分」，不是人偶的扇骨
-      const splay = (i - 1.25) * 0.05;
+      // 指扇再收（0.05→0.042）：张开的手指是「并拢微分」，不是人偶的扇骨
+      const splay = (i - 1.25) * 0.042;
       const ss = Math.sin(splay), cs = Math.cos(splay);
       let px = -0.0235 + i * 0.0162, py = -0.088, pz = 0.008;
       const r1 = R1[i];
+      const fk = FK[i];
       const chain = [[px - ss * 0.014, py + 0.015, pz - 0.004]]; // 根：埋进掌缘软过渡
       chain.push([px, py, pz]);
       const seg = (a, len) => {
@@ -1021,9 +1025,9 @@ function handGeo(curl = 'relax') {
         px += dx * len; py += dy * len; pz += dz * len;
         chain.push([px, py, pz]);
       };
-      seg(c1, L1[i]);                  // 近节
-      seg(c1 + c2, L2[i]);             // 中节
-      seg(c1 + c2 + c3, L3[i]);        // 远节（到指尖）
+      seg(c1 * fk, L1[i]);                       // 近节
+      seg((c1 + c2) * fk, L2[i]);                // 中节
+      seg((c1 + c2 + c3) * fk, L3[i]);           // 远节（到指尖）
       parts.push(fingerSweep(chain, [r1 * 1.3, r1 * 1.04, r1 * 0.92, r1 * 0.82, r1 * 0.7]));
     }
     // 拇指：一根连续管自鱼际斜出、向掌心对掌
