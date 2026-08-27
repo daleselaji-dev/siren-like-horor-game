@@ -1545,22 +1545,31 @@ export function muralTexture(size = 512) {
 /** 矿物孔板（理册婆第三只眼）：暗青板上放射状细孔 */
 export function poreplateTexture(size = 128) {
   const [c, ctx] = makeCanvas(size);
-  ctx.fillStyle = '#2c3834';
+  // 轮25：底面从墨绿(#2c3834)提到风化骨灰白——特写里整盘压暗读成「额头黑洞」；
+  // 「异物感」由孔阵承担，不由明度承担
+  ctx.fillStyle = '#cfc4ae';
   ctx.fillRect(0, 0, size, size);
+  const rand = mulberry32(97);
+  for (let i = 0; i < 60; i++) { // 石面矿斑（浅）
+    ctx.fillStyle = `rgba(120,110,92,${(0.10 + rand() * 0.14).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(rand() * size, rand() * size, 1 + rand() * 4, 0, 6.28);
+    ctx.fill();
+  }
   const cx = size / 2, cy = size / 2;
-  for (let ring = 1; ring <= 5; ring++) {
+  for (let ring = 1; ring <= 4; ring++) {
     const n = ring * 6;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + ring * 0.4;
       const rr = ring * size * 0.085;
-      ctx.fillStyle = 'rgba(8,12,10,0.95)';
+      ctx.fillStyle = 'rgba(38,34,28,0.9)';
       ctx.beginPath();
-      ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, size * 0.028 - ring * 0.4, 0, 6.28);
+      ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, size * 0.022 - ring * 0.6, 0, 6.28);
       ctx.fill();
     }
   }
-  ctx.fillStyle = 'rgba(6,8,8,1)';
-  ctx.beginPath(); ctx.arc(cx, cy, size * 0.05, 0, 6.28); ctx.fill();
+  ctx.fillStyle = 'rgba(30,26,22,1)';
+  ctx.beginPath(); ctx.arc(cx, cy, size * 0.042, 0, 6.28); ctx.fill();
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

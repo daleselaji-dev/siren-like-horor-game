@@ -108,8 +108,9 @@ export function buildMaterials(lowspec = false) {
   M.driftwood = std(T.driftwood, { normalScale: 1.6, envInt: 0.8 }); // 侍应浮木颈臂
   M.sediment = std(T.sediment, { normalScale: 1.3, envInt: 0.9 }); // 沉积覆层
   M.poreplate = new THREE.MeshStandardMaterial({
-    map: T.poreplate, roughness: 0.5, metalness: 0.15,
-    emissive: 0x1a2224, emissiveIntensity: 0.25,
+    // 轮25：去「黑洞感」——底色提到暖石灰（贴图孔点仍深）、金属感归零、
+    // 自发光青调删除；矿盘在侧光下读成「嵌进皮里的石片」，不是额头破洞
+    map: T.poreplate, color: 0x9a8d78, roughness: 0.58, metalness: 0.02,
   }); // 理册婆第三眼矿物孔板
 
   // ===== 蚀湾 · 南方大酒店 =====

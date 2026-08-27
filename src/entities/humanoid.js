@@ -639,7 +639,9 @@ function clipHairline(geo, anch, tight = false) {
   // 其余发型 16mm 渐稀带
   // 轮24：tight 羽化 8→13mm（背头梳线下的发根渐密），方位门控过渡放软
   //（0.52-0.34→0.60-0.30）——裁剪扇区侧缘不再啃出「豁口」
-  const f0 = tight ? 0.005 : 0.004, f1 = tight ? 0.018 : 0.020;
+  // 轮25：非背头羽化带 20→12mm、线位再下压 1.5mm——旧 2cm 半透明带读成
+  // 「高发际+稀疏毛边」（keeper 额头巨大的一半来源）
+  const f0 = tight ? 0.005 : 0.004, f1 = tight ? 0.018 : 0.012;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
     const r = Math.hypot(x, y, z);
@@ -648,8 +650,8 @@ function clipHairline(geo, anch, tight = false) {
     // 上稿无 |x| 门控时，背头在耳上方被抛物线误裁出整片秃块（侧照穿帮元凶）
     const w = _ss01(0.10, 0.40, z / r) * _ss01(0.60, 0.30, Math.abs(x) / r);
     if (w <= 0) continue;
-    // 线位下移 3.5mm：壳檐压过照片发际的皮发交界，盖住烘焙侧的浅色头皮条
-    const hl = anch.hairY - anch.hairSagK * x * x - 0.0035;
+    // 线位下移 5mm：壳檐压过照片发际的皮发交界，盖住烘焙侧的浅色头皮条
+    const hl = anch.hairY - anch.hairSagK * x * x - 0.005;
     const a = _ss01(hl + f0, hl + f1, y);
     col.setW(i, Math.min(col.getW(i), 1 - w * (1 - a)));
   }
@@ -663,7 +665,7 @@ function hairGeo(style = 'crop', variant = 'm', P = null, photoKey = null) {
     const parts = [];
     // 壳檐羽化：主壳 v∈[0.8,1] 渐隐（前檐即发际线——alpha 溶进头皮，不再是实心切线）；
     // 后脑补片下缘同理渐隐进颈窝
-    const cap = (scaleY = 1, lift = 0, r = 0.108) => {
+    const cap = (scaleY = 1, lift = 0, r = 0.108, tilt = 0.19) => {
       // 发际线抬高：壳体后移+后仰，额头必须露出来（不能像头盔盖到眉毛）；
       // 壳弧加深到 0.5π——共形贴颅后壳檐要能包住鬓角，不悬在颅顶
       // 轮18：檐羽化带加宽（0.9→0.82）——发际是「渐稀两厘米」，不是一条切口
@@ -671,15 +673,18 @@ function hairGeo(style = 'crop', variant = 'm', P = null, photoKey = null) {
       // 额头占掉半张脸，五官被挤进下半中心（face_a/waiter「头长额巨」元凶）
       // 轮24：壳体细分 24×16→36×24——壳檐 alpha 羽化走顶点色，粗网格的大三角
       // 插值出锯齿「撕纸边」（emcee 发际穿帮元凶之一）；细分后檐线是曲线
+      // 轮25：后仰量开成参数——寸头/盘发用 0.12（发际前檐真的压回照片发际线，
+      // photo 脸有 clipHairline 兜底不会盖眉）；0.19 只留给背头/烫发
       parts.push(fadeRim(xform(new THREE.SphereGeometry(r, 36, 24, 0, Math.PI * 2, 0, Math.PI * 0.5),
-        0, 0.03 + lift, -0.013, 0.19, 0, 0, 1.0, scaleY, 1.02), rimV(0.82, 1.0)));
+        0, 0.03 + lift, -0.013, tilt, 0, 0, 1.0, scaleY, 1.02), rimV(0.82, 1.0)));
       // 后脑+颈窝补片（φ π..2π 是 -z 后半球）——缺了这块，背影读成光头戴小帽
       parts.push(fadeRim(xform(new THREE.SphereGeometry(r - 0.001, 26, 14, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
         0, 0.03 + lift, -0.012, 0.16, 0, 0, 1.0, scaleY * 1.02, 1.0), rimV(0.82, 1.0)));
     };
     switch (style) {
-      case 'crop': { // 平头/寸头
-        cap(0.9, 0, 0.1065);
+      case 'crop': { // 平头/寸头——轮25：壳再收薄贴颅（0.9/0.1065→0.85/0.1055），
+        // 顶不再是「一坨高帽」；后仰 0.12 让前檐真的落在发际线上
+        cap(0.85, 0, 0.1055, 0.12);
         break;
       }
       case 'back': { // 大背头（报数员）——轮18：压薄压低，不再是罩在颅上的大穹顶
@@ -695,7 +700,7 @@ function hairGeo(style = 'crop', variant = 'm', P = null, photoKey = null) {
         break;
       }
       case 'bun': { // 盘发髻（理册婆）：壳贴颅、向后拢，束发圈勒出髻根
-        cap(0.9, 0, 0.104);
+        cap(0.9, 0, 0.104, 0.12);
         parts.push(fadeRim(xform(new THREE.SphereGeometry(0.04, 14, 10), 0, 0.026, -0.099, 0, 0, 0, 1, 0.78, 0.95)));
         parts.push(fadeRim(xform((() => { const t = new THREE.TorusGeometry(0.028, 0.0055, 6, 14); return t; })(),
           0, 0.028, -0.082, 0.35, 0, 0)));
@@ -740,8 +745,10 @@ function hairGeo(style = 'crop', variant = 'm', P = null, photoKey = null) {
     // 轮22：沟槽/绺团双双加深（1→1.6/1→1.5）——几何起伏配合发绺贴图+碎发卡层，
     // 三层一起把「光滑头盔」拆掉
     // 轮23：末尾过 clipHairline——photo 脸的壳檐钉在照片发际曲线上
+    // 轮25：绺团噪声 1.5→1.0——旧值把壳剪影揉出「一坨坨鼓包」，配上竖起的
+    // 绺卡读成乱刷；层次交给沟槽+贴图+压平后的绺卡
     return clipHairline(hairClumpNoise(conformSkull(hairGrooves(merged(parts), style === 'long' ? 1.4 : 1.6),
-      variant, FP, { fadeLow: style === 'long', inflate: 1.014 }), style === 'long' ? 0.7 : 1.5), anch, style === 'back');
+      variant, FP, { fadeLow: style === 'long', inflate: 1.014 }), style === 'long' ? 0.7 : 1.0), anch, style === 'back');
   });
 }
 
@@ -792,21 +799,25 @@ function hairClumpCardsGeo(style, variant, P) {
         fld(dx, dy, dz, sp);
         const k2 = ((0.103 + 0.03 * dy - 0.018 * dz) / SKULL_R) * 1.03;
         const w = 0.034 + ((ci * 5) % 3) * 0.007;
-        const h = 0.03 + ((ci * 3) % 3) * 0.008;
+        // 轮25·刷状竖发根治：顶两圈卡片长度砍 45%——旧 3-4.6cm 卡在颅顶
+        // 顺坡方向近水平+梢部外抬，剪影读成一排立起的「刷毛」（keeper 灾难帧主凶）
+        const h = (0.03 + ((ci * 3) % 3) * 0.008) * (el < 0.72 ? 0.55 : 0.85);
         const g = hairCardGeo(w, h, 3).clone();
         N.set(dx, dy, dz);                                     // 壳面外法向（球近似）
         T.set(Math.cos(el) * Math.sin(az), -Math.sin(el), Math.cos(el) * Math.cos(az)); // 顺坡向下
         Y.copy(T).negate();                                    // 卡片根边朝坡上（发从根垂向梢）
         X.crossVectors(Y, N).normalize();
         m4.makeBasis(X, Y, N);
-        // 梢部外抬（负角=梢离壳）+ 面内微旋（毛流参差）
-        m4.multiply(mR.makeRotationX(-(0.2 + ((ci * 7) % 4) * 0.05)));
+        // 梢部外抬（负角=梢离壳）——轮25：0.2-0.35→0.06-0.12 rad，卡片伏贴壳面
+        // 只留一点点「翘」；竖刺从旋转量层面不存在
+        m4.multiply(mR.makeRotationX(-(0.06 + ((ci * 7) % 4) * 0.02)));
         m4.multiply(mR.makeRotationZ(((ci * 11) % 5 - 2) * 0.06));
-        // 根边压进壳面下、梢端探出壳缘——中心顺坡下移 0.3h
+        // 根边压进壳面下、梢端贴壳缘——中心顺坡下移 0.3h；轮25：法向 +1mm 悬浮
+        // 改 −0.8mm 沉入壳面（卡片是壳上的「绺」，不是浮在壳外的「翅」）
         m4.setPosition(
-          sp.x * k2 + T.x * h * 0.3 + dx * 0.001,
-          sp.y * k2 + T.y * h * 0.3 + dy * 0.001,
-          sp.z * k2 + T.z * h * 0.3 + dz * 0.001);
+          sp.x * k2 + T.x * h * 0.3 - dx * 0.0008,
+          sp.y * k2 + T.y * h * 0.3 - dy * 0.0008,
+          sp.z * k2 + T.z * h * 0.3 - dz * 0.0008);
         g.applyMatrix4(m4);
         parts.push(g);
       }
@@ -1566,15 +1577,26 @@ function roeSealGeo() {
   });
 }
 
-/** 理册婆：第三眼矿物孔板（额头正中、眉心上方） */
+/** 理册婆：第三眼矿物孔板（眉心正中——「长在皮里的异物」不是钉上去的道具） */
 function poreplateDiscGeo() {
-  return G('poreDisc', () => {
-    // 轮24九稿：缩径下移——旧 0.02/y0.042 顶缘插进刘海（0.6m 近景读成穿模道具
-    // 而不是「长在皮里的异物」）；缩到 0.016 落在眉心-发际正中的露肤带
-    const g = new THREE.CylinderGeometry(0.016, 0.0175, 0.008, 16);
-    g.rotateX(Math.PI / 2 - 0.18); // 下额更立，盘面跟着立起来贴皮
-    g.translate(0, 0.030, 0.094);
+  return G('poreDisc25', () => {
+    // 轮25：再缩径（0.016→0.0115）+ 落到眉心露肤带（y 0.030→0.014）——
+    // 旧位顶进发际暗根带，特写里黑盘叠黑带读成「额头穿模黑洞」（父审否决）；
+    // 眉心是照片保证露肤的地方，盘径必须小于眉间距
+    const g = new THREE.CylinderGeometry(0.0115, 0.0128, 0.0075, 16);
+    g.rotateX(Math.PI / 2 - 0.10); // 眉心皮面近垂直，盘面立起贴皮
+    g.translate(0, 0.014, 0.0955);
     return g;
+  });
+}
+
+/** 孔板肤缘环：一圈皮色窄环压住盘缘——皮是「包着长上来的」，缝隙非法 */
+function poreplateRimGeo() {
+  return G('poreRim25', () => {
+    const t = new THREE.TorusGeometry(0.0126, 0.0028, 6, 18);
+    t.rotateX(-0.10);
+    t.translate(0, 0.014, 0.0952);
+    return t;
   });
 }
 
@@ -1768,7 +1790,7 @@ export class Humanoid {
     // 照片烘进头皮的鬓角/发根与 3D 发壳必须是同一头发；
     // 黑发照片配随机棕壳=「戴假发」（轮22 终审「发壳」否决项之一）
     const hairMat = pick(role === 'matron' || D.face === 'old'
-      ? Mtl('hairGrey', () => new THREE.MeshStandardMaterial({ color: 0x4e4a46, roughness: 0.85 }))
+      ? Mtl('hairGrey', () => new THREE.MeshStandardMaterial({ color: 0x6e6a62, roughness: 0.85 })) // 轮25：随 FACE_HAIR 老年银灰同步提亮
       : (D.photo && FACE_HAIR[D.photo] !== undefined)
         ? Mtl('hairPhoto_' + D.photo, () => new THREE.MeshStandardMaterial({ color: FACE_HAIR[D.photo], roughness: 0.88 }))
         : hairPool[seed % hairPool.length]);
@@ -2011,8 +2033,10 @@ export class Humanoid {
       // ① 顶口封环：领筒顶缘与颈柱之间的环形空隙用一片随前缘下压的环面封死，
       //    俯角看进领口是「领内阴影」，不是穿透衣身的镂空网底；
       // ② 内衬筒：领筒背面补一层深色衬（BackSide）——侧缝角度也看不穿
-      const innerM = Mtl('collarInnerDark', () => new THREE.MeshStandardMaterial({
-        color: 0x17120f, roughness: 0.96,
+      // 轮25：封环 0x17120f→0x2e2620——近黑的环在特写里读成「颈与领之间的
+      // 悬空缝」（matron 颈衣缝隙否决项）；提亮到「阴影里的布」档
+      const innerM = Mtl('collarInnerDark25', () => new THREE.MeshStandardMaterial({
+        color: 0x2e2620, roughness: 0.96,
       }));
       const cap = mkMesh(G('collarCap24' + style, () => {
         const rg = new THREE.RingGeometry(0.034, 0.0567, 18, 1);
@@ -2040,8 +2064,8 @@ export class Humanoid {
         }
         c.computeVertexNormals();
         return c;
-      }), pick(Mtl('collarLiningM', () => new THREE.MeshStandardMaterial({
-        color: 0x1a1512, roughness: 0.95, side: THREE.BackSide,
+      }), pick(Mtl('collarLiningM25', () => new THREE.MeshStandardMaterial({
+        color: 0x271f19, roughness: 0.95, side: THREE.BackSide, // 轮25：随封环同步提亮——领内是阴影不是深渊
       }))), 0, 0.631, 0.004);
       lin.name = 'collarLining';
       lin.userData.noShadow = true;
@@ -2527,7 +2551,9 @@ export class Humanoid {
       if (!D.cap) {
         // 轮22·分层碎发卡层：三圈发绺卡瓦片式伏在壳上（单网格一次 draw）——
         // 壳的光滑轮廓被锯齿卡打散，任何角度「泳帽穹顶」剪影不再成立
-        if (hairStyle) {
+        // 轮25：盘发(bun)禁绺卡——盘起来的发是「梳顺抿光」的，颅顶散绺卡
+        // 在 matron 特写里读成一头竖刺（父审灾难帧否决项）
+        if (hairStyle && hairStyle !== 'bun') {
           const clumps = mkMesh(hairClumpCardsGeo(hairStyle, faceVariant, P), strandM, 0, 0.115, 0, HX, 1, HZ);
           clumps.castShadow = false;
           this.head.add(clumps);
@@ -2582,14 +2608,14 @@ export class Humanoid {
         // 旧方案是两片大卡打十字（0.05 高），逆光下读成「贴片玻璃」；
         // 改为短绒卡（长度减半 ~0.02，数量翻六倍）。根位走颅骨变形域精确求壳面：
         // 壳 = field(dir) × (r_orig/R)×1.02（conformSkull 同式），根部沉进壳面 1/4 卡高
-        {
+        if (hairStyle !== 'bun') { // 轮25：盘发颅顶必须抿光——顶心绒卡一并禁掉
           const fld2 = makeSkullField(faceVariant, P, { bare: true });
           const sp2 = { x: 0, y: 0, z: 0 };
           for (let ci = 0; ci < 18; ci++) { // 轮24：12→18——顶心绒毛层加密
             const az2 = (ci / 18) * Math.PI * 2 + (ci % 2) * 0.26 + P.asymPh * 0.8;
             const el2 = 0.24 + (ci % 3) * 0.15;          // 距顶极角两圈（0.24/0.39/0.54 rad）
+            const ch2 = 0.007 + (ci % 3) * 0.0015;       // 轮25：再缩——绒毛不许立成刺
             const dx2 = Math.sin(el2) * Math.sin(az2), dy2 = Math.cos(el2), dz2 = Math.sin(el2) * Math.cos(az2);
-            const ch2 = 0.009 + (ci % 3) * 0.002;        // 轮23：再缩 30%——只留贴壳绒毛感
             fld2(dx2, dy2, dz2, sp2);                    // 该方向的颅面点
             // 壳共形倍率：cap 球心 (0,+0.03,-0.018) 抬高了原始顶点半径——按方向重建
             const k2 = ((0.103 + 0.03 * dy2 - 0.018 * dz2) / SKULL_R) * 1.02;
@@ -2598,8 +2624,8 @@ export class Humanoid {
               0.115 + sp2.y * k2 + dy2 * ch2 * 0.25,
               (sp2.z * k2 + dz2 * ch2 * 0.25) * HZ);
             wsp.rotation.order = 'YXZ';                  // 先方位后外倾再翻根
-            // 轮23：外倾再加大（0.55→0.8）——绒卡完全伏贴壳面顺毛流，剪影零尖刺
-            wsp.rotation.set(el2 * 0.85 + 0.8 + ((ci * 7) % 5) * 0.04, az2, Math.PI);
+            // 轮25：外倾 0.8→0.95——绒卡完全贴伏壳面顺毛流，剪影零尖刺
+            wsp.rotation.set(el2 * 0.85 + 0.95 + ((ci * 7) % 5) * 0.04, az2, Math.PI);
             wsp.castShadow = false;
             this.head.add(wsp);
           }
@@ -2680,6 +2706,11 @@ export class Humanoid {
     }
     if (D.poreplate) {
       this.head.add(mkMesh(poreplateDiscGeo(), pick(M.poreplate), 0, 0.115, 0, HX, 1, HZ));
+      // 轮25：盘缘一圈皮色环（睑同调材质）——矿盘是从皮里长出来的，
+      // 盘缘与额皮之间不许读出「洞缘」
+      const rim = mkMesh(poreplateRimGeo(), lidSkin, 0, 0.115, 0, HX, 1, HZ);
+      rim.userData.noShadow = true;
+      this.head.add(rim);
     }
     if (D.saltFrost || opts.saltFrost) {
       // 盐霜附居痕迹：按头形参数缩放贴面（晶壳长在皮上，不悬空）

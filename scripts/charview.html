@@ -131,6 +131,17 @@ window.__profile = (i) => {
   cam.lookAt(p.x, p.y, p.z);
 };
 window.__lookAt(0);
+// 动态挂载口：按游戏内真实 seed 造角色（r25look 等取证快环用）——
+// 造完追加进 figures，__face/__profile/__measure 全部通用
+window.__mk = (name, opts, mode = 'idle') => {
+  const h = new Humanoid(M, opts);
+  const i = figures.length;
+  h.group.position.set(i * 2.2, 0, 0);
+  scene.add(h.group);
+  figures.push({ name, group: h.group, h, mode });
+  window.__names.push(name);
+  return i;
+};
 // 调试探针口（eggprobe 等临时脚本射线定位用）
 window.__THREE = THREE;
 window.__camera = cam;

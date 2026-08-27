@@ -47,13 +47,16 @@ const FACE_DEFS = {
     url: urlMOld, base: 'skinOld',
     eyeY: 0.458, eyeLX: 0.386, eyeRX: 0.615, mouthY: 0.748, chinY: 0.878,
     browY: 0.398, noseY: 0.628, hairY: 0.245, hairSag: 0.10,
-    mat: { envInt: 0.55, cc: 0.16, ccRough: 0.5, normalScale: 1.22, poreScale: 1.4 },
+    // 轮25：法线/毛孔清漆双降档（1.22/1.4→0.92/1.05）+ 清漆 0.16→0.10——
+    // 旧值三层法线叠打把照片皮渲成「腌肉壳」（keeper 灾难帧的油亮暗肤主凶）；
+    // 老人皮的皱走照片色阶，凹凸只留三成
+    mat: { envInt: 0.42, cc: 0.10, ccRough: 0.55, normalScale: 0.92, poreScale: 1.05 },
   },
   oldf: {
     url: urlFOld, base: 'skinOld',
     eyeY: 0.419, eyeLX: 0.388, eyeRX: 0.607, mouthY: 0.678, chinY: 0.792,
     browY: 0.345, noseY: 0.563, hairY: 0.290, hairSag: 0.28,
-    mat: { envInt: 0.55, cc: 0.18, ccRough: 0.48, normalScale: 1.16, poreScale: 1.35 },
+    mat: { envInt: 0.42, cc: 0.12, ccRough: 0.52, normalScale: 0.92, poreScale: 1.05 },
   },
   pale: {
     url: urlPale, base: 'skin',
@@ -76,8 +79,10 @@ const FACE_DEFS = {
 export const FACE_HAIR = {
   m: 0x18130f,     // 黑寸头
   f: 0x201611,     // 深棕黑
-  oldm: 0x4e4a44,  // 灰白
-  oldf: 0x565049,  // 灰白
+  // 轮25：老年灰发提亮两档——照片里是银灰寸头/银灰盘发，旧 0x4e/0x56 的壳
+  // 顶在银发照片头皮上读成「戴黑假发」（keeper 黑刷 vs 照片灰发的断层）
+  oldm: 0x6e6961,  // 银灰
+  oldf: 0x746e66,  // 银灰
   pale: 0x16120f,  // 黑色背头（酒店员工）
   chalk: 0x3c352d, // 灰褐
 };
