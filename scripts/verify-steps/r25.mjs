@@ -218,8 +218,10 @@ export async function run(page, h) {
         let PointC = null;
         g.engine.scene.traverse((o) => { if (!PointC && o.isPointLight) PointC = o.constructor; });
         if (PointC) {
-          const amb = new PointC(0xffe4c8, 3.2, 4, 1.6);
-          amb.position.set(head.x + fwd.x * 0.7, head.y - 0.1, head.z + fwd.z * 0.7);
+          // 轮25二稿：3.2→2.2 + 从颏下抬到眼高——底光平怼颈带时把颌裙环
+          // 曝成「玻璃领」（keeper 帧）；抬暗部够用就好
+          const amb = new PointC(0xffe4c8, 2.2, 4, 1.6);
+          amb.position.set(head.x + fwd.x * 0.7, head.y - 0.02, head.z + fwd.z * 0.7);
           g.engine.scene.add(amb);
           rig.push(amb);
         }

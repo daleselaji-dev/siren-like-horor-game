@@ -1935,11 +1935,14 @@ export class Humanoid {
           const pos2 = g2.attributes.position;
           const col = new Float32Array(pos2.count * 3);
           for (let i = 0; i < pos2.count; i++) {
-            // 下颌接触阴影烘在环自己身上：越往上钻进颌腔越暗（0.14），
+            // 下颌接触阴影烘在环自己身上：越往上钻进颌腔越暗，
             // 露出的下摆归一亮——与其下方的颈裙同色衔接
+            // 轮25：0.14→0.32——射线实锤颏下可见颈带整段是这只环；近景底光
+            // 直射下环顶缘亮成一圈「玻璃领口沿」（keeper 取证帧），接触影必须
+            // 深到能把顶缘按进颌下阴影里
             const t = Math.min(1, Math.max(0, (pos2.getY(i) - 0.0019) / 0.0322));
             const s2 = t * t * (3 - 2 * t);
-            const sh = 1 - s2 * 0.14;
+            const sh = 1 - s2 * 0.32;
             col[i * 3] = sh; col[i * 3 + 1] = sh; col[i * 3 + 2] = sh;
           }
           g2.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -2207,8 +2210,11 @@ export class Humanoid {
     // 湿层全改「模糊镜」：清漆减半+粗糙抬档——环境映影糊成柔和水光，锐利鬼影出局
     // 轮25：环反射 0.18→0.07——夜景 envMap（灰蓝天光）整面映在巩膜上，
     // 0.6m 特写里眼球读成「灰蓝金属珠」（r24 keeper/runner 蓝珠眼真凶）
+    // 轮25三稿：0.07→0.02——阴天 envMap 亮度是高动态的（>1），0.07 仍够把
+    // 深褐虹膜洗成灰蓝（r25 一稿室外 runner/祠堂 keeper 复发帧）；湿感全权
+    // 交给捕捉光点+直射灯清漆高光，envMap 对眼球基本致盲
     const scleraMat = pick(Mtl('scleraWet25', () => new THREE.MeshPhysicalMaterial({
-      color: 0xcfc2b1, roughness: 0.5, envMapIntensity: 0.07,
+      color: 0xcfc2b1, roughness: 0.5, envMapIntensity: 0.02,
       clearcoat: 0.15, clearcoatRoughness: 0.5,
     })));
     // 虹膜盘材质：贴图带色环+瞳孔；emissive 通道保留给潮光（sightjack 发光）
@@ -2217,7 +2223,7 @@ export class Humanoid {
       // 轮24四稿：粗糙 0.6→0.75、环反射 0.3→0.12——正面暖光下虹膜盘的漫反射
       // 高光把深褐洗成灰蓝（emcee「雾眼」）；虹膜自己只出「色」，光交给角膜/光点
       map: irisTexture(irisTint), transparent: true, roughness: 0.75,
-      envMapIntensity: 0.02, emissive: 0x4a6a70, emissiveIntensity: 0, // 轮25：0.06→0.02 虹膜盘对天光 envMap 全盲——盘色只走贴图
+      envMapIntensity: 0, emissive: 0x4a6a70, emissiveIntensity: 0, // 轮25三稿：0.02→0 虹膜盘对天光 envMap 全盲——盘色只走贴图
       
       // 虹膜盘是正对相机的平面：镜面反射一大就整盘糊白（白珠眼回魂）——
       // 湿光交给角膜壳与捕捉光点，虹膜自己只出「色」
@@ -2260,8 +2266,10 @@ export class Humanoid {
       // 角膜是模糊的湿镜：横幅/招牌不许在眼球上映出硬边色块（D形奶油斑根治）
       // 轮25：环反射 0.22→0.08、清漆 0.7→0.45——角膜壳把灰蓝夜光整片罩在
       // 虹膜上=「蓝珠眼」另一半；湿感只留清漆余量+捕捉光点
+      // 轮25三稿：环反射 0.08→0.015、清漆 0.45→0.25——室外阴天 envMap 是
+      // 高动态亮源，0.08 罩层仍把整盘虹膜洗灰（runner 复发帧）；直射灯高光即湿
       color: 0xffffff, transparent: true, opacity: 0.04, roughness: 0.16,
-      envMapIntensity: 0.08, clearcoat: 0.45, clearcoatRoughness: 0.3,
+      envMapIntensity: 0.015, clearcoat: 0.25, clearcoatRoughness: 0.3,
       depthWrite: false,
     })));
     // 捕捉光点：角膜上永远亮着的一粒（暗厅里眼睛也得是「湿」的——活人证据第一条）
@@ -2568,13 +2576,10 @@ export class Humanoid {
         // 壳的光滑轮廓被锯齿卡打散，任何角度「泳帽穹顶」剪影不再成立
         // 轮25：盘发(bun)禁绺卡——盘起来的发是「梳顺抿光」的，颅顶散绺卡
         // 在 matron 特写里读成一头竖刺（父审灾难帧否决项）
-        // 轮25三稿：灰发同禁——银灰壳上深色绺卡边缘侧立读成「太阳穴乱线/
-        // 颅顶竖丝」（keeper 复拍残余伪影）；老年短发的层次交给壳沟槽贴图
-        if (hairStyle && hairStyle !== 'bun' && !greyHair) {
-          const clumps = mkMesh(hairClumpCardsGeo(hairStyle, faceVariant, P), strandM, 0, 0.115, 0, HX, 1, HZ);
-          clumps.castShadow = false;
-          this.head.add(clumps);
-        }
+        // 轮25三稿：绺卡整层退役——压平/缩短/沉根之后，在亮背景（瓷砖墙/天光）
+        // 前 crown 剪影上仍是一簇簇黑刺（emcee/waiter 游戏内取证复发帧；
+        // charview 暗底上看不出来）。顶部层次由壳沟槽贴图+绺团噪声独自承担，
+        // 任何背景下剪影必须干净——「刷状竖发」从几何上根除
         // 前发际线：绒边贴图卡片（顶带近实接壳檐、向下稀疏成绒毛梢）——
         // 中央一片 + 左右两小片，硬笔画换软绒边，裸皮上不再是「涂鸦」
         // 轮23：photo 脸的发际卡沿照片发际曲线落位（与壳檐 clipHairline 同一条线）；

@@ -306,12 +306,15 @@ export function buildFaceMaterials(M, T, lowspec = false) {
     const neckPoreN = T.skinPoreN.clone();
     neckPoreN.needsUpdate = true;
     neckPoreN.repeat.set(2.6, 1.2);
+    // 轮25：sheen 0.22→0.08 / 环反射 ×0.7→×0.35 / 清漆 ×0.4→×0.2 / 粗糙 0.74→0.80——
+    // 近景补光直射颈带时，淡色 sheen+环反射把整段颈洗成「半透明玻璃领」
+    // （keeper 取证帧：射线实锤颏下可见颈带=颌裙环+颈裙这套材质）
     M.faceNecks[key] = new THREE.MeshPhysicalMaterial({
-      color: 0xa17b63, roughness: 0.74, envMapIntensity: D.mat.envInt * 0.7,
+      color: 0xa17b63, roughness: 0.80, envMapIntensity: D.mat.envInt * 0.35,
       map: neckMapFor(D.base, baseTex.map.image),
       normalMap: neckPoreN, normalScale: new THREE.Vector2(0.5, 0.5),
-      clearcoat: D.mat.cc * 0.4, clearcoatRoughness: D.mat.ccRough + 0.2,
-      sheen: 0.22, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffe2d0),
+      clearcoat: D.mat.cc * 0.2, clearcoatRoughness: D.mat.ccRough + 0.2,
+      sheen: 0.08, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffe2d0),
       vertexColors: true,
     });
     // 唇：湿润高光（轮22：湿度收档——顶光下满唇镜面=蜡人唇）
