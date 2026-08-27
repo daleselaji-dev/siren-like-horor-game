@@ -1569,9 +1569,11 @@ function roeSealGeo() {
 /** 理册婆：第三眼矿物孔板（额头正中、眉心上方） */
 function poreplateDiscGeo() {
   return G('poreDisc', () => {
-    const g = new THREE.CylinderGeometry(0.02, 0.022, 0.008, 16);
-    g.rotateX(Math.PI / 2 - 0.24);
-    g.translate(0, 0.042, 0.0925); // 眉心上方的露肤额头（别嵌进发际线）
+    // 轮24九稿：缩径下移——旧 0.02/y0.042 顶缘插进刘海（0.6m 近景读成穿模道具
+    // 而不是「长在皮里的异物」）；缩到 0.016 落在眉心-发际正中的露肤带
+    const g = new THREE.CylinderGeometry(0.016, 0.0175, 0.008, 16);
+    g.rotateX(Math.PI / 2 - 0.18); // 下额更立，盘面跟着立起来贴皮
+    g.translate(0, 0.030, 0.094);
     return g;
   });
 }
