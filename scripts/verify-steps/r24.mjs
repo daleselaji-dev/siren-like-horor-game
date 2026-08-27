@@ -165,20 +165,26 @@ export async function run(page, h) {
       hum.group.updateMatrixWorld(true);
       const V = g.player.pos.constructor;
       const head = hum.headWorldPos(new V());
-      // 轮24七稿：机位沿「头部世界朝向」取位而非身体 yaw——idle 收敛后头仍带
-      // 躯干残余偏转（emcee ~15°），远侧眼落进极掠射视角=「单片眼镜」伪影；
-      // 正对脸取位，两眼近正视，与镜头对视本来就是 0.6m 人像的验收标准
+      // 轮24八稿：机位沿「头部世界朝向・含俯仰」取位——idle 姿态头上仰 ~8°+
+      // 相机下俯 3° 叠成 11° 垂直离轴（旧机位把 fwd.y 拍平），0.6m 下从眼球
+      // 下缘掠视；改为双眼中点 + 头部真 3D 前向 0.6m，与镜头对视零离轴
       const hq = new g.THREE.Quaternion();
       hum.head.getWorldQuaternion(hq);
-      const fwd = new V(0, 0, 1).applyQuaternion(hq);
-      fwd.y = 0;
-      fwd.normalize();
+      const fwd3 = new V(0, 0, 1).applyQuaternion(hq).normalize();
+      const fwd = new V(fwd3.x, 0, fwd3.z).normalize(); // 拍平版给灯位/侧向用
       const side = new V(fwd.z, 0, -fwd.x);
+      const eyeMid = new V();
+      {
+        const eL = new V(), eR = new V();
+        hum.eyeGL.getWorldPosition(eL);
+        hum.eyeGR.getWorldPosition(eR);
+        eyeMid.set((eL.x + eR.x) / 2, (eL.y + eR.y) / 2, (eL.z + eR.z) / 2);
+      }
       const cam = g.engine.camera;
       window.__origFov = window.__origFov ?? cam.fov;
       cam.fov = 33; cam.updateProjectionMatrix();
-      cam.position.set(head.x + fwd.x * 0.60, head.y + 0.14, head.z + fwd.z * 0.60);
-      cam.lookAt(head.x, head.y + 0.11, head.z);
+      cam.position.set(eyeMid.x + fwd3.x * 0.60, eyeMid.y + fwd3.y * 0.60, eyeMid.z + fwd3.z * 0.60);
+      cam.lookAt(eyeMid.x, eyeMid.y - 0.025, eyeMid.z);
       hum.constructor.viewer.copy(cam.position);
       hum.updateLOD();
       // 临时摄影灯（拍完撤）：斜侧 35° 暖主光（掠射出毛孔）+ 对侧冷弱补（暗部不死黑）

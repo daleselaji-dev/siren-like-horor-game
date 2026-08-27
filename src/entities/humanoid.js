@@ -2175,9 +2175,13 @@ export class Humanoid {
     // 解剖比（≈眼球一半），巩膜在两眦真的露出来——纯黑玻璃珠从此非法
     // 轮24·去灯泡眼：巩膜反射再压两档（顶光/聚光下整球泛灰白=「金属珠眼」元凶）——
     // 眼睛的「湿」只留给角膜壳与捕捉光点；巩膜自己是偏暖的哑骨白
+    // 轮24八稿·「单片眼镜/D形奶油斑」终极真凶=环境贴图镜像：宴会厅黄色「還」字
+    // 横幅经角膜/巩膜的低粗糙清漆层整片映在眼球上，读成硬边奶油斑（视角刀锋敏感、
+    // 左右眼不对称、藏角膜后巩膜清漆继续反射——历轮二分「全不消」的原因）。
+    // 湿层全改「模糊镜」：清漆减半+粗糙抬档——环境映影糊成柔和水光，锐利鬼影出局
     const scleraMat = pick(Mtl('scleraWet', () => new THREE.MeshPhysicalMaterial({
-      color: 0xcfc2b1, roughness: 0.46, envMapIntensity: 0.28,
-      clearcoat: 0.28, clearcoatRoughness: 0.3,
+      color: 0xcfc2b1, roughness: 0.5, envMapIntensity: 0.18,
+      clearcoat: 0.15, clearcoatRoughness: 0.5,
     })));
     // 虹膜盘材质：贴图带色环+瞳孔；emissive 通道保留给潮光（sightjack 发光）
     const irisTint = (seed % 3 === 0) ? 0x6a4526 : 0x53341e; // 深褐/暖褐两档
@@ -2185,7 +2189,8 @@ export class Humanoid {
       // 轮24四稿：粗糙 0.6→0.75、环反射 0.3→0.12——正面暖光下虹膜盘的漫反射
       // 高光把深褐洗成灰蓝（emcee「雾眼」）；虹膜自己只出「色」，光交给角膜/光点
       map: irisTexture(irisTint), transparent: true, roughness: 0.75,
-      envMapIntensity: 0.12, emissive: 0x4a6a70, emissiveIntensity: 0,
+      envMapIntensity: 0.06, emissive: 0x4a6a70, emissiveIntensity: 0, // 轮24八稿：0.12→0.06 虹膜不做镜
+      
       // 虹膜盘是正对相机的平面：镜面反射一大就整盘糊白（白珠眼回魂）——
       // 湿光交给角膜壳与捕捉光点，虹膜自己只出「色」
       depthWrite: false,
@@ -2223,8 +2228,10 @@ export class Humanoid {
       // 轮24：opacity 0.1→0.05、环反射 1.1→0.5、清漆 1.0→0.7——聚光下角膜壳
       // 整面糊成灰镜=「虹膜被洗掉的金属球」另一半元凶；湿高光留一点就够
       // 轮24四稿：环反射 0.5→0.38——暖聚光正面机位下角膜仍把虹膜洗成灰盘
-      color: 0xffffff, transparent: true, opacity: 0.05, roughness: 0.06,
-      envMapIntensity: 0.38, clearcoat: 0.7, clearcoatRoughness: 0.1,
+      // 轮24八稿：粗糙 0.06→0.16、环反射 0.38→0.22、清漆糙 0.1→0.3——
+      // 角膜是模糊的湿镜：横幅/招牌不许在眼球上映出硬边色块（D形奶油斑根治）
+      color: 0xffffff, transparent: true, opacity: 0.05, roughness: 0.16,
+      envMapIntensity: 0.22, clearcoat: 0.7, clearcoatRoughness: 0.3,
       depthWrite: false,
     })));
     // 捕捉光点：角膜上永远亮着的一粒（暗厅里眼睛也得是「湿」的——活人证据第一条）

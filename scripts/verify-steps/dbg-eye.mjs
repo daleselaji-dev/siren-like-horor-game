@@ -1,5 +1,4 @@
-// 一次性排查：emcee 左眼「单片眼镜」——完全复刻 r24 机位（FOV33/瞄 head+0.11），
-// 先确认复现，再二分隐藏（虹膜/上睑/巩膜/角膜）；放大靠事后裁剪不动相机
+// 一次性排查：emcee 左眼伪影——裸眼球检验 + 离轴角数值转储
 import fs from 'node:fs';
 
 export async function run(page, h) {
@@ -24,8 +23,7 @@ export async function run(page, h) {
     requestAnimationFrame(tick);
   }), n);
 
-  // —— 与 r24 closeup('emcee') 逐行同构 ——
-  await page.evaluate(() => {
+  const dump = await page.evaluate(() => {
     const g = window.__game;
     g.game.state = 'PAUSE';
     const e = g.byId.emcee;
@@ -39,10 +37,6 @@ export async function run(page, h) {
     hum.blinkPh = -1; hum.blinkT = 9;
     hum.lidL.rotation.x = hum.lidBaseL;
     hum.lidR.rotation.x = hum.lidBaseR;
-    hum.lidLoL.rotation.x = hum.lidLoBase;
-    hum.lidLoR.rotation.x = hum.lidLoBase;
-    hum.eyeL.scale.y = hum.eyeSclY;
-    hum.eyeR.scale.y = hum.eyeSclY;
     if (hum.micG) hum.micG.visible = false;
     const wps = e.def?.waypoints;
     if (wps && wps.length > 1) {
@@ -55,14 +49,17 @@ export async function run(page, h) {
     hum.group.updateMatrixWorld(true);
     const V = g.player.pos.constructor;
     const head = hum.headWorldPos(new V());
-    const fwd = new V(Math.sin(e.yaw), 0, Math.cos(e.yaw));
+    const hq = new g.THREE.Quaternion();
+    hum.head.getWorldQuaternion(hq);
+    const fwd = new V(0, 0, 1).applyQuaternion(hq);
+    fwd.y = 0;
+    fwd.normalize();
     const side = new V(fwd.z, 0, -fwd.x);
     const cam = g.engine.camera;
-    window.__origFov = window.__origFov ?? cam.fov;
     cam.fov = 33; cam.updateProjectionMatrix();
     cam.position.set(head.x + fwd.x * 0.60, head.y + 0.14, head.z + fwd.z * 0.60);
     cam.lookAt(head.x, head.y + 0.11, head.z);
-    hum.constructor.viewer.copy(cam.position);
+    hum.constructor.viewer.copy(head);
     hum.updateLOD();
     let SpotC = null;
     g.engine.scene.traverse((o) => { if (!SpotC && o.isSpotLight) SpotC = o.constructor; });
@@ -82,13 +79,31 @@ export async function run(page, h) {
     g.hud.clearSubtitles();
     g.hud.objTimer = 0;
     g.hud.el.objToast.classList.remove('show');
+    // 数值转储：P 参数 / 眼球世界位 / 相机轴与眼视线的离轴角
+    const eL = new V(), eR = new V();
+    hum.eyeGL.getWorldPosition(eL);
+    hum.eyeGR.getWorldPosition(eR);
+    const camDir = new V(head.x - cam.position.x, head.y + 0.11 - cam.position.y, head.z - cam.position.z).normalize();
+    const eyeFwdW = new V(0, 0, 1).applyQuaternion(hq); // 眼球组世界朝向≈头朝向
+    const offAxis = Math.acos(Math.max(-1, Math.min(1, -camDir.dot(eyeFwdW)))) * 180 / Math.PI;
+    return {
+      eyeX: hum.P.eyeX, asym: hum.P.asym, asymPh: hum.P.asymPh, eyeS: hum.P.eyeS,
+      eyeXoff: hum.eyeXoff,
+      eyeL: [eL.x, eL.y, eL.z].map((v) => +v.toFixed(4)),
+      eyeR: [eR.x, eR.y, eR.z].map((v) => +v.toFixed(4)),
+      headFwd: [fwd.x, fwd.z].map((v) => +v.toFixed(4)),
+      eyaw: +e.yaw.toFixed(4),
+      hq: [hq.x, hq.y, hq.z, hq.w].map((v) => +v.toFixed(4)),
+      offAxisDeg: +offAxis.toFixed(2),
+    };
   });
+  console.log('[dbg] state:', JSON.stringify(dump));
   await page.waitForFunction(() => {
     const hum = window.__game.byId.emcee.body;
     return hum._hd === true && hum.headHD && hum.headHD.visible;
   }, { timeout: 15000, polling: 100 });
   await frames(3);
-  await h.shot('dbg/x_a_base');
+  await h.shot('dbg/w_a_base');
 
   const vis = (code, name) => page.evaluate((c) => {
     const hum = window.__game.byId.emcee.body;
@@ -96,63 +111,16 @@ export async function run(page, h) {
     new Function('hum', c)(hum);
   }, code).then(() => frames(2)).then(() => h.shot(`dbg/${name}`));
 
-  // 射线定凶：先给眼区网格逐一命名，再从相机穿过奶油竖条像素（全图 ~(529,382)±）
-  const rays = await page.evaluate(() => {
-    const g = window.__game;
-    const cam = g.engine.camera;
-    const hum = g.byId.emcee.body;
-    const THREE = g.THREE;
-    hum.eyeL.name = 'scleraL'; hum.eyeR.name = 'scleraR';
-    hum.irisL.name = 'irisL'; hum.irisR.name = 'irisR';
-    for (const [grp, sfx] of [[hum.eyeGL, 'L'], [hum.eyeGR, 'R']]) {
-      for (const c of grp.children) {
-        if (!c.name) c.name = (c.geometry?.type === 'CircleGeometry' ? 'glint' : 'cornea') + sfx;
-      }
-    }
-    hum.lidL.name = 'lidL'; hum.lidR.name = 'lidR';
-    hum.lidL.children.forEach((c, i) => { c.name = 'lidChildL' + i + ':' + (c.material?.side ?? ''); });
-    hum.lidR.children.forEach((c, i) => { c.name = 'lidChildR' + i; });
-    hum.lidLoL.name = 'lidLoL'; hum.lidLoR.name = 'lidLoR';
-    hum.head.children.forEach((c, i) => {
-      if (!c.name) c.name = 'headkid' + i + ':' + (c.geometry?.type ?? c.type);
-    });
-    const rc = new THREE.Raycaster();
-    const V2 = THREE.Vector2;
-    const out = [];
-    for (const [px, py, tag] of [
-      [529, 382, 'capsule'], [524, 378, 'capsule2'], [534, 388, 'capsule3'],
-      [522, 386, 'darkslit'], [726, 380, 'righteye_ctrl'],
-    ]) {
-      const ndc = new V2((px / 1280) * 2 - 1, 1 - (py / 720) * 2);
-      rc.setFromCamera(ndc, cam);
-      const hits = rc.intersectObjects(g.engine.scene.children, true)
-        .filter((h) => h.object.visible !== false).slice(0, 6)
-        .map((h) => ({ d: +h.distance.toFixed(4), name: h.object.name || h.object.geometry?.type }));
-      out.push({ tag, hits });
-    }
-    return out;
-  });
-  console.log('[dbg] rays:', JSON.stringify(rays));
-
-  await vis('hum.irisL.visible = false; hum.irisR.visible = false;', 'x_b_noiris');
-  await vis(`hum.irisL.visible = true; hum.irisR.visible = true;
-    hum.lidL.visible = false; hum.lidR.visible = false;`, 'x_c_nolid');
-  await vis(`hum.lidL.visible = true; hum.lidR.visible = true;
-    hum.eyeL.visible = false; hum.eyeR.visible = false;`, 'x_d_nosclera');
-  await vis(`hum.eyeL.visible = true; hum.eyeR.visible = true;
-    for (const grp of [hum.eyeGL, hum.eyeGR]) {
-      for (const c of grp.children) {
-        if (c.geometry?.type === 'CircleGeometry') c.visible = false;
-        if (c.geometry?.type === 'SphereGeometry' && c !== hum.eyeL && c !== hum.eyeR
-          && c !== hum.irisL && c !== hum.irisR && c.rotation.x > 1) c.visible = false;
-      }
-    }`, 'x_e_nocornea');
-  await vis(`for (const grp of [hum.eyeGL, hum.eyeGR]) for (const c of grp.children) c.visible = true;
-    hum.lidLoL.visible = false; hum.lidLoR.visible = false;`, 'x_f_nolidlo');
-  await vis(`hum.lidLoL.visible = true; hum.lidLoR.visible = true;
+  // 裸眼球：藏头皮（HD+低模）——看眼球+睑的相对位置
+  await vis('hum.headHD.visible = false; hum.headMesh.visible = false;', 'w_b_nohead');
+  // 再藏上下睑+睫毛+AO——纯裸眼球：虹膜是否在球正前？
+  await vis(`hum.lidL.visible = false; hum.lidR.visible = false;
+    hum.lidLoL.visible = false; hum.lidLoR.visible = false;
     hum.head.children.forEach((c) => {
-      if (c.geometry?.parameters?.thetaStart === 0.66) c.visible = false;
-    });`, 'x_g_noao');
+      const p = c.geometry?.parameters;
+      if (p?.thetaStart === 0.66) c.visible = false;
+      if (c.geometry?.type === 'PlaneGeometry') c.visible = false;
+    });`, 'w_c_bareeye');
 
   console.log('[dbg] done');
 }
