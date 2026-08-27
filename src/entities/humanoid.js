@@ -846,11 +846,19 @@ function tieGeo() {
 
 /** 领结（侍应） */
 function bowtieGeo() {
-  return G('bowtie', () => merged([
-    xform(new THREE.SphereGeometry(0.014, 8, 6), 0, 0, 0),
-    xform(new THREE.BoxGeometry(0.035, 0.024, 0.012), -0.024, 0, 0, 0, 0, 0.12),
-    xform(new THREE.BoxGeometry(0.035, 0.024, 0.012), 0.024, 0, 0, 0, 0, -0.12),
-  ]));
+  // 轮21：两翼换「蝶形楔」——外端上下角折进、翼面向后掠 + 中结布带竖箍，
+  // 不再是两只方几何块钉在领口
+  return G('bowtie', () => {
+    const wing = (s) => {
+      const g2 = new THREE.CylinderGeometry(0.0125, 0.0042, 0.036, 6, 1);
+      g2.scale(1, 1, 0.42);
+      return xform(g2, s * 0.0245, 0, -0.0035, 0.14 * s, 0.1 * s, -s * (Math.PI / 2 + 0.1));
+    };
+    return merged([
+      xform(new THREE.BoxGeometry(0.011, 0.017, 0.011), 0, 0, 0.002, 0, 0, 0.06),   // 中结布箍
+      wing(-1), wing(1),
+    ]);
+  });
 }
 
 /** 立领+盘扣（缎袄）：扣子贴着缎袄弧面走 */
@@ -925,52 +933,52 @@ function driftLimbGeo(r, len, key) {
   });
 }
 
-/** 指管扫掠（轮20·木偶手根治核心）：沿关节折线的 CatmullRom 曲线扫出**一根连续
- *  皮肤管**——粗细沿指渐收、指节处只有曲率没有缝，指尖收成软圆头。
- *  分段胶囊+关节球的拼装从此废除：关节处不再有深色球/木节缝，屈曲是「弯」不是「铰」。 */
-function fingerSweep(pts, radii, radial = 10) {
-  const curve = new THREE.CatmullRomCurve3(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)), false, 'centripetal', 0.5);
-  const S = 20;                       // 沿指采样段数
-  const pos = [], uv = [], idx = [];
-  // 半径沿弧长平滑插值（radii 与 pts 一一对应，段内 smoothstep）
-  const radAt = (t) => {
-    const f = t * (radii.length - 1);
-    const i = Math.min(radii.length - 2, f | 0);
-    let k = f - i;
-    k = k * k * (3 - 2 * k);
-    return radii[i] + (radii[i + 1] - radii[i]) * k;
-  };
-  // 帧平行输运：法向沿管连续，不因指屈翻拧
-  let N = new THREE.Vector3(1, 0, 0);
-  const T = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
-  const rings = [];
-  for (let i = 0; i <= S; i++) {
-    const t = i / S;
-    curve.getPointAt(t, C);
-    curve.getTangentAt(t, T);
-    N.addScaledVector(T, -N.dot(T)).normalize();
-    B.crossVectors(T, N);
-    rings.push({ c: C.clone(), n: N.clone(), b: B.clone(), r: radAt(t), t });
-  }
-  // 指尖圆头：沿末端切线追加三圈收拢 + 顶点圈
-  const last = rings[rings.length - 1];
-  for (const [dt, rk] of [[0.35, 0.86], [0.62, 0.58], [0.82, 0.26], [0.92, 0.04]]) {
-    rings.push({
-      c: last.c.clone().addScaledVector(T, last.r * dt),
-      n: last.n, b: last.b, r: last.r * rk, t: 1,
-    });
-  }
+// ================= 手（轮21·人手网格 v2——全新实现） =================
+// 旧方案（掌=三颗压扁球拼装 + 指=CatmullRom 折线扫掠管）在舞台顶光下仍被
+// 终审读成「木偶手」：指过长过直、指扇过开像扇骨、掌背没有骨相、
+// 腕口一颗独立胶囊读成「腕球关节」、食指还长在小指位（解剖翻转）。
+// v2 从零重建，一只手 = 一套连续皮肤放样：
+//   掌体 = 沿掌长的超椭圆截面放样（袖内腕管→腕沟→掌骨扇→指节脊→指蹼收头），
+//          鱼际/小鱼际直接烘进截面轮廓——没有任何独立球件；
+//   手指 = 解析积分的连续锥管：屈度是弧长上的平滑曲率窝（smoothstep 集中在
+//          指节处），节间指腹微鼓、指节背侧微棱、指背远端压出指甲小平面、
+//          指尖软圆头——全指一条网格，没有分节缝、没有关节球；
+//   拇指 = 同一生成器自鱼际斜出对掌；
+//   腕   = 掌体放样向上延伸的皮管直接埋进袖口（独立腕胶囊废除）；
+//   解剖 = 右手拇指/食指在 +X 侧（旧实现食指在小指位）；四指并拢微分不开扇。
+// 顶点色 = 指蹼/指节沟接触影（配 faceNecks 皮肤材质族的 vertexColors）。
+
+/** 环放样公共件：rings = [{c:中心Vec3片段, e1,e2:截面基, rx,rz:半轴, k:超椭圆方,
+ *  pad:掌侧鼓, boss:背侧棱, shade:顶点色, v:UV纵坐标}] → 连续索引网格 */
+function loftRings(rings, radial = 16) {
+  const pos = [], uv = [], col = [], idx = [];
   for (let i = 0; i < rings.length; i++) {
     const rg = rings[i];
     for (let j = 0; j <= radial; j++) {
       const a = (j / radial) * Math.PI * 2;
-      // 指腹微鼓（掌侧 +6%）：指头有「肉」，但没有任何一圈是独立的「节」
-      const squash = 1 + Math.sin(a) * 0.06;
+      const c = Math.cos(a), s = Math.sin(a);
+      // 超椭圆截面（k<1 → 圆角矩形趋势：掌背/指腹是「面」不是「管」）
+      let ex = Math.sign(c) * Math.pow(Math.abs(c), rg.k) * rg.rx;
+      let ez = Math.sign(s) * Math.pow(Math.abs(s), rg.k) * rg.rz;
+      // 掌侧指腹鼓 / 背侧指节棱（法向微起伏，不是独立件）
+      const w = 1 + (rg.pad ?? 0) * Math.max(0, s) + (rg.boss ?? 0) * Math.max(0, -s);
+      ex *= w; ez *= w;
+      // 局部鼓包（鱼际/小鱼际）：沿截面角度的高斯窗
+      if (rg.lumps) {
+        for (const [la, lw, lk] of rg.lumps) {
+          let da = a - la;
+          da -= Math.round(da / (Math.PI * 2)) * Math.PI * 2;
+          const g2 = Math.exp(-(da * da) / (2 * lw * lw)) * lk;
+          ex *= 1 + g2; ez *= 1 + g2;
+        }
+      }
       pos.push(
-        rg.c.x + (rg.n.x * Math.cos(a) + rg.b.x * Math.sin(a)) * rg.r * squash,
-        rg.c.y + (rg.n.y * Math.cos(a) + rg.b.y * Math.sin(a)) * rg.r * squash,
-        rg.c.z + (rg.n.z * Math.cos(a) + rg.b.z * Math.sin(a)) * rg.r * squash);
-      uv.push(j / radial, rg.t);
+        rg.c[0] + rg.e1[0] * ex + rg.e2[0] * ez,
+        rg.c[1] + rg.e1[1] * ex + rg.e2[1] * ez,
+        rg.c[2] + rg.e1[2] * ex + rg.e2[2] * ez);
+      uv.push(j / radial, rg.v);
+      const sh = rg.shade ?? 1;
+      col.push(sh, sh, sh);
     }
   }
   const W = radial + 1;
@@ -983,60 +991,141 @@ function fingerSweep(pts, radii, radial = 10) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
   g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
 }
 
-/** 手（轮20·连续皮肤网格）：掌体+鱼际/小鱼际+四指+拇指——每根指是**一根**
- *  fingerSweep 连续管（根部埋进掌体软过渡），全手同一皮肤材质；
- *  关节球/分段胶囊全部废除——任何角度都读不出「木偶节」。
- *  curl: 'relax'|'open'|'flat'。几何为右手；左手用 mirroredHandGeo 取真镜像。 */
-function handGeo(curl = 'relax') {
-  return G('hand_' + curl, () => {
-    const parts = [];
-    // 掌体（扁椭球）+ 指蹼缘垫 + 鱼际（拇指侧掌肉）+ 小鱼际
-    parts.push(xform(new THREE.SphereGeometry(0.04, 18, 14), 0, -0.048, 0.004, 0.12, 0, 0, 0.82, 1.18, 0.38));
-    parts.push(xform(new THREE.SphereGeometry(0.03, 12, 9), 0, -0.082, 0.007, 0.1, 0, 0, 1.02, 0.42, 0.42));
-    parts.push(xform(new THREE.SphereGeometry(0.016, 10, 8), 0.02, -0.06, 0.011, 0.3, 0, 0.2, 1.0, 1.3, 0.62));
-    parts.push(xform(new THREE.SphereGeometry(0.0125, 10, 8), -0.024, -0.06, 0.007, -0.15, 0, -0.1, 0.9, 1.35, 0.6));
-    const c1 = curl === 'open' ? 0.26 : curl === 'flat' ? 0.06 : 0.5;   // 近节屈
-    const c2 = curl === 'open' ? 0.22 : curl === 'flat' ? 0.07 : 0.58;  // 中节屈
-    const c3 = curl === 'open' ? 0.12 : curl === 'flat' ? 0.05 : 0.34;  // 远节屈
-    // 轮20二稿：指长收 13%/径加 7%——中指:掌 ≈0.78 真人档（旧 0.94 读成细长签子）
-    const R1 = [0.0071, 0.0074, 0.0068, 0.0058];   // 逐指基半径（食/中/环/小）
-    const L1 = [0.029, 0.032, 0.0295, 0.023];
-    const L2 = [0.018, 0.021, 0.019, 0.014];
-    const L3 = [0.013, 0.015, 0.0135, 0.0115];
-    // 轮20三稿：逐指屈度梯度（食指最直→小指最弯）——四指同角的「机械梳齿」出局；
-    // 真人张手是一道屈度瀑布，不是四根平行签
-    const FK = [0.78, 0.9, 1.08, 1.3];
-    for (let i = 0; i < 4; i++) {
-      // 指扇再收（0.05→0.042）：张开的手指是「并拢微分」，不是人偶的扇骨
-      const splay = (i - 1.25) * 0.042;
-      const ss = Math.sin(splay), cs = Math.cos(splay);
-      let px = -0.0235 + i * 0.0162, py = -0.088, pz = 0.008;
-      const r1 = R1[i];
-      const fk = FK[i];
-      const chain = [[px - ss * 0.014, py + 0.015, pz - 0.004]]; // 根：埋进掌缘软过渡
-      chain.push([px, py, pz]);
-      const seg = (a, len) => {
-        const dx = ss * Math.cos(a), dy = -cs * Math.cos(a), dz = Math.sin(a);
-        px += dx * len; py += dy * len; pz += dz * len;
-        chain.push([px, py, pz]);
-      };
-      seg(c1 * fk, L1[i]);                       // 近节
-      seg((c1 + c2) * fk, L2[i]);                // 中节
-      seg((c1 + c2 + c3) * fk, L3[i]);           // 远节（到指尖）
-      parts.push(fingerSweep(chain, [r1 * 1.3, r1 * 1.04, r1 * 0.92, r1 * 0.82, r1 * 0.7]));
+/** 连续锥管手指：屈度 θ(s) 沿弧长积分——每个指节是一段 smoothstep 曲率窝，
+ *  节间指腹微鼓、指节背侧微棱、节沟极浅收腰（<6%，只读「褶」不读「缝」），
+ *  指尖圆头 + 背侧压平的指甲小平面。root 起点埋进掌体 12mm 软过渡。 */
+function digitGeo({ root, d0, b0, lens, curls, r0, taper = 0.78, radial = 14 }) {
+  const D = new THREE.Vector3(...d0).normalize();
+  const B = new THREE.Vector3(...b0);
+  B.addScaledVector(D, -B.dot(D)).normalize();      // 掌侧屈向（正交化）
+  const E1 = new THREE.Vector3().crossVectors(B, D); // 屈轴（截面横向）
+  const L = lens.reduce((a2, b2) => a2 + b2, 0);
+  const joints = [0];
+  for (const l of lens) joints.push(joints[joints.length - 1] + l);
+  const ss01 = (x) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
+  const bendAt = (s) => {
+    let th = 0;
+    for (let i = 0; i < curls.length; i++) {
+      const w = 0.008 + 0.004 * (i === 0 ? 1 : 0);  // 掌指关节屈段稍宽
+      th += curls[i] * ss01((s - (joints[i] - w)) / (2 * w));
     }
-    // 拇指：一根连续管自鱼际斜出、向掌心对掌
-    parts.push(fingerSweep([
-      [0.026, -0.042, 0.008],
-      [0.035, -0.054, 0.014],
-      [0.0525, -0.0805, 0.0275],
-      [0.0655, -0.0985, 0.0415],
-    ], [0.0105, 0.0088, 0.0068, 0.0056]));
+    return th;
+  };
+  const S = 26;
+  const bury = 0.012;
+  const rings = [];
+  const P = new THREE.Vector3(...root);
+  // 根部两圈：略粗、埋进掌缘（网格交贯，无缝可读）
+  P.addScaledVector(D, -bury);
+  const rB = r0 * 1.16;
+  rings.push({ c: [P.x, P.y, P.z], e1: E1.toArray(), e2: B.toArray(), rx: rB * 1.02, rz: rB * 0.9, k: 0.85, shade: 0.84, v: 0 });
+  let prev = 0;
+  const dcur = new THREE.Vector3(), e2c = new THREE.Vector3();
+  for (let i = 0; i <= S; i++) {
+    const s = (i / S) * L;
+    const th = bendAt(s);
+    dcur.copy(D).multiplyScalar(Math.cos(th)).addScaledVector(B, Math.sin(th));
+    P.addScaledVector(dcur, s - prev + (i === 0 ? bury : 0));
+    prev = s;
+    e2c.copy(B).multiplyScalar(Math.cos(th)).addScaledVector(D, -Math.sin(th));
+    let r = r0 * (1.04 - (1 - taper) * (s / L));
+    let pad = 0.05, boss = 0, shade = 1;
+    for (let jn = 1; jn < joints.length - 1; jn++) {
+      const d2 = s - joints[jn];
+      const g2 = Math.exp(-(d2 * d2) / (2 * 0.0045 * 0.0045));
+      r *= 1 - 0.055 * g2;              // 节沟浅收腰
+      boss += 0.06 * g2;                 // 背侧指节微棱
+      shade -= 0.09 * g2;                // 节沟接触影
+      const mid = (joints[jn] + joints[jn - 1]) / 2;
+      const dm = s - mid;
+      pad += 0.09 * Math.exp(-(dm * dm) / (2 * 0.008 * 0.008)); // 节间指腹
+    }
+    // 指背远端指甲位：背侧压平（甲面读平光，不加独立件）
+    const nailZone = ss01((s - (L - lens[lens.length - 1] * 0.72)) / (lens[lens.length - 1] * 0.5));
+    rings.push({
+      c: [P.x, P.y, P.z], e1: E1.toArray(), e2: e2c.toArray(),
+      rx: r * 1.04, rz: r * 0.93, k: 0.92 - nailZone * 0.18,
+      pad, boss: boss - nailZone * 0.24, shade: shade + nailZone * 0.045, v: 0.1 + (s / L) * 0.8,
+    });
+  }
+  // 指尖软圆头（沿末端切向收拢；背侧继承甲面压平）
+  const thL = bendAt(L);
+  dcur.copy(D).multiplyScalar(Math.cos(thL)).addScaledVector(B, Math.sin(thL));
+  e2c.copy(B).multiplyScalar(Math.cos(thL)).addScaledVector(D, -Math.sin(thL));
+  const rT = r0 * (1.04 - (1 - taper));
+  let tipD = 0;
+  for (const [dt, rk] of [[0.34, 0.88], [0.6, 0.62], [0.8, 0.3], [0.9, 0.05]]) {
+    P.addScaledVector(dcur, rT * (dt - tipD));
+    tipD = dt;
+    rings.push({
+      c: [P.x, P.y, P.z], e1: E1.toArray(), e2: e2c.toArray(),
+      rx: rT * rk * 1.02, rz: rT * rk * 0.85, k: 0.95, boss: -0.2 * rk, shade: 1.04, v: 0.95 + dt * 0.05,
+    });
+  }
+  return loftRings(rings, radial);
+}
+
+/** 手（轮21·v2）：单套连续放样。curl: 'relax'|'open'|'flat'。
+ *  几何为右手（拇指/食指 +X 侧，掌心 +Z）；左手用 mirroredHandGeo 取真镜像。 */
+function handGeo(curl = 'relax') {
+  return G('hand21_' + curl, () => {
+    const parts = [];
+    const Y = [0, 1, 0], Z = [0, 0, 1], X = [1, 0, 0];
+    // —— 掌体放样：腕管(入袖)→腕沟→掌骨扇(鱼际/小鱼际烘进 lumps)→指节脊→指蹼收头 ——
+    const th2 = [[0.75, 0.62, 0.16], [2.5, 0.66, 0.09]]; // [鱼际, 小鱼际] 高斯窗
+    const palmRow = (y, rx, rz, k, cz = 0, lumps = null, shade = 1, v = 0) =>
+      ({ c: [0, y, cz], e1: X, e2: Z, rx, rz, k, lumps, shade, v });
+    parts.push(loftRings([
+      palmRow(0.042, 0.0242, 0.0176, 0.9, 0, null, 1, 0),
+      palmRow(0.016, 0.0250, 0.0180, 0.88, 0, null, 1, 0.08),
+      palmRow(-0.006, 0.0264, 0.0184, 0.85, 0.0004, null, 0.97, 0.16), // 腕沟
+      palmRow(-0.030, 0.0328, 0.0200, 0.78, 0.0012, [[th2[0][0], 0.62, 0.10], th2[1]], 1, 0.3),
+      palmRow(-0.054, 0.0384, 0.0208, 0.72, 0.0018, th2, 1, 0.45),
+      palmRow(-0.074, 0.0417, 0.0198, 0.68, 0.0014, [[0.9, 0.5, 0.07], [2.45, 0.6, 0.05]], 0.97, 0.6),
+      palmRow(-0.088, 0.0427, 0.0182, 0.66, 0.0008, null, 0.95, 0.72),  // 掌指沟/指节脊
+      palmRow(-0.098, 0.0404, 0.0158, 0.7, 0.0004, null, 0.9, 0.82),
+      palmRow(-0.1055, 0.0328, 0.0112, 0.8, 0, null, 0.87, 0.9),
+      palmRow(-0.1105, 0.0202, 0.0064, 0.95, 0, null, 0.85, 0.96),
+      palmRow(-0.1128, 0.0036, 0.0018, 1, 0, null, 0.85, 1),
+    ]));
+    // —— 四指：并拢微分（拇指侧为 +X：食→小从 +X 到 -X），屈度瀑布 ——
+    const CURL = {
+      relax: [0.42, 0.5, 0.3], open: [0.17, 0.21, 0.13], flat: [0.1, 0.1, 0.06],
+    }[curl];
+    const CAS = curl === 'flat' ? [0.92, 1, 1.06, 1.12] : [0.82, 0.95, 1.1, 1.28];
+    const FIN = [ // [x0, y0, z0, r0, L1, L2, L3, splay]
+      [0.0300, -0.086, 0.0012, 0.0082, 0.040, 0.024, 0.019, 0.048],
+      [0.0102, -0.090, 0.0018, 0.0086, 0.044, 0.027, 0.021, 0.008],
+      [-0.0098, -0.088, 0.0015, 0.0080, 0.041, 0.0255, 0.020, -0.030],
+      [-0.0285, -0.081, 0.0006, 0.0068, 0.031, 0.019, 0.016, -0.068],
+    ];
+    for (let i = 0; i < 4; i++) {
+      const [x0, y0, z0, r0, l1, l2, l3, sp] = FIN[i];
+      parts.push(digitGeo({
+        root: [x0, y0, z0],
+        d0: [Math.sin(sp), -Math.cos(sp), 0.06],
+        b0: [0, 0, 1],
+        lens: [l1, l2, l3],
+        curls: CURL.map((c) => c * CAS[i]),
+        r0,
+      }));
+    }
+    // —— 拇指：自鱼际斜出对掌（2 节） ——
+    const TC = { relax: [0.3, 0.42], open: [0.2, 0.3], flat: [0.16, 0.24] }[curl];
+    parts.push(digitGeo({
+      root: [0.0252, -0.031, 0.0055],
+      d0: [0.78, -0.5, 0.36],
+      b0: [-0.3, -0.2, 0.9],
+      lens: [0.037, 0.03],
+      curls: TC,
+      r0: 0.0096, taper: 0.72,
+    }));
     return merged(parts);
   });
 }
@@ -1361,7 +1450,7 @@ export class Humanoid {
     // ---- 骨架枢轴（与 v2 兼容：pelvis/torso/neck/head + 肩肘髋膝）----
     this.pelvis = new THREE.Group(); this.pelvis.position.y = 0.82; this.group.add(this.pelvis);
     this.torso = new THREE.Group(); this.torso.position.y = 0.10; this.pelvis.add(this.torso);
-    const neckLen = 0.092; // 轮20三稿：再降 6mm + 领体系整体上移 8mm——「长颈」终审项双向压缩
+    const neckLen = 0.082; // 轮21：再降 10mm——颏底压到领口环顶 ±5mm 内，露颈只剩「领以上一点点」
     this.neck = new THREE.Group(); this.neck.position.y = 0.58; this.torso.add(this.neck);
     this.head = new THREE.Group(); this.head.position.y = neckLen; this.neck.add(this.head);
     this.head.scale.setScalar(1.16); // 头高 0.25-0.257m 档：1.87m 骨架 ÷ 7.28-7.48 头
@@ -1388,8 +1477,8 @@ export class Humanoid {
     {
       const fl = headBase(D.face, P).faceLen; // 与颅骨雕刻域同一份基频
       const base = 0.82 + 0.10;
-      const crown = base + 0.678 + (0.115 + 0.105 * fl) * 1.16 + 0.006;   // 颅顶+发壳厚
-      const chin = base + 0.678 + (0.115 - 0.105 * fl * 1.03) * 1.16;
+      const crown = base + 0.668 + (0.115 + 0.105 * fl) * 1.16 + 0.006;   // 颅顶+发壳厚（轮21：随 neckLen -10mm）
+      const chin = base + 0.668 + (0.115 - 0.105 * fl * 1.03) * 1.16;
       const clav = base + 0.578;
       const shR = torsoProfile(D.torso).reduce((m2, [r, y2]) => (Math.abs(y2 - 0.48) < 0.06 ? Math.max(m2, r) : m2), 0.14);
       this.metrics = {
@@ -1404,24 +1493,25 @@ export class Humanoid {
     this.torso.add(this.torsoMesh);
     // 颈（轮17：浮木长颈废除——侍应的异常收敛到前臂/托盘，颈必须读成人的颈；
     // 「导管颈」的竖拉伸浮木贴图从此不可能出现在颈上）
+    // 轮21：neckMat 提升到构造器作用域——手与脸/颈同一皮肤材质族（faceNecks
+    // 同源取色+同一张毛孔调频贴图），舞台光下「手比脸白一档=蜡手/木手」根治
+    const neckMat = (D.photo && M.faceNecks?.[D.photo]) ? pick(M.faceNecks[D.photo])
+      : pick(Mtl('neckV_' + skin.uuid, () => {
+        const m = skin.clone();
+        m.vertexColors = true;
+        return m;
+      }));
     {
-      // 颈裙：车削喉颈替代胶囊——上缘细、整圈藏进下颌腔内，向下外扩铺进领口/斜方肌；
-      // 顶点色把上缘压暗成「下颌接触阴影」，胶囊颈的横向接缝就此消失
-      const neckMat = (D.photo && M.faceNecks?.[D.photo]) ? pick(M.faceNecks[D.photo])
-        : pick(Mtl('neckV_' + skin.uuid, () => {
-          const m = skin.clone();
-          m.vertexColors = true;
-          return m;
-        }));
       const nkG = G('neckSkirt', () => {
         // 轮18：颈柱几何加宽（顶径 87→97mm）+ 下段更快铺进斜方肌——
         // 「大头顶细管」的对比消失；配合头组下移，裸颈段只剩喉那 2cm
         // 轮19：整柱再 +8%（成人男颈横径 ~110mm）——face_a「大头细颈」终审否决项；
         // 领筒/颌裙环/喉结同步扩径
+        // 轮21：整柱再 +6%（随头组下移，颈更粗更短——「细长管」双向出局）
         const prof = [
           [0.0491, 0.105], [0.0524, 0.085], [0.0545, 0.06], [0.0545, 0.035],
           [0.0562, 0.012], [0.0621, -0.008], [0.0724, -0.026], [0.0896, -0.042], [0.1123, -0.055],
-        ].map(([r, y2]) => new THREE.Vector2(r, y2));
+        ].map(([r, y2]) => new THREE.Vector2(r * 1.06, y2));
         const g2 = new THREE.LatheGeometry(prof, 18);
         g2.scale(1, 1, 0.8); // 颈截面前后略薄（加宽后压回——颈前不许越过下巴）
         const pos2 = g2.attributes.position;
@@ -2044,17 +2134,18 @@ export class Humanoid {
             ? limbGeo(0.041, 0.029, 0.22, 'foreArmSkin', 0.13, { peak: 0.3 })
             : limbGeo(0.041, 0.035, 0.226, 'foreArmCuff', 0.1, { peak: 0.3, cuff: 0.007, wrinkle: 0.0026 }),
           foreMat, 0, 0.008, 0, limbScl, 1, limbScl));
-        // 袖口露腕（手套角色腕部也是胶皮）——腕径回到真人 (r 24mm)。
-        // 轮17：旧胶囊长 10cm,抬臂时从袖口垂出一整段裸皮柱+球头(审计的「肘冒皮肤球」)——
-        // 缩到 6cm 且上端藏进袖管：袖口与掌根之间只露 2-3cm 真腕
-        elbow.add(mkMesh(G('wrist', () => new THREE.CapsuleGeometry(0.0245, 0.012, 4, 10)), D.gloves ? rubber : skin, 0, -0.245, 0));
       }
-      const handMat = D.drift ? drift : D.gloves ? rubber : skin;
+      // 轮21：独立腕胶囊废除——v2 手网格自带入袖腕管（袖口里长出的是同一条皮），
+      // 「腕口一颗球」从任何角度都不再存在
+      // 手材质 = 脸/颈同一 faceNecks 皮肤族（裸臂裙装跟前臂 skin 防腕口换皮；
+      // 手套角色胶皮）；浮木侍应的手也必须是活人肉手——异常只留在前臂
+      const handMat = D.gloves ? rubber : (D.torso === 'dress' ? skin : neckMat);
       const flat = D.tray && side < 0;
-      // 手整体收 8%：近景里旧手掌大过半张脸（人偶手元凶之一）。
-      // 轮19：左手换真镜像几何（拇指在拇指侧）——两手不再共用一只「转过去的右手」
-      const handG = side < 0 ? mirroredHandGeo(flat ? 'flat' : 'relax') : handGeo(flat ? 'flat' : 'relax');
-      const hand = mkMesh(handG, handMat, 0, -0.252, 0.004, 0.92, 0.92, 0.92);
+      // 左手真镜像几何（拇指在拇指侧）；持麦者的抬臂左手用 open 屈度（对观众的
+      // 掌是「张开的软手」，不是攥拳也不是扇骨）
+      const curlKind = flat ? 'flat' : (D.mic && side < 0 ? 'open' : 'relax');
+      const handG = side < 0 ? mirroredHandGeo(curlKind) : handGeo(curlKind);
+      const hand = mkMesh(handG, handMat, 0, -0.2405, 0.002, 0.92, 0.92, 0.92);
       // 静息掌心朝腿（解剖静息位是半旋前），托盘手保持掌心向上的旧取向
       hand.rotation.y = flat ? Math.PI : (side < 0 ? 1.2 : -1.2);
       elbow.add(hand);
