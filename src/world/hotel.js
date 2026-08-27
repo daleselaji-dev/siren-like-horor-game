@@ -625,9 +625,9 @@ export function buildHotel(ctx) {
     const wingM2 = new THREE.MeshStandardMaterial({ color: 0xc4b69e, roughness: 0.85, envMapIntensity: 2.0 }); // 与翼端块同断言标记色
     const frameM2 = new THREE.MeshStandardMaterial({ color: 0x37544a, roughness: 0.5, metalness: 0.25 });
     const voidDeep = new THREE.MeshStandardMaterial({ color: 0x0d0f11, roughness: 1 });
-    const glowWarm = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffb26a, emissiveIntensity: 0.9, roughness: 1 });
-    const glowWarm2 = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffc07a, emissiveIntensity: 0.62, roughness: 1 });
-    const glowCool = new THREE.MeshStandardMaterial({ color: 0x10151a, emissive: 0x8fb4c8, emissiveIntensity: 0.5, roughness: 1 });
+    const glowWarm = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffb26a, emissiveIntensity: 1.3, roughness: 1, fog: false }); // 轮24四稿:0.9→1.3+关雾
+    const glowWarm2 = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffc07a, emissiveIntensity: 0.9, roughness: 1, fog: false }); // 轮24四稿:0.62→0.9+关雾
+    const glowCool = new THREE.MeshStandardMaterial({ color: 0x10151a, emissive: 0x8fb4c8, emissiveIntensity: 0.75, roughness: 1, fog: false }); // 轮24四稿:0.5→0.75+关雾
     // —— 翼端挑楼塔（s=±1）：侧墩+层间腰板留出窗带，玻璃退进 0.45m 深腔 ——
     for (const s of [-1, 1]) {
       const wx = s * 15.25;
@@ -712,10 +712,10 @@ export function buildHotel(ctx) {
     for (const [a, b] of [[-11.5, -9.5], [-7, -5], [6, 8], [10.5, 12.5]]) balcony(a, b, F2, Math.floor(brnd() * 3));
     for (const [a, b] of [[-11.5, -9.5], [-7, -5], [-2.5, -0.5], [1.5, 3.5], [6, 8], [10.5, 12.5]]) balcony(a, b, F3, Math.floor(brnd() * 3));
     // —— 亮窗群（自发光薄片贴窗洞内缝，不吃灯预算）——
-    const glowA = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffb26a, emissiveIntensity: 1.1, roughness: 1 });   // 暖帘光
-    const glowB = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffc07a, emissiveIntensity: 0.65, roughness: 1 });  // 弱暖光
-    const glowF = new THREE.MeshStandardMaterial({ color: 0x101512, emissive: 0xbfe0c8, emissiveIntensity: 0.55, roughness: 1 });  // 荧光管冷绿
-    const glowT = new THREE.MeshStandardMaterial({ color: 0x10151a, emissive: 0x8fb4c8, emissiveIntensity: 0.5, roughness: 1 });   // 电视蓝
+    const glowA = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffb26a, emissiveIntensity: 1.6, roughness: 1, fog: false });   // 暖帘光(轮24四稿:1.1→1.6+关雾——雨夜亮窗穿雾)
+    const glowB = new THREE.MeshStandardMaterial({ color: 0x241a10, emissive: 0xffc07a, emissiveIntensity: 0.95, roughness: 1, fog: false });  // 弱暖光(0.65→0.95+关雾)
+    const glowF = new THREE.MeshStandardMaterial({ color: 0x101512, emissive: 0xbfe0c8, emissiveIntensity: 0.85, roughness: 1, fog: false });  // 荧光管冷绿(0.55→0.85+关雾)
+    const glowT = new THREE.MeshStandardMaterial({ color: 0x10151a, emissive: 0x8fb4c8, emissiveIntensity: 0.75, roughness: 1, fog: false });   // 电视蓝(0.5→0.75+关雾)
     // [材质, cx, y0(层), 宽, 高偏移]——错落在各窗樘（部分藏在阳台栏板后：光从栏板上沿溢出）
     const glows = [
       [glowA, 6.6, F2, 0.9], [glowB, 11.4, F2, 0.85],

@@ -658,6 +658,18 @@ export function buildTown(scene, M) {
       // —— 轮24·空场/酒店前场积水群：街景纵深与 hotel_wide 取证线里最大的
       // 「泥平板」区域铺镜洼链——夜空/亮窗/招牌在地上有了倒影层，
       // 地面第一读是「雨后的湿场」，不是一块哑光泥毯 ——
+      // 轮24四稿·黑洞根治：路面洼的 0.92 金属度材质在取证广角（俯视）下
+      // 反射向天顶暗区=一摊纯黑「地洞」；广场洼独立材质——金属度降半、
+      // 基色提到亮灰蓝参与漫反射、环反射抬档，俯视是「泛着天光的水皮」
+      const plazaM = new THREE.MeshStandardMaterial({
+        color: 0x39434a, roughness: 0.05, metalness: 0.45, envMapIntensity: 2.4,
+        // 微量天光自发光：水面反射的是「被镇灯照亮的雨云穹」——环贴图天顶偏暗，
+        // 纯反射在俯视角永远是黑；这层恒定水光让洼读成「泛光的水皮」不是地洞
+        emissive: 0x2b343c, emissiveIntensity: 0.5,
+      });
+      plazaM.stencilWrite = true;
+      plazaM.stencilRef = 1;
+      plazaM.stencilZPass = THREE.ReplaceStencilOp;
       dynamic.plazaPuddles = [];
       for (const [px, pz, s, sq, rot] of [
         // 酒店门前场（正门台阶前一片带状洼地）
@@ -670,7 +682,7 @@ export function buildTown(scene, M) {
         // 民居间的洼（hotel_wide 前景两侧）
         [-16, -33, 1.4, 0.48, 0.5], [9, -34, 1.3, 0.5, 1.6], [12, -27, 1.0, 0.55, 2.2],
       ]) {
-        const p = new THREE.Mesh(puddleG, puddleM);
+        const p = new THREE.Mesh(puddleG, plazaM);
         p.rotation.x = -Math.PI / 2;
         p.rotation.z = rot;
         p.scale.set(s, s * sq, 1);

@@ -2178,8 +2178,10 @@ export class Humanoid {
     // 虹膜盘材质：贴图带色环+瞳孔；emissive 通道保留给潮光（sightjack 发光）
     const irisTint = (seed % 3 === 0) ? 0x6a4526 : 0x53341e; // 深褐/暖褐两档
     this.eyeMat = Mtl('irisTex_' + irisTint.toString(16), () => new THREE.MeshStandardMaterial({
-      map: irisTexture(irisTint), transparent: true, roughness: 0.6,
-      envMapIntensity: 0.3, emissive: 0x4a6a70, emissiveIntensity: 0,
+      // 轮24四稿：粗糙 0.6→0.75、环反射 0.3→0.12——正面暖光下虹膜盘的漫反射
+      // 高光把深褐洗成灰蓝（emcee「雾眼」）；虹膜自己只出「色」，光交给角膜/光点
+      map: irisTexture(irisTint), transparent: true, roughness: 0.75,
+      envMapIntensity: 0.12, emissive: 0x4a6a70, emissiveIntensity: 0,
       // 虹膜盘是正对相机的平面：镜面反射一大就整盘糊白（白珠眼回魂）——
       // 湿光交给角膜壳与捕捉光点，虹膜自己只出「色」
       depthWrite: false,
@@ -2207,14 +2209,15 @@ export class Humanoid {
     const corneaMat = pick(Mtl('corneaWet', () => new THREE.MeshPhysicalMaterial({
       // 轮24：opacity 0.1→0.05、环反射 1.1→0.5、清漆 1.0→0.7——聚光下角膜壳
       // 整面糊成灰镜=「虹膜被洗掉的金属球」另一半元凶；湿高光留一点就够
+      // 轮24四稿：环反射 0.5→0.38——暖聚光正面机位下角膜仍把虹膜洗成灰盘
       color: 0xffffff, transparent: true, opacity: 0.05, roughness: 0.06,
-      envMapIntensity: 0.5, clearcoat: 0.7, clearcoatRoughness: 0.1,
+      envMapIntensity: 0.38, clearcoat: 0.7, clearcoatRoughness: 0.1,
       depthWrite: false,
     })));
     // 捕捉光点：角膜上永远亮着的一粒（暗厅里眼睛也得是「湿」的——活人证据第一条）
     const glintG = G('eyeGlint', () => new THREE.CircleGeometry(0.0015, 8));
     const glintMat = pick(Mtl('eyeGlintM', () => new THREE.MeshBasicMaterial({
-      color: 0xd8e4e8, transparent: true, opacity: 0.62, depthWrite: false, // 轮24：捕捉光点收敛——一粒湿光，不是车灯
+      color: 0xd8e4e8, transparent: true, opacity: 0.55, depthWrite: false, // 轮24四稿：0.62→0.55——一粒湿光，不是车灯
     })));
     // 轮20三稿：横向摊脸——眼球随眼窝/照片同乘 1.149 外移（HX 收颅宽相抵，
     // 世界瞳距守 63-65mm）；skull 域 eyeNX 同步（除以 0.0882 换算）
