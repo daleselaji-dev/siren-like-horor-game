@@ -102,26 +102,32 @@ const moveLights = (x) => {
   key.target.position.set(x, 1.2, 0);
   fill.position.set(x - 3, 2.5, 2);
 };
+const setFov = (fov) => { cam.fov = fov; cam.updateProjectionMatrix(); };
 window.__lookAt = (i, dist = 2.6, height = 1.4) => {
   const f = figures[i];
+  setFov(45);
   moveLights(f.group.position.x);
   cam.position.set(f.group.position.x + dist * 0.3, height, dist);
   cam.lookAt(f.group.position.x, 1.05, 0);
 };
 window.__face = (i) => {
   const f = figures[i];
+  // 轮19二稿：45°/0.64m 的广角近摄是「头大肩窄」错觉的放大器（鼻-耳距差 18%）。
+  // 改人像焦段：FOV 36 + 0.78m（仍在父审 0.5-0.8m 近景带内），框幅基本不变
+  setFov(36);
   moveLights(f.group.position.x);
-  // 用头部世界坐标取景——姿态低头/歪头时也能框住脸（0.6m 级近景：父审要求 0.5-0.8m）
+  // 用头部世界坐标取景——姿态低头/歪头时也能框住脸
   const p = f.h ? f.h.headWorldPos(new THREE.Vector3()) : new THREE.Vector3(f.group.position.x, 1.62, 0);
-  cam.position.set(p.x + 0.2, p.y + 0.08, p.z + 0.6);
-  cam.lookAt(p.x, p.y + 0.01, p.z);
+  cam.position.set(p.x + 0.245, p.y + 0.06, p.z + 0.73);
+  cam.lookAt(p.x, p.y, p.z);
 };
 window.__profile = (i) => {
   const f = figures[i];
+  setFov(36);
   moveLights(f.group.position.x);
   // 侧脸机位：鼻突/眉弓-鼻根-鼻梁三段线/颌缘的证据位
   const p = f.h ? f.h.headWorldPos(new THREE.Vector3()) : new THREE.Vector3(f.group.position.x, 1.62, 0);
-  cam.position.set(p.x + 0.68, p.y + 0.04, p.z + 0.1);
+  cam.position.set(p.x + 0.79, p.y + 0.04, p.z + 0.12);
   cam.lookAt(p.x, p.y, p.z);
 };
 window.__lookAt(0);

@@ -190,13 +190,23 @@ const SKULL_R = 0.105;
  * 发壳/帽体的顶点按 (r/R) 径向倍率过同一域（conformSkull），
  * 与颅骨逐种子共形——头顶不再是罩在窄颅上的悬浮圆拱。
  */
+/** 颅形基频（雕刻域/比例公式/盐霜贴面共用同一份，不许各抄各的漂移）。
+ *  轮19二稿：gaunt 员工脸 面长 −0.9% + 头宽 +2.4%——waiter「窄长头」的骨相修正 */
+function headBase(variant, P) {
+  const fem = variant === 'f';
+  const gaunt = variant === 'gaunt';
+  return {
+    headW: (fem ? 0.835 : gaunt ? 0.84 : 0.82) + P.headW * 0.04,
+    faceLen: (gaunt ? 0.976 : 0.985) + P.faceLen * 0.03, // 抖动收半：头身比 1/7.2-7.5 全种子成立
+  };
+}
+
 function makeSkullField(variant, P, o = {}) {
   const R = SKULL_R;
   const old = variant === 'old' || variant === 'gaunt';
   const fem = variant === 'f';
   // 轮17：头宽上限收 3%、颌收拢上限收 3 成——「头宽下颌尖」的倒三角脸出局
-  const headW = (fem ? 0.835 : 0.82) + P.headW * 0.04;
-  const faceLen = 0.985 + P.faceLen * 0.03; // 抖动收半：头身比 1/7.2-7.5 必须全种子成立
+  const { headW, faceLen } = headBase(variant, P);
   const jawT = (fem ? 0.29 : 0.25) + P.jaw * 0.07;
   const chinZ = 0.02 + P.chin * 0.017;
   const cheekAmp = 0.0035 + P.cheek * 0.007 + (old ? 0.0035 : 0);
@@ -1299,7 +1309,7 @@ export class Humanoid {
     this.torsoScl = { x: shW, z: chD };
     // 数值化比例（轮17 铁律，供 charshot 断言）：颅心 = torso 局部 0.688 + 0.115·1.16
     {
-      const fl = 0.985 + P.faceLen * 0.03;
+      const fl = headBase(D.face, P).faceLen; // 与颅骨雕刻域同一份基频
       const base = 0.82 + 0.10;
       const crown = base + 0.678 + (0.115 + 0.105 * fl) * 1.16 + 0.006;   // 颅顶+发壳厚
       const chin = base + 0.678 + (0.115 - 0.105 * fl * 1.03) * 1.16;
@@ -1399,20 +1409,20 @@ export class Humanoid {
         }), neckMat, 0, 0.672, 0.0405, 0.66, 0.9, 0.13));
       }
     }
-    // 轮18·斜方肌过渡：颈根—肩峰两道衣料包着的斜坡（capsule 斜置）——
-    // 头/肩/胸的连接不再是「领筒插在圆胸顶上」，正面剪影从颈根顺着斜方肌落到肩。
-    // 轮19：胶囊减径压扁放平（r58→42mm、倾角 1.18→1.30、竖向压 0.8）——
-    // 旧参数是两只骑在领口两侧的「肩球」（face_a 近景否决项），现在是贴着
-    // 肩线走的薄坡，剪影里只剩「斜方肌的坡度」，没有独立圆辊
+    // 轮18·斜方肌过渡：颈根—肩峰两道衣料包着的斜坡（capsule 斜置）。
+    // 轮19二稿（换色探针实锤）：一稿参数正视仍是领口两侧两片「花瓣」、
+    // 侧视胸前一颗「泪滴球」——就是 face_a 否决单里的「肩球」本体。
+    // 现在减径(42→28mm)+削薄(z 0.72→0.5)+放平(1.30→1.44)+外移下沉，
+    // 胶囊几乎整根埋进躯干，肩上只露一道 <2cm 的斜方肌坡棱
     {
       const trapG = G('trapWedge', () => {
-        const g2 = new THREE.CapsuleGeometry(0.042, 0.128, 6, 10);
-        g2.scale(1, 1, 0.72);
+        const g2 = new THREE.CapsuleGeometry(0.028, 0.108, 6, 10);
+        g2.scale(1, 1, 0.5);
         return g2;
       });
       for (const s of [-1, 1]) {
-        const tp = mkMesh(trapG, torsoMat, s * 0.086 * shW, 0.552, -0.004, 1, 0.8, chD);
-        tp.rotation.z = s * 1.3;
+        const tp = mkMesh(trapG, torsoMat, s * 0.096 * shW, 0.534, -0.006, 1, 0.62, chD);
+        tp.rotation.z = s * 1.44;
         this.torso.add(tp);
       }
     }
@@ -1441,8 +1451,10 @@ export class Humanoid {
       rim.name = 'collarRim';
       this.torso.add(rim);
       if (style === 'fold') {
-        // 翻领面：领筒外翻出的一圈坡面（2001 工装/衬衫的软翻领）
-        this.torso.add(mkMesh(G('collarFold', () => new THREE.CylinderGeometry(0.0665, 0.0945, 0.058, 16, 1, true)), mat, 0, 0.608, 0.004));
+        // 翻领面：领筒外翻出的一圈坡面（2001 工装/衬衫的软翻领）。
+        // 轮19二稿：下摆 94.5→85.5mm、高 58→50mm——旧喇叭铺到肩上读成
+        //「灯罩斗篷」，把颈衬得更细（face_a 近景否决项之一）
+        this.torso.add(mkMesh(G('collarFold', () => new THREE.CylinderGeometry(0.066, 0.0855, 0.05, 16, 1, true)), mat, 0, 0.61, 0.004));
       }
     };
     if (D.lapel) {
@@ -1901,8 +1913,7 @@ export class Humanoid {
     }
     if (D.saltFrost || opts.saltFrost) {
       // 盐霜附居痕迹：按头形参数缩放贴面（晶壳长在皮上，不悬空）
-      const hw = (faceVariant === 'f' ? 0.835 : 0.82) + P.headW * 0.04;
-      const fl = 0.985 + P.faceLen * 0.03;
+      const { headW: hw, faceLen: fl } = headBase(faceVariant, P);
       const saltM = mkMesh(saltFrostGeo(seed),
         pick(M.saltFrost ?? Mtl('saltFrostFb', () => new THREE.MeshStandardMaterial({ color: 0xf2efe2, roughness: 0.55, envMapIntensity: 1.5 }))),
         0, 0.115, 0);
@@ -1918,10 +1929,10 @@ export class Humanoid {
       this.torso.add(shoulder);
       // 袖山（去球关节读感）：斜切椭球顺着三角肌走向塌进肩线——
       // 不再是躯干旁边并排一颗光球，是袖管从肩缝里「长」出来的布肩
-      // 轮19：再压扁（0.74→0.66）+ 内塌 + 顺坡加斜（0.42→0.52）——正面剪影上
-      // 袖山融进斜方肌坡线，肩点不再各顶一颗独立球
+      // 轮19二稿：再压扁（0.66→0.58）+ 内塌下沉——斜方肌坡棱削薄后
+      // 袖山不许接棒变成下一代「肩球」
       const capM = mkMesh(G('shoulderCap', () => new THREE.SphereGeometry(0.05, 14, 11)), torsoMat,
-        -0.02 * side, -0.028, 0, 0.96 * limbScl, 0.66, 0.86 * limbScl);
+        -0.026 * side, -0.034, 0, 0.96 * limbScl, 0.58, 0.86 * limbScl);
       capM.rotation.z = 0.52 * side;
       shoulder.add(capM);
       // 袖管过肘 12mm（管-管重叠盖住缝球）：屈肘时张口被袖管自己的延伸接住
@@ -2443,6 +2454,9 @@ export class Humanoid {
         lerp(this.armL.shoulder.rotation, 'x', -0.2 - announce * 1.1, 5);
         lerp(this.armL.shoulder.rotation, 'z', 0.15 + announce * 0.4, 5);
         lerp(this.armL.elbow.rotation, 'x', -0.2 - announce * 0.2, 5);
+        // 轮19：抬臂时腕部内旋——掌面斜对观众（正对镜头的平板手掌是「人偶手」读法）
+        lerp(this.armL.hand.rotation, 'z', -0.38 * announce, 5);
+        lerp(this.armL.hand.rotation, 'x', -0.15 * announce, 5);
         lerp(this.legL.hip.rotation, 'x', 0, 4);
         lerp(this.legR.hip.rotation, 'x', 0, 4);
         lerp(this.pelvis.position, 'y', 0.855, 4);

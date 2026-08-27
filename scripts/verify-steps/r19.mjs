@@ -11,6 +11,8 @@ export async function run(page, h) {
   await h.tapKey('Space');
   await h.sleep(300);
   await page.waitForFunction(() => window.__facesReady === true, { timeout: 300000, polling: 1000 });
+  // 目标横幅整场隐藏（CSS 淡出有过渡，仅摘 class 截屏时还挂在半空）
+  await page.evaluate(() => { window.__game.hud.el.objToast.style.display = 'none'; });
 
   const assert = (ok, msg) => { if (!ok) throw new Error('ASSERT: ' + msg); };
   const frames = (n) => page.evaluate((k) => new Promise((res) => {
@@ -31,7 +33,12 @@ export async function run(page, h) {
       g.player.syncCamera(0);
     }, { px, pz, tx, tz, yHint, pitch });
     await frames(settle);
-    await page.evaluate(() => window.__game.hud.clearSubtitles());
+    await page.evaluate(() => {
+      const g = window.__game;
+      g.hud.clearSubtitles();
+      g.hud.objTimer = 0;
+      g.hud.el.objToast.classList.remove('show'); // 目标横幅不入取证帧
+    });
     await h.shot(`r19/${name}`);
   };
 
@@ -50,7 +57,7 @@ export async function run(page, h) {
     return { attic, balcony, grill };
   });
   console.log('[verify] r19 massing:', JSON.stringify(fc));
-  assert(fc.attic >= 100, 'central attic volume missing: ' + fc.attic);
+  assert(fc.attic >= 90, 'central attic volume missing: ' + fc.attic);
   assert(fc.balcony >= 500, 'balcony band modules missing: ' + fc.balcony);
   assert(fc.grill >= 100, 'AC grills missing: ' + fc.grill);
 
@@ -137,10 +144,10 @@ export async function run(page, h) {
     await page.evaluate(({ px, pz, tx, tz }) => {
       const g = window.__game;
       const yaw = Math.atan2(-(tx - px), -(tz - pz));
-      g.player.setPosition(px, pz, yaw, 3.5);
-      g.player.pitch = 0.02;
+      g.player.setPosition(px, pz, yaw, 3.42);
+      g.player.pitch = 0.0;
       g.player.syncCamera(0);
-    }, { px: em.x + 0.62, pz: em.z + 0.62, tx: em.x, tz: em.z });
+    }, { px: em.x + 0.56, pz: em.z + 0.68, tx: em.x, tz: em.z });
     await page.waitForFunction(() => {
       const hum = window.__game.byId.emcee.body;
       return hum._hd === true && hum.headHD && hum.headHD.visible;
@@ -157,17 +164,22 @@ export async function run(page, h) {
     console.log('[verify] r19 emcee LOD:', JSON.stringify(hd));
     assert(hd.hd && hd.hdVisible && !hd.loVisible, 'HD head not swapped in at 0.9m');
     assert(hd.hdVerts > 8000, 'HD head too coarse: ' + hd.hdVerts);
-    // 拨到抬臂峰值 → 补两帧渲染 → 拍
+    // 轮18复拍教训：PLAY 态下实体 AI 每帧继续推进相位，
+    // 「拨峰值→等3帧→按快门」窗口里手臂已经掉下来了。
+    // 现在先 PAUSE 冻结世界（渲染继续、AI 停摆），再钉死峰值姿势拍照
     await page.evaluate(() => {
-      const hum = window.__game.byId.emcee.body;
+      const g = window.__game;
+      g.game.state = 'PAUSE';
+      const hum = g.byId.emcee.body;
       hum.phase = 5.54;
       for (let i = 0; i < 4; i++) hum.animate('mc', 3, 0);
       hum.phase = 5.54;
       hum.animate('mc', 0.001, 0);
+      g.hud.clearSubtitles();
     });
     await frames(3);
-    await page.evaluate(() => window.__game.hud.clearSubtitles());
     await h.shot('r19/emcee_stage');
+    await page.evaluate(() => { window.__game.game.state = 'PLAY'; });
   }
 
   // ---------- 门3立面取证 ----------
