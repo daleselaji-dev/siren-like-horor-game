@@ -71,6 +71,17 @@ const FACE_DEFS = {
   },
 };
 
+// —— 逐照片发色（读图标定）：photo 脸的 3D 发壳/碎发卡必须与照片里烘进头皮的
+// 鬓角/发根同色——旧方案按种子随机抽发色池，黑发照片顶一头棕壳=「戴假发」——
+export const FACE_HAIR = {
+  m: 0x18130f,     // 黑寸头
+  f: 0x201611,     // 深棕黑
+  oldm: 0x4e4a44,  // 灰白
+  oldf: 0x565049,  // 灰白
+  pale: 0x16120f,  // 黑色背头（酒店员工）
+  chalk: 0x3c352d, // 灰褐
+};
+
 // —— 逐脸五官锚点（相对颅心，米）：把照片的眉线/鼻底线反投影回头模球面 ——
 // 3D 眉贴片、鼻件按这个 y 落位，才能和烘焙进皮的照片眉/鼻影重合成一副五官。
 const _anchors = {};
@@ -83,10 +94,16 @@ export function faceAnchor(key) {
   const mouthY3 = R0 * (MOUTH_Y / Math.hypot(MOUTH_Y, MOUTH_Z));
   const sy = ((D.mouthY - D.eyeY) * S) / (eyeY3 - mouthY3);
   const cy = D.eyeY * S + eyeY3 * sy;
+  // 轮23：鬓角下垂抛物线的「头局部」系数——发壳前檐逐顶点裁剪到与烘焙 hairGate
+  // 同一条发际曲线（hl(x) = hairY − hairSagK·x²）；两条发际线合成一条
+  const thetaE = Math.acos(EYE_Y / Math.hypot(EYE_X, EYE_Y, EYE_Z));
+  const phiE = Math.atan2(EYE_X, EYE_Z);
+  const eyeX3 = R0 * Math.sin(phiE) * Math.sin(thetaE);
   return (_anchors[key] = {
     browY: (cy - D.browY * S) / sy,
     noseY: (cy - D.noseY * S) / sy,
     hairY: (cy - D.hairY * S) / sy, // 正中发际线（头局部米）——发壳前檐按此对位盖住烘焙边界
+    hairSagK: (D.hairSag * S) / (sy * (2 * eyeX3) * (2 * eyeX3)),
   });
 }
 
@@ -228,6 +245,9 @@ export function buildFaceMaterials(M, T, lowspec = false) {
     oil(0.385, 0.53, 0.05, 0.038, 0.3 * oilK);          // 颧骨左
     oil(0.615, 0.53, 0.05, 0.038, 0.3 * oilK);          // 颧骨右
     oil(0.5, 0.625, 0.038, 0.03, 0.28 * oilK);          // 下巴
+    // 轮23：唇带微湿（3D 体积唇废除后，照片唇的「湿」由粗糙度承担——
+    // 唇区比颊面略滑一档，侧光下唇面先亮，嘴是活的不是画上去的）
+    oil(0.5, 0.578, 0.032, 0.012, 0.42 * oilK);
     // 颊侧/颌缘反向提亮（更粗糙偏哑）：油区之外皮面是干的
     for (const [mu, mv] of [[0.32, 0.58], [0.68, 0.58]]) {
       xr.save();
@@ -513,13 +533,23 @@ function compositeFace(M, job, img) {
   // 颈与脸皮同源：同一份颊部取色、RGB 同乘——只降明度不动色相
   //（颌下变暗交给顶点色 smoothstep 接触影；0.96 = 0.88 补偿颈皮调频贴图
   //  的 ~0.80 均值，总亮度与轮10 标定持平）
-  M.faceNecks[key].color.setRGB(skinAvg[0] / 255 * 0.96, skinAvg[1] / 255 * 0.96, skinAvg[2] / 255 * 0.96, THREE.SRGBColorSpace);
+  // 轮23：颈色暖移（R 保 / G −4% / B −9%）——灰调颈皮衬着照片暖脸读成「换头缝合」；
+  // 颈的血色必须与脸同族
+  M.faceNecks[key].color.setRGB(skinAvg[0] / 255 * 0.97, skinAvg[1] / 255 * 0.93, skinAvg[2] / 255 * 0.88, THREE.SRGBColorSpace);
 
   // 底皮均值（色调匹配：底皮乘到照片肤色）
+  // 轮23：只在「脸纬度带」（v∈0.40..0.70，照片颊区同纬）取均值——旧的全画布均值
+  // 被顶部发根/底部颈带压暗，tint 补偿过度 → 照片区外的底皮亮一档黄一档，
+  // 颊侧读出一条「面具缘」明暗断层（轮22 终审「贴图脸」的一半来源）
   const base = xd.getImageData(0, 0, S, S);
   const B = base.data;
   let br = 0, bg = 0, bb = 0, bn = 0;
-  for (let i = 0; i < B.length; i += 64) { br += B[i]; bg += B[i + 1]; bb += B[i + 2]; bn++; }
+  for (let py0 = Math.floor(S * 0.40); py0 < S * 0.70; py0 += 3) {
+    for (let px0 = 0; px0 < S; px0 += 8) {
+      const i = (py0 * S + px0) * 4;
+      br += B[i]; bg += B[i + 1]; bb += B[i + 2]; bn++;
+    }
+  }
   br /= bn; bg /= bn; bb /= bn;
   const tint = [
     Math.min(1.9, Math.max(0.45, skinAvg[0] / br)),
@@ -585,7 +615,9 @@ function compositeFace(M, job, img) {
               kf *= 1 - 0.62 * Math.exp(-dBrow * dBrow);
               const mlx = (spx - cx) / (ioPx * 0.42), mly = (spy - D.mouthY * PS) / (mePx * 0.3);
               kf *= 1 - 0.55 * Math.exp(-(mlx * mlx + mly * mly));
-              const fDel = Math.min(1.75, Math.max(0.55, 1 + (skinLum / bl - 1) * kf));
+              // 轮23：钳位收窄（[0.55,1.75]→[0.74,1.40]）——去光照的增益别把照片
+              // 局部噪声放大成「病斑」；形体明暗仍被压平，皮面统计更干净
+              const fDel = Math.min(1.40, Math.max(0.74, 1 + (skinLum / bl - 1) * kf));
               pr *= fDel; pg *= fDel; pb *= fDel;
             }
             // 照片肤色→底皮色彩迁移（脸盖消融的另一半）：羽化带内色度收敛到调色底皮，
@@ -614,7 +646,7 @@ function compositeFace(M, job, img) {
   {
     const MTILE = buildMottleTile(P, PS, D, cx, ioPx, mePx);
     const MT = 256;
-    const mk = 0.5; // 残差强度
+    const mk = 0.3; // 残差强度（轮23：0.5→0.3——旧值把色斑铺成「皮肤病」）
     for (let py2 = 0; py2 < S; py2++) {
       const ty = ((py2 * 0.5) | 0) % MT;
       for (let px2 = 0; px2 < S; px2++) {
@@ -703,7 +735,7 @@ function compositeFace(M, job, img) {
   // 近景里「贴上去的照片脸」与周边皮面不再隔着一圈频率断层（面具感的最后一味根治）
   {
     xd.globalCompositeOperation = 'overlay';
-    xd.globalAlpha = 0.42;
+    xd.globalAlpha = 0.30; // 轮23：0.42→0.30——微粒统频要「看不见地起作用」
     xd.fillStyle = grainPattern(xd);
     xd.fillRect(0, 0, S, S);
     xd.globalAlpha = 1;
@@ -748,6 +780,12 @@ function compositeFace(M, job, img) {
       const bi = ((spy | 0) * PS + (spx | 0)) * 4;
       w *= bgGate(P[bi], P[bi + 1], P[bi + 2]); // 背景边界的假法线一并拒绝
       w *= strandGate(spy, P[bi], P[bi + 1], P[bi + 2]); // 额区发丝假法线一并拒绝
+      // 轮23：口周法线降半——照片胡茬/唇缘高频在 3D 唇废除后直接见皮，
+      // 全强度会把嘴周烘成「结痂」凹凸
+      {
+        const mgx = (spx - cx) / (ioPx * 0.5), mgy = (spy - D.mouthY * PS) / (mePx * 0.45);
+        w *= 1 - 0.5 * Math.exp(-(mgx * mgx + mgy * mgy));
+      }
       if (w < 0.01) continue;
       // 高频亮度差分 → 法线扰动（暗=凹：皱纹沟、唇纹、毛孔）
       const gx = (hp(spx + 2, spy) - hp(spx - 2, spy)) * kN * w;
