@@ -35,33 +35,33 @@ const FACE_DEFS = {
     url: urlMYoung, base: 'skin',
     eyeY: 0.433, eyeLX: 0.397, eyeRX: 0.620, mouthY: 0.708, chinY: 0.862,
     browY: 0.372, noseY: 0.593, hairY: 0.295, hairSag: 0.10,
-    mat: { envInt: 0.48, cc: 0.2, ccRough: 0.4, normalScale: 1.0, poreScale: 1.0 },
+    mat: { envInt: 0.48, cc: 0.2, ccRough: 0.4, normalScale: 1.1, poreScale: 1.18 },
   },
   f: {
     url: urlFYoung, base: 'skin',
     eyeY: 0.449, eyeLX: 0.400, eyeRX: 0.614, mouthY: 0.711, chinY: 0.845,
     browY: 0.378, noseY: 0.607, hairY: 0.180, hairSag: 0.33,
-    mat: { envInt: 0.5, cc: 0.22, ccRough: 0.38, normalScale: 0.88, poreScale: 0.85 },
+    mat: { envInt: 0.5, cc: 0.22, ccRough: 0.38, normalScale: 0.92, poreScale: 0.98 },
   },
   oldm: {
     url: urlMOld, base: 'skinOld',
     eyeY: 0.458, eyeLX: 0.386, eyeRX: 0.615, mouthY: 0.748, chinY: 0.878,
     browY: 0.398, noseY: 0.628, hairY: 0.245, hairSag: 0.10,
-    mat: { envInt: 0.55, cc: 0.16, ccRough: 0.5, normalScale: 1.15, poreScale: 1.25 },
+    mat: { envInt: 0.55, cc: 0.16, ccRough: 0.5, normalScale: 1.22, poreScale: 1.4 },
   },
   oldf: {
     url: urlFOld, base: 'skinOld',
     eyeY: 0.419, eyeLX: 0.388, eyeRX: 0.607, mouthY: 0.678, chinY: 0.792,
     browY: 0.345, noseY: 0.563, hairY: 0.290, hairSag: 0.28,
-    mat: { envInt: 0.55, cc: 0.18, ccRough: 0.48, normalScale: 1.1, poreScale: 1.2 },
+    mat: { envInt: 0.55, cc: 0.18, ccRough: 0.48, normalScale: 1.16, poreScale: 1.35 },
   },
   pale: {
     url: urlPale, base: 'skin',
     eyeY: 0.400, eyeLX: 0.407, eyeRX: 0.598, mouthY: 0.635, chinY: 0.714,
     browY: 0.352, noseY: 0.545, hairY: 0.295, hairSag: 0.13,
-    // 轮22：舞台顶光下仍读「蜡」——清漆 0.16→0.10、环反射 0.42→0.34、
-    // 毛孔法线 0.9→1.12：高光碎在毛孔里，皮不再是一层匀光的蜡壳
-    mat: { envInt: 0.34, cc: 0.10, ccRough: 0.52, normalScale: 1.12, poreScale: 0.95 },
+    // 轮24：蜡亮再压——清漆 0.10→0.07、环反射 0.34→0.30；毛孔/微皱走法线
+    // （normalScale 1.12→1.28、poreScale 0.95→1.18）：侧光下先读到的是皮的糙，不是蜡的匀
+    mat: { envInt: 0.30, cc: 0.07, ccRough: 0.55, normalScale: 1.28, poreScale: 1.18 },
   },
   chalk: {
     url: urlChalk, base: 'skinOld',
@@ -272,8 +272,8 @@ export function buildFaceMaterials(M, T, lowspec = false) {
       envMapIntensity: D.mat.envInt,
       clearcoat: D.mat.cc, clearcoatRoughness: D.mat.ccRough,
       // 绒毛边缘光（peach fuzz）：皮面掠射一层软散射——正是塑料没有的那层
-      // 轮22：0.3→0.22 收半档——舞台顶光下 sheen 过强=整脸糊一层「蜡光膜」
-      sheen: 0.22, sheenRoughness: 0.62, sheenColor: new THREE.Color(0xffe2d0),
+      // 轮24：0.22→0.17 再收——蜡光膜的最后一味；绒毛感留住，膜感去掉
+      sheen: 0.17, sheenRoughness: 0.65, sheenColor: new THREE.Color(0xffe2d0),
     });
     m.clearcoatNormalMap = T.skinPoreN;
     m.clearcoatNormalScale = new THREE.Vector2(D.mat.poreScale, D.mat.poreScale);
@@ -328,24 +328,27 @@ function weightBuf(S) {
 // 减去补丁均值得到零均值的彩色残差，余弦窗拼贴进 256 瓦片（环绕连续）。
 // 铺满整头皮后，羽化带外的底皮区也带上「这张脸自己的」红斑/色沉频率——
 // 照片区与程序区的色度统计终于是同一张皮
-function buildMottleTile(P, PS, D, cx, ioPx, mePx) {
+function buildMottleTile(P, PS, D, cx, ioPx, mePx, skinLum = 0) {
   const MT = 256;
   const acc = new Float32Array(MT * MT * 3);
   const wsum = new Float32Array(MT * MT);
   let s = 1237;
   const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  // 干净皮区（照片空间中心点）：双颊 / 额下段（眉上一指）/ 下巴
+  // 干净皮区（照片空间中心点）：双颊 / 额下段 / 上唇上方
+  // 轮24·脏斑根治①：旧额区（browY−0.045）贴着发际线、旧下巴区（mouthY+0.34me）
+  // 贴着衣领——补丁把黑发/深领采进瓦片，铺满头皮后成排「深色滴斑」（waiter 颊上
+  // 的泪痕状污点即此）。取样区整体内收到确定的皮面上
   const zones = [
     [cx - ioPx * 0.58, D.eyeY * PS + mePx * 0.52],
     [cx + ioPx * 0.58, D.eyeY * PS + mePx * 0.52],
-    [cx, (D.browY - 0.045) * PS],
-    [cx, D.mouthY * PS + mePx * 0.34],
+    [cx, (D.browY - 0.018) * PS],
+    [cx, D.mouthY * PS + mePx * 0.16],
   ];
   const PR = 30; // 补丁半径（照片 px）
   for (let k = 0; k < 44; k++) {
     const z = zones[k % zones.length];
-    const px0 = Math.round(z[0] + (rnd() - 0.5) * ioPx * 0.22);
-    const py0 = Math.round(z[1] + (rnd() - 0.5) * mePx * 0.2);
+    const px0 = Math.round(z[0] + (rnd() - 0.5) * ioPx * 0.18);
+    const py0 = Math.round(z[1] + (rnd() - 0.5) * mePx * 0.12);
     if (px0 < PR + 1 || px0 > PS - PR - 2 || py0 < PR + 1 || py0 > PS - PR - 2) continue;
     // 补丁均值
     let mr = 0, mg = 0, mb = 0, mn = 0;
@@ -356,6 +359,8 @@ function buildMottleTile(P, PS, D, cx, ioPx, mePx) {
       }
     }
     mr /= mn; mg /= mn; mb /= mn;
+    // 轮24·脏斑根治②：补丁均值偏离肤色均值太远（采到发/领/影）→ 整补丁拒收
+    if (skinLum > 0 && Math.abs(mr * 0.35 + mg * 0.5 + mb * 0.15 - skinLum) > 34) continue;
     // 目标落点（瓦片内随机，环绕写入）
     const tx0 = (rnd() * MT) | 0, ty0 = (rnd() * MT) | 0;
     for (let dy = -PR; dy <= PR; dy++) {
@@ -365,9 +370,10 @@ function buildMottleTile(P, PS, D, cx, ioPx, mePx) {
         const w = 0.5 + 0.5 * Math.cos(rr * Math.PI); // 余弦窗
         const i = ((py0 + dy) * PS + (px0 + dx)) * 4;
         const ti = (((ty0 + dy + MT) % MT) * MT + ((tx0 + dx + MT) % MT)) * 3;
-        acc[ti] += (P[i] - mr) * w;
-        acc[ti + 1] += (P[i + 1] - mg) * w;
-        acc[ti + 2] += (P[i + 2] - mb) * w;
+        // 轮24·脏斑根治③：残差逐像素钳到 ±26——单像素黑点（痣/鼻孔边）不许进瓦片
+        acc[ti] += Math.max(-26, Math.min(26, P[i] - mr)) * w;
+        acc[ti + 1] += Math.max(-26, Math.min(26, P[i + 1] - mg)) * w;
+        acc[ti + 2] += Math.max(-26, Math.min(26, P[i + 2] - mb)) * w;
         wsum[ti / 3] += w;
       }
     }
@@ -583,9 +589,17 @@ function compositeFace(M, job, img) {
         if (spx > 1 && spx < PS - 2 && spy > 1 && spy < PS - 2) {
           const frontW = sstep(0.14, 0.48, dz);
           const gate = hairGate(spx, spy);
-          // 发际以上的头皮压暗一档（发根阴影）：发壳羽化边下露出的头皮不是亮粉的秃皮
-          const rootDk = 1 - (1 - gate) * 0.18 * frontW;
-          r *= rootDk; g *= rootDk; b *= rootDk;
+          // 轮24·秃带根治：发际以上的头皮不再只是「压暗一档的皮」——直接向该脸
+          // 的发色收敛（收敛度随离线距离到 72%）。发壳前檐羽化带（半透明区）下面
+          // 垫着的是「发根色的头皮」，特写里壳檐→皮的过渡是发根渐密，
+          // 不再是亮粉秃皮上悬一圈锯齿黑边（emcee/waiter「秃带+撕纸边」元凶）
+          if (gate < 1) {
+            const hcr = (FACE_HAIR[key] >> 16) & 255, hcg = (FACE_HAIR[key] >> 8) & 255, hcb = FACE_HAIR[key] & 255;
+            const hk = (1 - gate) * frontW * 0.72;
+            r += (hcr * 1.25 - r) * hk;
+            g += (hcg * 1.25 - g) * hk;
+            b += (hcb * 1.25 - b) * hk;
+          }
           // 权重：朝前 × 椭圆 × 下巴截止 × 发际线 gate
           // 羽化带展宽三倍（0.72-0.98 → 0.52-1.0）：底皮→照片是长坡不是窄圈陡坎
           let w = frontW;
@@ -615,9 +629,9 @@ function compositeFace(M, job, img) {
               kf *= 1 - 0.62 * Math.exp(-dBrow * dBrow);
               const mlx = (spx - cx) / (ioPx * 0.42), mly = (spy - D.mouthY * PS) / (mePx * 0.3);
               kf *= 1 - 0.55 * Math.exp(-(mlx * mlx + mly * mly));
-              // 轮23：钳位收窄（[0.55,1.75]→[0.74,1.40]）——去光照的增益别把照片
+              // 轮24：钳位再收窄（[0.74,1.40]→[0.82,1.28]）——去光照的增益别把照片
               // 局部噪声放大成「病斑」；形体明暗仍被压平，皮面统计更干净
-              const fDel = Math.min(1.40, Math.max(0.74, 1 + (skinLum / bl - 1) * kf));
+              const fDel = Math.min(1.28, Math.max(0.82, 1 + (skinLum / bl - 1) * kf));
               pr *= fDel; pg *= fDel; pb *= fDel;
             }
             // 照片肤色→底皮色彩迁移（脸盖消融的另一半）：羽化带内色度收敛到调色底皮，
@@ -644,9 +658,9 @@ function compositeFace(M, job, img) {
   // 照片区按权重递减到 15%——底皮区不再是「调过色的均匀皮」，
   // 而是带着同一张脸的红斑/色沉频率（面具边界最后一味统计差的根治）
   {
-    const MTILE = buildMottleTile(P, PS, D, cx, ioPx, mePx);
+    const MTILE = buildMottleTile(P, PS, D, cx, ioPx, mePx, skinLum);
     const MT = 256;
-    const mk = 0.3; // 残差强度（轮23：0.5→0.3——旧值把色斑铺成「皮肤病」）
+    const mk = 0.16; // 残差强度（轮24：0.3→0.16——统计合流要「看不见地起作用」，斑不许读成「脏」）
     for (let py2 = 0; py2 < S; py2++) {
       const ty = ((py2 * 0.5) | 0) % MT;
       for (let px2 = 0; px2 < S; px2++) {
@@ -735,7 +749,7 @@ function compositeFace(M, job, img) {
   // 近景里「贴上去的照片脸」与周边皮面不再隔着一圈频率断层（面具感的最后一味根治）
   {
     xd.globalCompositeOperation = 'overlay';
-    xd.globalAlpha = 0.30; // 轮23：0.42→0.30——微粒统频要「看不见地起作用」
+    xd.globalAlpha = 0.20; // 轮24：0.30→0.20——颗粒统频再收一档；皮的细节交给毛孔法线，不交给色噪
     xd.fillStyle = grainPattern(xd);
     xd.fillRect(0, 0, S, S);
     xd.globalAlpha = 1;

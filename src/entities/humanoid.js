@@ -47,27 +47,39 @@ function irisTexture(base = 0x5a3a22) {
   g0.addColorStop(1, 'rgb(18,12,8)');
   x.fillStyle = g0;
   x.beginPath(); x.arc(cxy, cxy, R, 0, Math.PI * 2); x.fill();
-  // 放射纤维纹：明暗交替细楔（活人虹膜的「丝」）
+  // 放射纤维纹：明暗交替细楔（活人虹膜的「丝」）——轮24：对比再抬一档，
+  // 聚光下虹膜也要读得出「层」，不许被高光洗成一色灰盘
   let s = 77;
   const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 72; i++) {
-    const a = (i / 72) * Math.PI * 2 + rnd() * 0.06;
+  for (let i = 0; i < 84; i++) {
+    const a = (i / 84) * Math.PI * 2 + rnd() * 0.06;
     const lite = i % 2 === 0;
-    x.strokeStyle = lite ? `rgba(${Math.min(255, br + 66)},${Math.min(255, bg + 44)},${bb + 18},0.22)`
-      : 'rgba(14,9,6,0.25)';
+    x.strokeStyle = lite ? `rgba(${Math.min(255, br + 74)},${Math.min(255, bg + 50)},${bb + 22},0.3)`
+      : 'rgba(12,8,5,0.34)';
     x.lineWidth = 1 + rnd() * 1.2;
     x.beginPath();
     x.moveTo(cxy + Math.cos(a) * S * 0.16, cxy + Math.sin(a) * S * 0.16);
     x.lineTo(cxy + Math.cos(a + 0.05) * R * 0.94, cxy + Math.sin(a + 0.05) * R * 0.94);
     x.stroke();
   }
-  // 瞳孔（软边黑）：占虹膜直径 ~0.5——室内暗光下的散瞳（0.5m 近景必须一眼读出黑瞳）
-  const gp = x.createRadialGradient(cxy, cxy, S * 0.17, cxy, cxy, S * 0.26);
+  // 领环（collarette）：瞳缘外一圈略亮的锯齿环——虹膜「内圈-主环-限缘」三层读法
+  x.strokeStyle = `rgba(${Math.min(255, br + 56)},${Math.min(255, bg + 40)},${bb + 16},0.4)`;
+  x.lineWidth = S * 0.02;
+  x.beginPath();
+  for (let i = 0; i <= 40; i++) {
+    const a = (i / 40) * Math.PI * 2;
+    const rr = S * (0.30 + Math.sin(a * 9 + 1.3) * 0.008);
+    if (i === 0) x.moveTo(cxy + Math.cos(a) * rr, cxy + Math.sin(a) * rr);
+    else x.lineTo(cxy + Math.cos(a) * rr, cxy + Math.sin(a) * rr);
+  }
+  x.stroke();
+  // 瞳孔（软边黑）：占虹膜直径 ~0.55——室内暗光下的散瞳（0.5m 近景必须一眼读出黑瞳）
+  const gp = x.createRadialGradient(cxy, cxy, S * 0.19, cxy, cxy, S * 0.28);
   gp.addColorStop(0, 'rgb(4,3,3)');
   gp.addColorStop(0.85, 'rgb(6,4,4)');
   gp.addColorStop(1, 'rgba(6,4,4,0)');
   x.fillStyle = gp;
-  x.beginPath(); x.arc(cxy, cxy, S * 0.26, 0, Math.PI * 2); x.fill();
+  x.beginPath(); x.arc(cxy, cxy, S * 0.28, 0, Math.PI * 2); x.fill();
   // 限缘环：虹膜外缘一道更深的环（虹膜「嵌」在巩膜里的读法）
   x.strokeStyle = 'rgba(10,7,5,0.9)';
   x.lineWidth = S * 0.05;
@@ -651,10 +663,12 @@ function hairGeo(style = 'crop', variant = 'm', P = null, photoKey = null) {
       // 轮18：檐羽化带加宽（0.9→0.82）——发际是「渐稀两厘米」，不是一条切口
       // 轮19：后仰收半（0.3→0.19）+后移收小——旧值把发际推上颅顶，
       // 额头占掉半张脸，五官被挤进下半中心（face_a/waiter「头长额巨」元凶）
-      parts.push(fadeRim(xform(new THREE.SphereGeometry(r, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5),
+      // 轮24：壳体细分 24×16→36×24——壳檐 alpha 羽化走顶点色，粗网格的大三角
+      // 插值出锯齿「撕纸边」（emcee 发际穿帮元凶之一）；细分后檐线是曲线
+      parts.push(fadeRim(xform(new THREE.SphereGeometry(r, 36, 24, 0, Math.PI * 2, 0, Math.PI * 0.5),
         0, 0.03 + lift, -0.013, 0.19, 0, 0, 1.0, scaleY, 1.02), rimV(0.82, 1.0)));
       // 后脑+颈窝补片（φ π..2π 是 -z 后半球）——缺了这块，背影读成光头戴小帽
-      parts.push(fadeRim(xform(new THREE.SphereGeometry(r - 0.001, 18, 10, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
+      parts.push(fadeRim(xform(new THREE.SphereGeometry(r - 0.001, 26, 14, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
         0, 0.03 + lift, -0.012, 0.16, 0, 0, 1.0, scaleY * 1.02, 1.0), rimV(0.82, 1.0)));
     };
     switch (style) {
@@ -668,9 +682,9 @@ function hairGeo(style = 'crop', variant = 'm', P = null, photoKey = null) {
         break;
       }
       case 'side': { // 三七分：整体壳微偏一侧（分头由轮廓不对称表达，不悬浮贴片）
-        parts.push(fadeRim(xform(new THREE.SphereGeometry(0.107, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5),
+        parts.push(fadeRim(xform(new THREE.SphereGeometry(0.107, 36, 24, 0, Math.PI * 2, 0, Math.PI * 0.5),
           -0.008, 0.03, -0.013, 0.19, 0, -0.06, 1.0, 0.95, 1.02), rimV(0.82, 1.0)));
-        parts.push(fadeRim(xform(new THREE.SphereGeometry(0.106, 18, 10, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
+        parts.push(fadeRim(xform(new THREE.SphereGeometry(0.106, 26, 14, Math.PI, Math.PI, Math.PI * 0.30, Math.PI * 0.42),
           0, 0.03, -0.012, 0.16, 0, 0, 1.0, 0.97, 1.0), rimV(0.82, 1.0)));
         break;
       }
@@ -750,9 +764,11 @@ function hairClumpCardsGeo(style, variant, P) {
     const parts = [];
     // [极角, 片数]：bun 收拢只留顶两圈；long 有帘只留顶圈；
     // crop 补第四圈枕后环（el 1.38，前向滤掉）——侧照枕后弧线不再是光滑球缘
-    const rings = style === 'long' ? [[0.45, 8], [0.8, 10]]
-      : style === 'bun' ? [[0.45, 8], [0.8, 10]]
-        : [[0.42, 8], [0.78, 11], [1.1, 13], [1.38, 12]];
+    // 轮24·碎发密度×2：每圈片数近倍增 + 插入中间圈——壳面被绺卡整面覆瓦，
+    // 任何角度先读到「一头碎发」，再读到壳
+    const rings = style === 'long' ? [[0.45, 14], [0.62, 12], [0.8, 18]]
+      : style === 'bun' ? [[0.45, 14], [0.62, 12], [0.8, 18]]
+        : [[0.42, 14], [0.6, 12], [0.78, 20], [0.95, 14], [1.1, 24], [1.38, 22]];
     let ci = 0;
     // 轮22二稿：欧拉角外翘（读成「故障黑尖刺」）废除——
     // 瓦片式切向标架：卡片贴伏壳面、发梢顺坡向下（毛流方向），
@@ -1980,6 +1996,45 @@ export class Humanoid {
       }), mat, 0, 0.67, 0.004);
       rim.name = 'collarRim';
       this.torso.add(rim);
+      // —— 轮24·领内闭合（face_a「领内露网」根治）——
+      // ① 顶口封环：领筒顶缘与颈柱之间的环形空隙用一片随前缘下压的环面封死，
+      //    俯角看进领口是「领内阴影」，不是穿透衣身的镂空网底；
+      // ② 内衬筒：领筒背面补一层深色衬（BackSide）——侧缝角度也看不穿
+      const innerM = Mtl('collarInnerDark', () => new THREE.MeshStandardMaterial({
+        color: 0x17120f, roughness: 0.96,
+      }));
+      const cap = mkMesh(G('collarCap24' + style, () => {
+        const rg = new THREE.RingGeometry(0.034, 0.0567, 18, 1);
+        rg.rotateX(-Math.PI / 2);
+        const p = rg.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i), z = p.getZ(i);
+          const f = Math.max(0, z / Math.hypot(x, z));
+          p.setY(i, p.getY(i) - dip * f * f);
+        }
+        rg.computeVertexNormals();
+        return rg;
+      }), pick(innerM), 0, 0.6685, 0.004);
+      cap.name = 'collarCap';
+      cap.userData.noShadow = true;
+      this.torso.add(cap);
+      const lin = mkMesh(G('collarLining24' + style, () => {
+        const c = new THREE.CylinderGeometry(0.0555, 0.069, 0.056, 18, 1, true);
+        const p = c.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+          if (y <= 0) continue;
+          const f = Math.max(0, z / Math.hypot(x, z));
+          p.setY(i, y - dip * f * f * (y / 0.028));
+        }
+        c.computeVertexNormals();
+        return c;
+      }), pick(Mtl('collarLiningM', () => new THREE.MeshStandardMaterial({
+        color: 0x1a1512, roughness: 0.95, side: THREE.BackSide,
+      }))), 0, 0.641, 0.004);
+      lin.name = 'collarLining';
+      lin.userData.noShadow = true;
+      this.torso.add(lin);
       if (style === 'fold') {
         // 翻领面：领筒外翻出的坡面——轮23 二刀：**前开口**。全圈领折=高领毛衣漏斗，
         // 真衬衫/夹克的翻领只包后颈与两侧，前面敞开露 V。开口 ±0.24π
@@ -2109,9 +2164,11 @@ export class Humanoid {
     // 眼（轮17·黑珠眼根治）：巩膜球 + 虹膜纹理盘（色环/纤维/瞳孔）+ 角膜凸透高光
     // + 角膜定位捕捉光点——任何光照下眼里都有一粒「活」的高光；虹膜直径回到
     // 解剖比（≈眼球一半），巩膜在两眦真的露出来——纯黑玻璃珠从此非法
+    // 轮24·去灯泡眼：巩膜反射再压两档（顶光/聚光下整球泛灰白=「金属珠眼」元凶）——
+    // 眼睛的「湿」只留给角膜壳与捕捉光点；巩膜自己是偏暖的哑骨白
     const scleraMat = pick(Mtl('scleraWet', () => new THREE.MeshPhysicalMaterial({
-      color: 0xd7ccbd, roughness: 0.34, envMapIntensity: 0.55, // 骨白非瓷白：环反射压半——「发光白珠」非法
-      clearcoat: 0.5, clearcoatRoughness: 0.2, // 泪膜：巩膜上真正的水层
+      color: 0xcfc2b1, roughness: 0.46, envMapIntensity: 0.28,
+      clearcoat: 0.28, clearcoatRoughness: 0.3,
     })));
     // 虹膜盘材质：贴图带色环+瞳孔；emissive 通道保留给潮光（sightjack 发光）
     const irisTint = (seed % 3 === 0) ? 0x6a4526 : 0x53341e; // 深褐/暖褐两档
@@ -2143,26 +2200,30 @@ export class Humanoid {
     // 角膜凸：罩在虹膜上的一层湿透壳（高光走在这层上，虹膜纹理在壳下）
     const corneaG = G('cornea', () => new THREE.SphereGeometry(0.008, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5));
     const corneaMat = pick(Mtl('corneaWet', () => new THREE.MeshPhysicalMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.1, roughness: 0.05,
-      envMapIntensity: 1.1, clearcoat: 1.0, clearcoatRoughness: 0.06, // 环反射 2.6→1.1：奶白雾膜糊掉虹膜的元凶
+      // 轮24：opacity 0.1→0.05、环反射 1.1→0.5、清漆 1.0→0.7——聚光下角膜壳
+      // 整面糊成灰镜=「虹膜被洗掉的金属球」另一半元凶；湿高光留一点就够
+      color: 0xffffff, transparent: true, opacity: 0.05, roughness: 0.06,
+      envMapIntensity: 0.5, clearcoat: 0.7, clearcoatRoughness: 0.1,
       depthWrite: false,
     })));
     // 捕捉光点：角膜上永远亮着的一粒（暗厅里眼睛也得是「湿」的——活人证据第一条）
     const glintG = G('eyeGlint', () => new THREE.CircleGeometry(0.0015, 8));
     const glintMat = pick(Mtl('eyeGlintM', () => new THREE.MeshBasicMaterial({
-      color: 0xd8e4e8, transparent: true, opacity: 0.85, depthWrite: false,
+      color: 0xd8e4e8, transparent: true, opacity: 0.62, depthWrite: false, // 轮24：捕捉光点收敛——一粒湿光，不是车灯
     })));
     // 轮20三稿：横向摊脸——眼球随眼窝/照片同乘 1.149 外移（HX 收颅宽相抵，
     // 世界瞳距守 63-65mm）；skull 域 eyeNX 同步（除以 0.0882 换算）
     const eyeXoff = 0.0385 + P.eyeX * 0.0055;
     const eyeYoff = 0.113 + (P.eyeH - 0.5) * 0.006; // 眼睛在头高一半处（婴儿化=眼太高）
-    const eyeScl = 0.86 + P.eyeS * 0.08; // 轮23：眼球再收一档——睑裂收窄配套（露出面积^2 级下降）
+    // 轮24·去鼓眼：球径再收一档（0.86→0.81 基）——特写里眼球顶着睑缘外凸
+    // =「惊恐灯泡眼」的几何来源；配合退窝 1.4mm，眼是「嵌在眶里」的
+    const eyeScl = 0.81 + P.eyeS * 0.07;
     this.eyeSclY = eyeScl;
     this.eyeXoff = eyeXoff;
-    // 眼球退进眼窝（z 0.0742→0.0726）——球体藏在眶缘/睑缘之内，只露睑裂那一条
+    // 眼球退进眼窝（z 0.0726→0.0712）——球体藏在眶缘/睑缘之内，只露睑裂那一条
     // （轮18：所有贴颅面附件的挂点随颅壳收窄同乘 HX/HZ——件不变形，只跟着面走）
-    this.eyeGL = new THREE.Group(); this.eyeGL.position.set(-eyeXoff * HX, eyeYoff, 0.0726 * HZ);
-    this.eyeGR = new THREE.Group(); this.eyeGR.position.set(eyeXoff * HX, eyeYoff, 0.0726 * HZ);
+    this.eyeGL = new THREE.Group(); this.eyeGL.position.set(-eyeXoff * HX, eyeYoff, 0.0712 * HZ);
+    this.eyeGR = new THREE.Group(); this.eyeGR.position.set(eyeXoff * HX, eyeYoff, 0.0712 * HZ);
     this.eyeL = mkMesh(eyeG, scleraMat, 0, 0, 0, eyeScl, eyeScl, eyeScl);
     this.eyeR = mkMesh(eyeG, scleraMat, 0, 0, 0, eyeScl, eyeScl, eyeScl);
     // 虹膜壳几何自带球面 z（0.0126 球）——网格只加 0.2mm 前浮防 z-fight
@@ -2191,7 +2252,7 @@ export class Humanoid {
       })));
       const aoG = G('eyeAOBand', () => new THREE.SphereGeometry(0.0129, 20, 6, 0, Math.PI * 2, 0.66, 0.22));
       for (const s of [-1, 1]) {
-        const ao = mkMesh(aoG, aoM, s * eyeXoff * HX, eyeYoff, 0.0726 * HZ, eyeScl * 1.02, eyeScl * 1.02, eyeScl * 1.02);
+        const ao = mkMesh(aoG, aoM, s * eyeXoff * HX, eyeYoff, 0.0712 * HZ, eyeScl * 1.02, eyeScl * 1.02, eyeScl * 1.02);
         ao.rotation.x = -0.5;
         ao.renderOrder = 1;
         ao.userData.noShadow = true;
@@ -2202,17 +2263,20 @@ export class Humanoid {
     // 轮23·睑裂收窄（照片档）：基础旋角 -0.72→-0.40 配合加宽壳弧（0.52π），
     // 上睑盖到虹膜上缘下 1-2mm——照片素材里的人全是半垂睑的普通邻居，
     // 旧值露出整颗虹膜+四周眼白 = 玩偶圆瞪眼的第一元凶
-    this.lidBaseL = -0.44 + P.droopL * 0.12;
-    this.lidBaseR = -0.44 + P.droopR * 0.12;
-    this.lidL = mkMesh(lidGeo(), lidSkin, -eyeXoff * HX, eyeYoff + 0.002, 0.0735 * HZ, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
+    // 轮24：基础旋角 -0.44→-0.37——上睑再压半档盖到虹膜上缘下 2mm，
+    // 「上睑半垂的普通邻居」而非「瞪圆的玩偶」；挂点 z 随眼球退窝同移
+    this.lidBaseL = -0.37 + P.droopL * 0.10;
+    this.lidBaseR = -0.37 + P.droopR * 0.10;
+    this.lidL = mkMesh(lidGeo(), lidSkin, -eyeXoff * HX, eyeYoff + 0.002, 0.0721 * HZ, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
     this.lidL.rotation.x = this.lidBaseL;
-    this.lidR = mkMesh(lidGeo(), lidSkin, eyeXoff * HX, eyeYoff + 0.002, 0.0735 * HZ, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
+    this.lidR = mkMesh(lidGeo(), lidSkin, eyeXoff * HX, eyeYoff + 0.002, 0.0721 * HZ, eyeScl * 1.1, eyeScl * 1.1, eyeScl * 1.1);
     this.lidR.rotation.x = this.lidBaseR;
     // 睑缘厚度带（轮17）：上睑壳口一圈 1mm 圆环——眼皮是有「厚度」的皮盖，
     // 不是零厚度蛋壳切口；随睑一起眨（挂在睑网格下），色比睑面深半档=睑缘线
     {
-      const rimG = G('lidRimBand23', () => {
-        const t = new THREE.TorusGeometry(0.0135, 0.001, 5, 20);
+      const rimG = G('lidRimBand24', () => {
+        // 轮24：睑缘管径 1.0→1.4mm——眼皮是有厚度的皮盖；近景睑缘一条实在的「肉线」
+        const t = new THREE.TorusGeometry(0.0135, 0.0014, 5, 20);
         t.rotateX(Math.PI / 2);           // 环面绕 y 轴（壳口纬线）
         t.translate(0, 0.0008, 0);        // 落到 0.52π 壳口纬度（轮23 随壳弧加宽下移）
         return t;
@@ -2230,10 +2294,11 @@ export class Humanoid {
     // 下睑：窄睑缘带从下前方贴住眼球（几乎不动——眨眼是上睑的事；眯眼时上抬）
     // 位置整体后收（z 0.0738→0.0720）：带体埋进眶腔，只露睑缘线
     // 轮23：随加宽带体上抬（-0.58→-0.665）——下睑缘托到虹膜下缘
-    this.lidLoBase = Math.PI - 0.665;
-    this.lidLoL = mkMesh(lidLoGeo(), lidSkin, -eyeXoff * HX, eyeYoff - 0.0026, 0.072 * HZ, eyeScl * 1.03, eyeScl * 0.8, eyeScl * 1.03);
+    // 轮24：-0.665→-0.70 下睑缘再托高 1mm + 挂点随眼球退窝同移
+    this.lidLoBase = Math.PI - 0.70;
+    this.lidLoL = mkMesh(lidLoGeo(), lidSkin, -eyeXoff * HX, eyeYoff - 0.0026, 0.0706 * HZ, eyeScl * 1.03, eyeScl * 0.8, eyeScl * 1.03);
     this.lidLoL.rotation.x = this.lidLoBase;
-    this.lidLoR = mkMesh(lidLoGeo(), lidSkin, eyeXoff * HX, eyeYoff - 0.0026, 0.072 * HZ, eyeScl * 1.03, eyeScl * 0.8, eyeScl * 1.03);
+    this.lidLoR = mkMesh(lidLoGeo(), lidSkin, eyeXoff * HX, eyeYoff - 0.0026, 0.0706 * HZ, eyeScl * 1.03, eyeScl * 0.8, eyeScl * 1.03);
     this.lidLoR.rotation.x = this.lidLoBase;
     this.head.add(this.lidLoL, this.lidLoR);
     // 睫毛：上睑缘窄弯带（贴图两端 alpha 渐隐——内外眦无贴片尖角）
@@ -2242,9 +2307,9 @@ export class Humanoid {
       depthWrite: false, side: THREE.DoubleSide, roughness: 0.8,
     })));
     if (M.textures?.lash) {
-      const lashL = mkMesh(lashGeo(), lashMat, -eyeXoff * HX, eyeYoff + 0.0062, 0.0842 * HZ, eyeScl, eyeScl, 1);
+      const lashL = mkMesh(lashGeo(), lashMat, -eyeXoff * HX, eyeYoff + 0.0058, 0.0824 * HZ, eyeScl, eyeScl, 1);
       lashL.rotation.x = -0.62;
-      const lashR = mkMesh(lashGeo(), lashMat, eyeXoff * HX, eyeYoff + 0.0062, 0.0842 * HZ, -eyeScl, eyeScl, 1);
+      const lashR = mkMesh(lashGeo(), lashMat, eyeXoff * HX, eyeYoff + 0.0058, 0.0824 * HZ, -eyeScl, eyeScl, 1);
       lashR.rotation.x = -0.62;
       this.head.add(lashL, lashR);
     }
@@ -2422,21 +2487,35 @@ export class Humanoid {
         // 背头(back)是「拢上去」的——垂落刘海卡非法，换贴壳倒伏的碎根卡
         const anchHL = this.photoKey ? faceAnchor(this.photoKey) : null;
         const hlAt = (x) => (anchHL ? anchHL.hairY - anchHL.hairSagK * x * x : 0.06);
+        // 轮24·发际带密度×2：沿照片发际曲线布双排碎根卡（下排贴线、上排压壳檐），
+        // 「发根渐密」由真卡片承担——秃带/撕纸边从此没有露出的机会
         if (hairStyle === 'back') {
           // 背头发际碎根：小卡贴着发际线向上倒伏（发是拢回去的，根部略毛）
+          for (let bi = 0; bi < 9; bi++) {
+            const bx = (bi - 4) * 0.0115 + (P.asym - 0.5) * 0.005;
+            addCard(hairCardGeo(0.017, 0.011, 4), fringeM, bx, hlAt(bx) + 0.007 + (bi % 2) * 0.004,
+              0.0765 - Math.abs(bx) * 0.16, -1.35, bx * 3.2, (P.asymPh - 0.5) * 0.15 + ((bi * 3) % 5 - 2) * 0.05);
+          }
           for (let bi = 0; bi < 5; bi++) {
-            const bx = (bi - 2) * 0.019 + (P.asym - 0.5) * 0.005;
-            addCard(hairCardGeo(0.02, 0.011, 4), fringeM, bx, hlAt(bx) + 0.008, 0.0765 - Math.abs(bx) * 0.16,
-              -1.35, bx * 3.2, (P.asymPh - 0.5) * 0.15);
+            const bx = (bi - 2) * 0.021 + (P.asymPh - 0.5) * 0.004;
+            addCard(hairCardGeo(0.024, 0.013, 4), fringeM, bx, hlAt(bx) + 0.016, 0.0735 - Math.abs(bx) * 0.14,
+              -1.2, bx * 3.0, ((bi * 7) % 5 - 2) * 0.06);
           }
         } else if (hairStyle !== 'bun') {
           addCard(hairCardGeo(0.07, 0.034, 5), fringeM, 0, hlAt(0) + 0.004, 0.0795, -0.55, 0, (P.asym - 0.5) * 0.24);
           addCard(hairCardGeo(0.042, 0.026, 6), fringeM, -0.038, hlAt(-0.038) + 0.005, 0.072, -0.55, -0.44, 0.14);
           addCard(hairCardGeo(0.042, 0.026, 6), fringeM, 0.038, hlAt(0.038) + 0.007, 0.072, -0.55, 0.44, -0.14);
+          // 加密排：中央两小片错位 + 两鬓过渡片——刘海是「一绺绺」，不是三块布
+          addCard(hairCardGeo(0.036, 0.024, 6), fringeM, -0.017, hlAt(-0.017) + 0.008, 0.0775, -0.62, -0.2, 0.08);
+          addCard(hairCardGeo(0.036, 0.024, 6), fringeM, 0.017, hlAt(0.017) + 0.009, 0.0775, -0.62, 0.2, -0.08);
+          addCard(hairCardGeo(0.03, 0.022, 6), fringeM, -0.054, hlAt(-0.054) + 0.006, 0.0645, -0.5, -0.72, 0.18);
+          addCard(hairCardGeo(0.03, 0.022, 6), fringeM, 0.054, hlAt(0.054) + 0.008, 0.0645, -0.5, 0.72, -0.18);
         } else {
-          // 盘发：发际线是「拢回去」的——两片低角度贴额扫向后（绒边，不压成刘海）
+          // 盘发：发际线是「拢回去」的——低角度贴额扫向后（绒边，不压成刘海）
           addCard(hairCardGeo(0.055, 0.026, 5), fringeM, -0.024, 0.066, 0.074, -1.0, -0.3, 0.5);
           addCard(hairCardGeo(0.055, 0.026, 5), fringeM, 0.024, 0.066, 0.074, -1.0, 0.3, -0.5);
+          addCard(hairCardGeo(0.04, 0.02, 5), fringeM, -0.048, 0.058, 0.063, -0.9, -0.7, 0.4);
+          addCard(hairCardGeo(0.04, 0.02, 5), fringeM, 0.048, 0.058, 0.063, -0.9, 0.7, -0.4);
         }
         // 鬓角（贴耳前，随不对称一高一低）+ 耳后补片——
         // 轮18：下移贴耳 + 换稀疏软 wisp（硬 alphaTest 密股卡在高发际颅型上
@@ -2455,8 +2534,8 @@ export class Humanoid {
         {
           const fld2 = makeSkullField(faceVariant, P, { bare: true });
           const sp2 = { x: 0, y: 0, z: 0 };
-          for (let ci = 0; ci < 12; ci++) {
-            const az2 = (ci / 12) * Math.PI * 2 + (ci % 2) * 0.26 + P.asymPh * 0.8;
+          for (let ci = 0; ci < 18; ci++) { // 轮24：12→18——顶心绒毛层加密
+            const az2 = (ci / 18) * Math.PI * 2 + (ci % 2) * 0.26 + P.asymPh * 0.8;
             const el2 = 0.24 + (ci % 3) * 0.15;          // 距顶极角两圈（0.24/0.39/0.54 rad）
             const dx2 = Math.sin(el2) * Math.sin(az2), dy2 = Math.cos(el2), dz2 = Math.sin(el2) * Math.cos(az2);
             const ch2 = 0.009 + (ci % 3) * 0.002;        // 轮23：再缩 30%——只留贴壳绒毛感
