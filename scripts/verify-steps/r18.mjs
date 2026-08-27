@@ -117,12 +117,39 @@ export async function run(page, h) {
   }
 
   // ---------- 门2场内近景：司仪抬臂 0.8m（r17/45 复拍——必须读成穿西装的人） ----------
+  // 轮19 同款流程：站位后等高模头真换入（0.25s 节流 LOD），再 PAUSE 冻结世界
+  // 钉死抬臂峰值拍——「低模人偶」和「快门前手臂掉落」两个坑一起绕开
   const em = await page.evaluate(() => {
     const g = window.__game;
     const p = g.byId.emcee.body.headWorldPos(new (g.player.pos.constructor)());
     return { x: p.x, y: p.y, z: p.z };
   });
-  await look('emcee_stage', em.x + 0.62, em.z + 0.62, em.x, em.z, 3.5, 0.02);
+  await page.evaluate(({ px, pz, tx, tz }) => {
+    const g = window.__game;
+    const yaw = Math.atan2(-(tx - px), -(tz - pz));
+    g.player.setPosition(px, pz, yaw, 3.5);
+    g.player.pitch = 0.02;
+    g.player.syncCamera(0);
+  }, { px: em.x + 0.62, pz: em.z + 0.62, tx: em.x, tz: em.z });
+  await page.waitForFunction(() => {
+    const hum = window.__game.byId.emcee.body;
+    return hum._hd === true && hum.headHD && hum.headHD.visible;
+  }, { timeout: 15000, polling: 100 });
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.game.state = 'PAUSE';
+    const hum = g.byId.emcee.body;
+    hum.phase = 5.54;
+    for (let i = 0; i < 4; i++) hum.animate('mc', 3, 0);
+    hum.phase = 5.54;
+    hum.animate('mc', 0.001, 0);
+    g.hud.clearSubtitles();
+    g.hud.objTimer = 0;
+    g.hud.el.objToast.style.display = 'none';
+  });
+  await frames(3);
+  await h.shot('r18/emcee_stage');
+  await page.evaluate(() => { window.__game.game.state = 'PLAY'; });
 
   // ---------- 门3立面取证 ----------
   const HO = await page.evaluate(() => {
