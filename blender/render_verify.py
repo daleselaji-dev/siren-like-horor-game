@@ -13,7 +13,7 @@ from mathutils import Vector
 def parse_args():
     argv = sys.argv
     args = argv[argv.index('--') + 1:] if '--' in argv else []
-    opts = {'chars': ['emcee', 'waiter', 'townsman', 'wetguest'], 'round': 'r1',
+    opts = {'chars': ['emcee', 'waiter', 'townsman', 'wetguest', 'seagod'], 'round': 'r1',
             'samples': 48, 'scale': 1.0, 'blend': 'blender/out', 'out': 'verify/blender'}
     i = 0
     while i < len(args):

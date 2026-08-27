@@ -244,9 +244,9 @@ def make_face_texture(spec, seed):
     if spec.get('anomaly') == 'calcified_mouth':
         # 报数员：口部鱼籽状钙化——珍珠灰瘤粒环唇一圈，唇色被盖掉
         pearl = np.array((0.78, 0.76, 0.70))
-        ring = np.clip(blob(U, V, 0.5, 0.398, 0.055, 0.028) - blob(U, V, 0.5, 0.398, 0.020, 0.008), 0, 1)
+        ring = np.clip(blob(U, V, 0.5, 0.398, 0.062, 0.033) - blob(U, V, 0.5, 0.398, 0.018, 0.007), 0, 1)
         gr = vnoise(rng, H, W, 160)
-        nodules = np.clip((gr - 0.52) * 5, 0, 1) * ring
+        nodules = np.clip((gr - 0.45) * 4.5, 0, 1) * ring
         L(ring, pearl * 0.82, 0.62)
         L(nodules, pearl * 1.05, 0.95)
         L(blob(U, V, 0.5, 0.397, 0.030, 0.004, 3), pearl * 0.7, 0.9)   # 口裂被封成一道灰缝
@@ -750,7 +750,7 @@ def build_clothed_torso(spec, m, mats, seed):
         r = 1.0
         z = zs[i]
         if quilt:
-            r *= 1 + 0.035 * math.sin(z * 52)          # 横向绗缝棱
+            r *= 1 + 0.05 * math.sin(z * 52)           # 横向绗缝棱
         r *= 1 + 0.018 * (wrinkle[int(a / TAU * 16) % 16] - 0.5)  # 竖褶不匀
         return r
     bm = bmesh.new()
@@ -775,6 +775,22 @@ def build_clothed_torso(spec, m, mats, seed):
              [neck_r + 0.004, neck_r + 0.006], [neck_r + 0.004, neck_r + 0.006], ring_n=14)
     collar = finish_mesh('Collar', bm, [mats['coat']], subsurf=1)
     extras.append(collar)
+    if outfit == 'waiter':
+        # 黑领结：两翼 + 中结，贴在立领正前
+        yf = yo - (neck_r + 0.018)
+        for sgn in (-1, 1):
+            bm = bmesh.new()
+            r = bmesh.ops.create_cube(bm, size=1)
+            for v in r['verts']:
+                v.co = Vector((v.co.x * 0.030, v.co.y * 0.010, v.co.z * (0.016 + 0.008 * (0.5 + sgn * v.co.x))))
+                v.co += Vector((sgn * 0.020, yf, zc + 0.010))
+            extras.append(finish_mesh('BowWing', bm, [mats['shoe']], subsurf=1))
+        bm = bmesh.new()
+        r = bmesh.ops.create_cube(bm, size=1)
+        for v in r['verts']:
+            v.co = Vector((v.co.x * 0.009, v.co.y * 0.009, v.co.z * 0.012))
+            v.co += Vector((0, yf - 0.002, zc + 0.010))
+        extras.append(finish_mesh('BowKnot', bm, [mats['shoe']], subsurf=1))
 
     # —— 前襟扣 ——
     if outfit in ('zhongshan', 'waiter'):
@@ -998,7 +1014,7 @@ def assemble_character(spec):
     mats = {
         'skin': tex_mat(name + '_skin', face_img, rough=0.62 if wet else 0.72),
         'skin_flat': flat_mat(name + '_skinf',
-                              tuple(min(1, c * (0.58 if wet else 0.94) + (0.03 if wet else 0)) for c in skin_rgb),
+                              tuple(min(1, c * (0.45 if wet else 0.94) + (0.02 if wet else 0)) for c in skin_rgb),
                               rough=0.55 if wet else 0.75),
         'eye': tex_mat(name + '_eye', eye_img, rough=0.34 if wet else 0.15),
         'hair': flat_mat(name + '_hair', spec.get('hair_rgb', (0.09, 0.08, 0.07)), rough=0.85),
@@ -1013,7 +1029,7 @@ def assemble_character(spec):
         'straw': flat_mat(name + '_straw', (0.55, 0.44, 0.26), rough=0.9),
         'tray': flat_mat(name + '_tray', (0.30, 0.20, 0.12), rough=0.55),
         'bowl': flat_mat(name + '_bowl', (0.85, 0.83, 0.78), rough=0.25),
-        'kelp': flat_mat(name + '_kelp', (0.10, 0.14, 0.10), rough=0.5),
+        'kelp': flat_mat(name + '_kelp', (0.115, 0.165, 0.105), rough=0.45),
     }
 
     root = bpy.data.objects.new(name + '_root', None)
@@ -1047,10 +1063,10 @@ def assemble_character(spec):
         for i in range(3):
             x0 = (-1 if i % 2 else 1) * (0.05 + rng.random() * 0.07)
             z0 = m['shoulder'] + 0.01
-            L = 0.18 + rng.random() * 0.22
+            L = 0.26 + rng.random() * 0.30
             bm = bmesh.new()
             pth = [Vector((x0 + math.sin(t * 4 + i) * 0.015, -0.045 - t * 0.02, z0 - L * t)) for t in np.linspace(0, 1, 4)]
-            tube(bm, pth, [0.014, 0.012, 0.009, 0.004], [0.003, 0.003, 0.002, 0.001], ring_n=6,
+            tube(bm, pth, [0.026, 0.021, 0.015, 0.006], [0.005, 0.0045, 0.003, 0.0015], ring_n=6,
                  cap_start=True, cap_end=True)
             parts.append(finish_mesh('Kelp%d' % i, bm, [mats['kelp']], subsurf=1))
 
