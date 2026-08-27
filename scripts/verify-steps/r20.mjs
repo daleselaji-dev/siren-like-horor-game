@@ -77,9 +77,9 @@ export async function run(page, h) {
   const emCheck = await page.evaluate(() => {
     const g = window.__game;
     const hum = g.byId.emcee.body;
-    hum.phase = 5.54;
-    for (let i = 0; i < 4; i++) hum.animate('mc', 3, 0);
-    hum.phase = 5.54;
+    const PEAK = 2.4 + Math.PI; // 轮21修钉法：animate 首行 phase+=dt·0.8，逐步预置到峰值
+    for (let i = 0; i < 5; i++) { hum.phase = PEAK - 3 * 0.8; hum.animate('mc', 3, 0); }
+    hum.phase = PEAK - 0.001 * 0.8;
     hum.animate('mc', 0.001, 0);
     hum.group.updateMatrixWorld(true);
     return {
@@ -130,9 +130,9 @@ export async function run(page, h) {
       const g = window.__game;
       g.game.state = 'PAUSE';
       const hum = g.byId.emcee.body;
-      hum.phase = 5.54;
-      for (let i = 0; i < 4; i++) hum.animate('mc', 3, 0);
-      hum.phase = 5.54;
+      const PEAK = 2.4 + Math.PI; // 轮21修钉法：逐步预置到峰值再收敛
+      for (let i = 0; i < 5; i++) { hum.phase = PEAK - 3 * 0.8; hum.animate('mc', 3, 0); }
+      hum.phase = PEAK - 0.001 * 0.8;
       hum.animate('mc', 0.001, 0);
       g.hud.clearSubtitles();
     });

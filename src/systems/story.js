@@ -337,6 +337,23 @@ export class Story {
     }
     const grp = new THREE.Group();
     for (const [mat, geos] of byMat) {
+      // 顶点色补齐（轮21：手网格带顶点色，与同材质的无色小件合并前补全白/对齐 itemSize）
+      if (geos.some((g) => g.attributes.color)) {
+        const csize = Math.max(...geos.map((g) => g.attributes.color?.itemSize ?? 3));
+        for (const g of geos) {
+          const n = g.attributes.position.count;
+          const c = g.attributes.color;
+          if (!c) {
+            g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * csize).fill(1), csize));
+          } else if (c.itemSize !== csize) {
+            const arr = new Float32Array(n * csize).fill(1);
+            for (let i = 0; i < n; i++) {
+              for (let k = 0; k < Math.min(c.itemSize, csize); k++) arr[i * csize + k] = c.array[i * c.itemSize + k];
+            }
+            g.setAttribute('color', new THREE.BufferAttribute(arr, csize));
+          }
+        }
+      }
       const mg = BufferGeometryUtils.mergeGeometries(geos, false);
       if (!mg) continue;
       const mesh = new THREE.Mesh(mg, mat);

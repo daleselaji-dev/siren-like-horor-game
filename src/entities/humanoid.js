@@ -1039,12 +1039,12 @@ function digitGeo({ root, d0, b0, lens, curls, r0, taper = 0.78, radial = 14 }) 
     for (let jn = 1; jn < joints.length - 1; jn++) {
       const d2 = s - joints[jn];
       const g2 = Math.exp(-(d2 * d2) / (2 * 0.0045 * 0.0045));
-      r *= 1 - 0.055 * g2;              // 节沟浅收腰
-      boss += 0.06 * g2;                 // 背侧指节微棱
-      shade -= 0.09 * g2;                // 节沟接触影
+      r *= 1 - 0.045 * g2;              // 节沟浅收腰
+      boss += 0.04 * g2;                 // 背侧指节微棱
+      shade -= 0.05 * g2;                // 节沟接触影（轮21二稿：减档——侧光下不许读成骨环带）
       const mid = (joints[jn] + joints[jn - 1]) / 2;
       const dm = s - mid;
-      pad += 0.09 * Math.exp(-(dm * dm) / (2 * 0.008 * 0.008)); // 节间指腹
+      pad += 0.07 * Math.exp(-(dm * dm) / (2 * 0.008 * 0.008)); // 节间指腹
     }
     // 指背远端指甲位：背侧压平（甲面读平光，不加独立件）
     const nailZone = ss01((s - (L - lens[lens.length - 1] * 0.72)) / (lens[lens.length - 1] * 0.5));
@@ -1095,15 +1095,18 @@ function handGeo(curl = 'relax') {
       palmRow(-0.1128, 0.0036, 0.0018, 1, 0, null, 0.85, 1),
     ]));
     // —— 四指：并拢微分（拇指侧为 +X：食→小从 +X 到 -X），屈度瀑布 ——
+    // hold=握持（持麦/持刷：指裹住柄，掌心留 25mm 空腔）
     const CURL = {
       relax: [0.42, 0.5, 0.3], open: [0.17, 0.21, 0.13], flat: [0.1, 0.1, 0.06],
+      hold: [0.88, 0.92, 0.5],
     }[curl];
     const CAS = curl === 'flat' ? [0.92, 1, 1.06, 1.12] : [0.82, 0.95, 1.1, 1.28];
+    // 轮21二稿：指扇再收近半——张开的手指是「并拢微分」
     const FIN = [ // [x0, y0, z0, r0, L1, L2, L3, splay]
-      [0.0300, -0.086, 0.0012, 0.0082, 0.040, 0.024, 0.019, 0.048],
-      [0.0102, -0.090, 0.0018, 0.0086, 0.044, 0.027, 0.021, 0.008],
-      [-0.0098, -0.088, 0.0015, 0.0080, 0.041, 0.0255, 0.020, -0.030],
-      [-0.0285, -0.081, 0.0006, 0.0068, 0.031, 0.019, 0.016, -0.068],
+      [0.0300, -0.086, 0.0012, 0.0082, 0.040, 0.024, 0.019, 0.030],
+      [0.0102, -0.090, 0.0018, 0.0086, 0.044, 0.027, 0.021, 0.005],
+      [-0.0098, -0.088, 0.0015, 0.0080, 0.041, 0.0255, 0.020, -0.020],
+      [-0.0285, -0.081, 0.0006, 0.0068, 0.031, 0.019, 0.016, -0.045],
     ];
     for (let i = 0; i < 4; i++) {
       const [x0, y0, z0, r0, l1, l2, l3, sp] = FIN[i];
@@ -1117,7 +1120,7 @@ function handGeo(curl = 'relax') {
       }));
     }
     // —— 拇指：自鱼际斜出对掌（2 节） ——
-    const TC = { relax: [0.3, 0.42], open: [0.2, 0.3], flat: [0.16, 0.24] }[curl];
+    const TC = { relax: [0.3, 0.42], open: [0.2, 0.3], flat: [0.16, 0.24], hold: [0.5, 0.62] }[curl];
     parts.push(digitGeo({
       root: [0.0252, -0.031, 0.0055],
       d0: [0.78, -0.5, 0.36],
@@ -1450,7 +1453,8 @@ export class Humanoid {
     // ---- 骨架枢轴（与 v2 兼容：pelvis/torso/neck/head + 肩肘髋膝）----
     this.pelvis = new THREE.Group(); this.pelvis.position.y = 0.82; this.group.add(this.pelvis);
     this.torso = new THREE.Group(); this.torso.position.y = 0.10; this.pelvis.add(this.torso);
-    const neckLen = 0.082; // 轮21：再降 10mm——颏底压到领口环顶 ±5mm 内，露颈只剩「领以上一点点」
+    const neckLen = 0.084; // 轮21：再降 8mm——颏底压到领口环顶 ±5mm 内，露颈只剩「领以上一点点」
+    // （0.082 时 face_b/c 颏底越过领口环顶 10-11mm 触「颏埋进领」下限，回抬 2mm）
     this.neck = new THREE.Group(); this.neck.position.y = 0.58; this.torso.add(this.neck);
     this.head = new THREE.Group(); this.head.position.y = neckLen; this.neck.add(this.head);
     this.head.scale.setScalar(1.16); // 头高 0.25-0.257m 档：1.87m 骨架 ÷ 7.28-7.48 头
@@ -1477,8 +1481,8 @@ export class Humanoid {
     {
       const fl = headBase(D.face, P).faceLen; // 与颅骨雕刻域同一份基频
       const base = 0.82 + 0.10;
-      const crown = base + 0.668 + (0.115 + 0.105 * fl) * 1.16 + 0.006;   // 颅顶+发壳厚（轮21：随 neckLen -10mm）
-      const chin = base + 0.668 + (0.115 - 0.105 * fl * 1.03) * 1.16;
+      const crown = base + 0.670 + (0.115 + 0.105 * fl) * 1.16 + 0.006;   // 颅顶+发壳厚（轮21：随 neckLen -8mm）
+      const chin = base + 0.670 + (0.115 - 0.105 * fl * 1.03) * 1.16;
       const clav = base + 0.578;
       const shR = torsoProfile(D.torso).reduce((m2, [r, y2]) => (Math.abs(y2 - 0.48) < 0.06 ? Math.max(m2, r) : m2), 0.14);
       this.metrics = {
@@ -2114,7 +2118,10 @@ export class Humanoid {
       // 材质永远跟袖管（不跟前臂）且上收 6mm 进袖端：裸前臂角色抬臂时看到的是
       // 「圆布袖口 + 从袖内长出的前臂」，不是深色袖端顶一颗皮肤球（木偶肘元凶）
       const elbowCapMat = D.drift ? drift : D.gloves ? rubber : torsoMat;
-      elbow.add(mkMesh(G('elbowCap', () => new THREE.SphereGeometry(0.0385, 10, 8)), elbowCapMat, 0, 0.006, 0, 0.94 * limbScl, 0.64, 0.94 * limbScl));
+      // 轮21：肘垫撑满肘罩管口——0.94/0.64 的瘪垫在深屈肘（持麦臂）从下方看
+      // 是「布管开口环 + 缝隙 + 内芯圆盘」三层同心圆（机械承窝读法）；
+      // 撑到 1.06/0.78 后管口被垫体填实，看到的是布包肘头
+      elbow.add(mkMesh(G('elbowCap', () => new THREE.SphereGeometry(0.0385, 10, 8)), elbowCapMat, 0, 0.006, 0, 1.06 * limbScl, 0.78, 1.06 * limbScl));
       // 轮18·肘部铰接袖罩：一节骑在关节上的褶皱布管，animate 每帧转到上下臂
       // 夹角的平分线上——屈肘任意角度肘点都在袖内，外侧看到的是布褶堆不是缝球
       //（「场内司仪抬臂=球关节人偶」的否决项根治）；浮木臂/裸臂裙装不套布罩
@@ -2141,9 +2148,12 @@ export class Humanoid {
       // 手套角色胶皮）；浮木侍应的手也必须是活人肉手——异常只留在前臂
       const handMat = D.gloves ? rubber : (D.torso === 'dress' ? skin : neckMat);
       const flat = D.tray && side < 0;
-      // 左手真镜像几何（拇指在拇指侧）；持麦者的抬臂左手用 open 屈度（对观众的
-      // 掌是「张开的软手」，不是攥拳也不是扇骨）
-      const curlKind = flat ? 'flat' : (D.mic && side < 0 ? 'open' : 'relax');
+      // 左手真镜像几何（拇指在拇指侧）；持麦者：抬臂左手用 open 屈度（对观众的
+      // 掌是「张开的软手」），持麦右手用 hold 屈度（指真的裹在麦杆上，不是
+      // 直指贴着杆「比划」）；理骨员持刷右手同理
+      const curlKind = flat ? 'flat'
+        : (D.mic && side < 0) ? 'open'
+          : ((D.mic || D.brush) && side > 0) ? 'hold' : 'relax';
       const handG = side < 0 ? mirroredHandGeo(curlKind) : handGeo(curlKind);
       const hand = mkMesh(handG, handMat, 0, -0.2405, 0.002, 0.92, 0.92, 0.92);
       // 静息掌心朝腿（解剖静息位是半旋前），托盘手保持掌心向上的旧取向
@@ -2623,10 +2633,13 @@ export class Humanoid {
         const announce = Math.max(0, Math.sin(this.phase * 0.5 - 1.2)) ** 3;
         lerp(this.armL.shoulder.rotation, 'x', -0.2 - announce * 1.1, 5);
         lerp(this.armL.shoulder.rotation, 'z', 0.15 + announce * 0.4, 5);
-        lerp(this.armL.elbow.rotation, 'x', -0.2 - announce * 0.2, 5);
-        // 轮19：抬臂时腕部内旋——掌面斜对观众（正对镜头的平板手掌是「人偶手」读法）
-        lerp(this.armL.hand.rotation, 'z', -0.38 * announce, 5);
-        lerp(this.armL.hand.rotation, 'x', -0.15 * announce, 5);
+        // 轮21：宣布臂前臂抬起（肘 -0.4→-0.95）——开掌举到脸侧高度对观众，
+        // 旧值手停在腰腹前读成「摸肚子」
+        lerp(this.armL.elbow.rotation, 'x', -0.2 - announce * 0.75, 5);
+        // 抬臂时腕部旋前——掌面转向观众（背手曲指对镜头是「探爪」读法）
+        lerp(this.armL.hand.rotation, 'y', 1.2 - 0.62 * announce, 5);
+        lerp(this.armL.hand.rotation, 'z', -0.5 * announce, 5);
+        lerp(this.armL.hand.rotation, 'x', -0.3 * announce, 5);
         lerp(this.legL.hip.rotation, 'x', 0, 4);
         lerp(this.legR.hip.rotation, 'x', 0, 4);
         lerp(this.pelvis.position, 'y', 0.855, 4);

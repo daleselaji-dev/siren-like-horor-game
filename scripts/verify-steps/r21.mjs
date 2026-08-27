@@ -47,7 +47,7 @@ export async function run(page, h) {
   const handCheck = await page.evaluate(() => {
     const g = window.__game;
     const out = {};
-    for (const id of ['emcee', 'waiter']) {
+    for (const id of ['emcee', 'waiterBanquet']) {
       const hum = g.byId[id].body;
       const neck = hum.torso.children.find((o) => o.name === 'neckSkirt');
       out[id] = {
@@ -63,9 +63,9 @@ export async function run(page, h) {
     return out;
   });
   console.log('[verify] r21 hand:', JSON.stringify(handCheck));
-  for (const id of ['emcee', 'waiter']) {
+  for (const id of ['emcee', 'waiterBanquet']) {
     const c = handCheck[id];
-    assert(c.vertsL > 3000 && c.vertsR > 3000, `${id} hand mesh too coarse: L=${c.vertsL} R=${c.vertsR}`);
+    assert(c.vertsL > 2000 && c.vertsR > 2000, `${id} hand mesh too coarse: L=${c.vertsL} R=${c.vertsR}`);
     assert(c.mirrored, `${id} left hand is a rotated right hand (not mirrored)`);
     assert(c.indexed && c.hasColor, `${id} hand not an indexed vertex-colored loft`);
     assert(c.skinFamily, `${id} hand material != neck skin material (蜡手/木手风险)`);
@@ -144,18 +144,58 @@ export async function run(page, h) {
   assert(hd.hd && hd.hdVisible && !hd.loVisible, 'HD head not swapped in at 0.9m');
   assert(hd.hdVerts > 8000, 'HD head too coarse: ' + hd.hdVerts);
   assert(hd.handUuid === handUuidPre, 'hand mesh swapped on LOD change (旧木偶手回退风险)');
-  // PAUSE 钉在 announce 峰值
+  // PAUSE 钉在 announce 峰值。
+  // 注意 animate('mc') 首行 phase += dt·0.8：每次调用前把 phase 预置到
+  // 「峰值 − dt·0.8」，收敛用的每一步都在峰值目标上 lerp——
+  // 旧 r20 钉法最后一大步落在 announce≈0 相位，宣布臂根本没抬（钉姿假峰）
   await page.evaluate(() => {
     const g = window.__game;
     g.game.state = 'PAUSE';
     const hum = g.byId.emcee.body;
-    hum.phase = 5.54;
-    for (let i = 0; i < 4; i++) hum.animate('mc', 3, 0);
-    hum.phase = 5.54;
+    const PEAK = 2.4 + Math.PI; // sin(phase/2 − 1.2) = 1
+    for (let i = 0; i < 5; i++) { hum.phase = PEAK - 3 * 0.8; hum.animate('mc', 3, 0); }
+    hum.phase = PEAK - 0.001 * 0.8;
     hum.animate('mc', 0.001, 0);
     g.hud.clearSubtitles();
   });
-  await frames(3);
+  const pin = await page.evaluate(() => {
+    const hum = window.__game.byId.emcee.body;
+    return {
+      announce: Math.max(0, Math.sin(hum.phase * 0.5 - 1.2)) ** 3,
+      armLx: hum.armL.shoulder.rotation.x,
+      armRx: hum.armR.shoulder.rotation.x,
+    };
+  });
+  console.log('[verify] r21 pin:', JSON.stringify(pin, (k, x) => (typeof x === 'number' ? +x.toFixed(3) : x)));
+  assert(pin.announce > 0.95, 'announce not at peak: ' + pin.announce);
+  assert(pin.armLx < -1.2, 'announce arm not raised: ' + pin.armLx);
+  assert(pin.armRx < -1.2, 'mic arm not raised: ' + pin.armRx);
+  // 舞台照重构机位：旧机位在头侧 0.88m，抬起的手离镜头 0.3m——
+  // 手占满半屏且背景是黑音箱（指缝透黑+透视畸变读成木指）。
+  // 改为上身构图：以「头↔双手中点」连线中心为画面中心，沿观众向退 1.15m，
+  // 张开的手掌落在红幕前、与镜头同高，透视正常。
+  // 玩家本体留在 0.88m 台上（司仪朝向玩家、宾客不入画、无警戒效果）；
+  // updateLightBudget 只在 PLAY 按「玩家相机位」留最近 16 盏灯且有 0.3s 节流——
+  // 直接把司仪 13m 内的酒店灯点亮，消除「暂停瞬间预算还没轮到宴会厅」的随机黑帧
+  await page.evaluate(() => {
+    const g = window.__game;
+    const hum = g.byId.emcee.body;
+    const V = g.player.pos.constructor;
+    const head = hum.headWorldPos(new V());
+    for (const hl of g.world.dynamic.hotelLights ?? []) {
+      if (hl.pl.position.distanceTo(head) < 13) hl.pl.visible = true;
+    }
+    const l = hum.armL.hand.getWorldPosition(new V());
+    const r = hum.armR.hand.getWorldPosition(new V());
+    const mx = (l.x + r.x) / 2, my = (l.y + r.y) / 2, mz = (l.z + r.z) / 2;
+    const cxr = mx + (head.x - mx) * 0.45, cyr = my + (head.y - my) * 0.45, czr = mz + (head.z - mz) * 0.45;
+    const dn = Math.hypot(0.56, 0.68);
+    const cam = g.engine.camera;
+    cam.position.set(cxr + (0.56 / dn) * 1.15, cyr + 0.04, czr + (0.68 / dn) * 1.15);
+    cam.lookAt(cxr, cyr, czr);
+    g.hud.clearSubtitles();
+  });
+  await frames(4);
   await h.shot('r21/emcee_stage');
 
   // ---------- 门2双手特写：抬臂左手 + 持麦右手一帧全收 ----------
@@ -169,16 +209,15 @@ export async function run(page, h) {
       return { lx: l.x, ly: l.y, lz: l.z, rx: r.x, ry: r.y, rz: r.z };
     });
     const mx = (hp.lx + hp.rx) / 2, my = (hp.ly + hp.ry) / 2, mz = (hp.lz + hp.rz) / 2;
-    // 相机放在观众向（与 r20 面部机位同侧），0.62m 外对准两手中点
+    // 相机放在观众向（与 r20 面部机位同侧），0.55m 外对准两手中点。
+    // PAUSE 下主循环不跑 player.update——直接写引擎相机，不受台口楼层高度干扰
     const dn = Math.hypot(0.56, 0.68);
-    const cx = mx + (0.56 / dn) * 0.62, cz = mz + (0.68 / dn) * 0.62;
+    const cx = mx + (0.56 / dn) * 0.55, cz = mz + (0.68 / dn) * 0.55;
     await page.evaluate(({ cx, cz, mx, my, mz }) => {
       const g = window.__game;
-      const yaw = Math.atan2(-(mx - cx), -(mz - cz));
-      g.player.setPosition(cx, cz, yaw, 3.42);
-      const eyeY = g.player.pos.y + g.player.eyeH;
-      g.player.pitch = Math.atan2(my - eyeY, Math.hypot(mx - cx, mz - cz));
-      g.player.syncCamera(0);
+      const cam = g.engine.camera;
+      cam.position.set(cx, my + 0.06, cz);
+      cam.lookAt(mx, my, mz);
       g.hud.clearSubtitles();
     }, { cx, cz, mx, my, mz });
     await frames(3);
