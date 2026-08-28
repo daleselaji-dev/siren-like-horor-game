@@ -11,6 +11,10 @@ import fs from 'node:fs';
 export async function run(page, h) {
   fs.mkdirSync('verify/station', { recursive: true });
   fs.mkdirSync('verify/keep/station', { recursive: true });
+  // r21_* 与 keep/ 是入库取证（FULLSPEC 灯档标定）——十步链的常规跑
+  // 只落 chk_*（gitignore），防低配画质覆写交付图
+  const FULL = process.env.FULLSPEC === '1';
+  const tag = FULL ? 'station/r21_' : 'station/chk_';
 
   await page.click('#title-start');
   await h.sleep(1500);
@@ -140,7 +144,7 @@ export async function run(page, h) {
   };
 
   // 舞台报数员（宴会厅）：GLB 细模站台 + 持麦
-  await look('station/r21_emcee_stage', -14.9, -63.0, -16.5, -64.6, 3.5);
+  await look(tag + 'emcee_stage', -14.9, -63.0, -16.5, -64.6, 3.5);
 
   // 宴会厅侍应：挪到入口空地正拍（同 looks 机位纪律，拍完归位）
   const wp = await page.evaluate(() => {
@@ -152,7 +156,7 @@ export async function run(page, h) {
     return orig;
   });
   await h.sleep(400);
-  await look('station/r21_waiter_banquet', -12.2, -46.2, -13.6, -47.4, 3.5);
+  await look(tag + 'waiter_banquet', -12.2, -46.2, -13.6, -47.4, 3.5);
   await page.evaluate((orig) => {
     const w = window.__game.byId.waiterBanquet;
     w.pos.set(orig.x, w.pos.y, orig.z);
@@ -170,7 +174,7 @@ export async function run(page, h) {
     m.state = 'PAUSE'; m.stateTimer = -9;
   });
   await h.sleep(400);
-  await look('station/r21_matron_close', -6.2, -55.5, -8, -55.5, 10.3);
+  await look(tag + 'matron_close', -6.2, -55.5, -8, -55.5, 10.3);
 
   // ---------- 4. 特写（暂停 + 直控相机 + 临时摄影灯，拍完即撤）----------
   const closeup = async (name, id, opts = {}) => {
@@ -231,15 +235,17 @@ export async function run(page, h) {
 
   // 麦头贴钙化口缝 / 侍应垂头领结 / 第三眼矿盘（2m 内读法）
   // 灯档按 FULLSPEC 胶片辉光标定：白中山装/浅肤近摄逢 keyI>10 直接曝飞
-  await closeup('station/r21_emcee_mic', 'emcee', { dist: 0.5, up: -0.05, fov: 30, keyI: 7, fillI: 3, ambI: 0.35 });
-  await closeup('station/r21_waiter_face', 'waiterBanquet', { dist: 0.55, up: 0.02, rise: 0.04, keyI: 4, fillI: 1.5, ambI: 0.2 });
-  await closeup('station/r21_matron_thirdeye', 'matron', { dist: 0.45, up: 0.05, fov: 28, keyI: 6, fillI: 2.5, ambI: 0.3 });
+  await closeup(tag + 'emcee_mic', 'emcee', { dist: 0.5, up: -0.05, fov: 30, keyI: 7, fillI: 3, ambI: 0.35 });
+  await closeup(tag + 'waiter_face', 'waiterBanquet', { dist: 0.55, up: 0.02, rise: 0.04, keyI: 4, fillI: 1.5, ambI: 0.2 });
+  await closeup(tag + 'matron_thirdeye', 'matron', { dist: 0.45, up: 0.05, fov: 28, keyI: 6, fillI: 2.5, ambI: 0.3 });
   await page.evaluate(() => window.__game.byId.matron.setEnabled(false));
 
-  // ---------- 5. keep 交付图（审计指定路径） ----------
-  fs.copyFileSync('verify/station/r21_emcee_stage.png', 'verify/keep/station/emcee_stage.png');
-  fs.copyFileSync('verify/station/r21_waiter_banquet.png', 'verify/keep/station/waiter_banquet.png');
-  fs.copyFileSync('verify/station/r21_matron_close.png', 'verify/keep/station/matron_close.png');
+  // ---------- 5. keep 交付图（审计指定路径；仅 FULLSPEC 覆写） ----------
+  if (FULL) {
+    fs.copyFileSync('verify/station/r21_emcee_stage.png', 'verify/keep/station/emcee_stage.png');
+    fs.copyFileSync('verify/station/r21_waiter_banquet.png', 'verify/keep/station/waiter_banquet.png');
+    fs.copyFileSync('verify/station/r21_matron_close.png', 'verify/keep/station/matron_close.png');
+  }
 
   console.log('[station] ✅ 工位 GLB 细模装配/步态/眼点/视奸/取证 全部通过');
 }

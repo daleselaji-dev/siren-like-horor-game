@@ -4,6 +4,7 @@ release/*
 !release/Fanchao-*.exe
 verify/*.png
 verify/*.jpg
+verify/station/chk_*.png
 !verify/keep/
 verify/dbg/
 blender/export/
