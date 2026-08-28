@@ -265,14 +265,14 @@ src/
   systems/       视奸、潜行/振动、CRT预现、议程时钟、叙事导演(文书/触发/检查点/终局)
   ui/            HUD(字幕/目标/文书/议程/振动/暂停/死亡/结局)
 scripts/         无头浏览器验证(构建→启动→截图→按九节拍自动通关)
-verify/blender/  Blender CLI 渲染的多轮迭代对照图（r1→r5）
+verify/blender/  Blender CLI 渲染的多轮迭代对照图（r1→r21）
 release/         Windows 便携 exe（入库，可直接下载运行）
 ```
 
 ## 自动化验证
 
 ```bash
-npm run verify                        # 八步全跑
+npm run verify                        # 十步全跑
 node scripts/verify.mjs smoke        # 渲染冒烟：镇口/前街/家属楼/酒店各层/巨物厅机位
 node scripts/verify.mjs gameplay     # 机制抽查（视奸/警觉/引座重生/CRT/议程/振动/上宾）
 node scripts/verify.mjs round4tools  # 反击工具：镁光定身/闹钟诱饵/贝灰界逐项断言
@@ -280,6 +280,7 @@ node scripts/verify.mjs round5leak   # 世界切换：封脊碰撞/湿客五员/
 node scripts/verify.mjs round6guest  # 主怪：部件计数/镁光定格/闹钟钓臂/贝灰界前悬停断言
 node scripts/verify.mjs round7mech   # 箱庭机制：录音对照三点三奖励/保险丝拔插/暗区视程
 node scripts/verify.mjs blenderglb   # Blender 英雄件：五件装配/细模面数/转头/字幕/返潮到岗
+node scripts/verify.mjs station      # 工位 GLB：五具细模/六 pivot/道具/禁胶囊/步态/眼点+r21 取证
 node scripts/verify.mjs looks        # 外观：镇口车站/牌坊/告示墙/巨骸/工位近景/渗漏态
 node scripts/verify.mjs playthrough  # 主线全流程通关：10 条文书 + 三条规则怪谈的
                                      # 违反与遵守双路径逐 flag 断言
