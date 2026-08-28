@@ -1023,9 +1023,10 @@ def assemble_character(spec):
     pivot.parent = root
 
     field, head_objs = HF.forge_head(spec, seed, mats)
-    # 头抬升：双侧 vstretch 后颏底 ~-0.67 单位，抬升系数按
-    # 「颏底落在领口上缘 +12mm」标定（领顶 = 轭肩顶 +0.028）
-    head_lift = field.rz * 0.78
+    # 头抬升：vstretch(0.07) 后颏底 ~-0.63 单位（r20 下脸回收 0.12→0.07，
+    # 颏底抬高 ~0.04 单位），抬升系数 0.78→0.74 同步下调，
+    # 保持「颏底落在领口上缘 +12mm」标定（领顶 = 轭肩顶 +0.028）
+    head_lift = field.rz * 0.74
     if spec.get('hat') == 'straw':
         hat = add_straw_hat(mats)
         crown = field.pos(Vector((0, -0.12, 1.0)))

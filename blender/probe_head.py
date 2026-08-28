@@ -52,7 +52,7 @@ def probe(char='emcee'):
     z_mm = Pz * 1000
     LM = HF.LM
     rz = field.rz
-    stretch_k = spec.get('head', {}).get('stretch', 0.12)
+    stretch_k = spec.get('head', {}).get('stretch', HF.STRETCH_K)
 
     def vz(zc):
         return HF.vstretch(zc, stretch_k)
