@@ -982,13 +982,13 @@ def build_calcified_nodules(field, mats):
         ang = i / n_ring * TAU + rng.random() * 0.06
         lon = math.cos(ang) * (0.150 + rng.random() * 0.016)
         zz = LM['seam_z'] + math.sin(ang) * (0.052 + rng.random() * 0.010)
-        put(lon, zz, 0.0008 + rng.random() * 0.0008)
+        put(lon, zz, 0.0007 + rng.random() * 0.0006)
     # 口缝封条：沿缝一列（略越过嘴角），粒大半档——「被封死」的读法在这里
     for i in range(15):
         tt = (i / 14 - 0.5) * 2
         lon = tt * 0.17 + (rng.random() - 0.5) * 0.012
         zz = LM['seam_z'] + (rng.random() - 0.5) * 0.012
-        put(lon, zz, 0.0011 + rng.random() * 0.0009)
+        put(lon, zz, 0.0009 + rng.random() * 0.0007)
     # 缝上零星二代粒（正在长的）
     for i in range(9):
         ang = rng.random() * TAU

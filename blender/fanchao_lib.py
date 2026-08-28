@@ -346,8 +346,8 @@ def build_clothed_torso(spec, m, mats, seed):
         frontness = max(0.0, fr)
         backness = max(0.0, -fr)
         if quilt:
-            r *= 1 + 0.034 * math.sin(z * 30 + 0.8) * (1 + 0.3 * wrk[i % 16])   # 绗缝横棱（打散规整感）
-            r *= 1 + 0.020 * math.sin(a * 5 + wrk[i % 16] * 6) * (1 - t * 0.5)  # 竖绗道
+            r *= 1 + 0.042 * math.sin(z * 30 + 0.8) * (1 + 0.3 * wrk[i % 16])   # 绗缝横棱（打散规整感）
+            r *= 1 + 0.026 * math.sin(a * 5 + wrk[i % 16] * 6) * (1 - t * 0.5)  # 竖绗道
         else:
             # 门襟棱（前中一条竖脊 + 两侧缝线沟）
             da = abs(a - TAU / 4)
@@ -965,8 +965,9 @@ def assemble_character(spec):
         'tray': flat_mat(name + '_tray', (0.30, 0.20, 0.12), rough=0.55),
         'bowl': flat_mat(name + '_bowl', (0.85, 0.83, 0.78), rough=0.25),
         'kelp': flat_mat(name + '_kelp', (0.115, 0.165, 0.105), rough=0.45),
-        # 钙化痂壳：石灰岩灰白哑光（r16「珠状牙」根治：不许珍珠亮）
-        'pearl': flat_mat(name + '_pearl', (0.50, 0.49, 0.44), rough=0.72),
+        # 钙化痂壳：石灰岩灰白哑光（r16「珠状牙」根治：不许珍珠亮；r19 再压暗——
+        # 侧影里过亮的粒环仍读成「露齿」）
+        'pearl': flat_mat(name + '_pearl', (0.43, 0.41, 0.36), rough=0.80),
         'salt': flat_mat(name + '_salt', (0.92, 0.94, 0.94), rough=0.55),
     }
 
