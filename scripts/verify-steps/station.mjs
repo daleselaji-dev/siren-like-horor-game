@@ -38,6 +38,9 @@ export async function run(page, h) {
     const g = window.__game;
     g.engine.setFilmLook(0.5);
     g.hud.el.objToast.style.display = 'none';
+    // 跳过开场后镜片上还挂着 0.18 的雨（正常靠游戏 dt 0.2/s 收干）——
+    // 无 GPU headless 下帧率低、dt 被钳制，墙钟一秒走不完淡出，取证前直接收干
+    g.engine.finalPass.uniforms.uWetLens.value = 0;
   });
 
   // ---------- 1. 装配断言：五具工位身体全部是 GLB 细模 ----------

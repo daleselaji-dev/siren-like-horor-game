@@ -27,6 +27,8 @@ export async function run(page, h) {
     const g = window.__game;
     g.engine.setFilmLook(0.5);
     g.hud.el.objToast.style.display = 'none';
+    // 同 station 步：跳场后残留的开场湿镜头在低帧率下收不干，取证前置零
+    g.engine.finalPass.uniforms.uWetLens.value = 0;
   });
 
   const look = async (name, px, pz, tx, tz, yHint, pitch = 0.02) => {
