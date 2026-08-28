@@ -14,12 +14,16 @@ def parse_args():
     argv = sys.argv
     args = argv[argv.index('--') + 1:] if '--' in argv else []
     opts = {'chars': ['emcee', 'waiter', 'townsman', 'wetguest', 'seagod'], 'round': 'r1',
-            'samples': 48, 'scale': 1.0, 'blend': 'blender/out', 'out': 'verify/blender'}
+            'samples': 48, 'scale': 1.0, 'blend': 'blender/out', 'out': 'verify/blender',
+            'views': None}
     i = 0
     while i < len(args):
         k = args[i]
         if k == '--chars':
             opts['chars'] = args[i + 1].split(',')
+            i += 2
+        elif k == '--views':
+            opts['views'] = args[i + 1].split(',')
             i += 2
         elif k in ('--round', '--blend', '--out'):
             opts[k[2:]] = args[i + 1]
@@ -40,7 +44,7 @@ def look_at(cam, target):
     cam.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler()
 
 
-def setup_and_render(blend_path, out_dir, tag, name, samples, scale):
+def setup_and_render(blend_path, out_dir, tag, name, samples, scale, only_views=None):
     bpy.ops.wm.open_mainfile(filepath=os.path.abspath(blend_path))
     sc = bpy.context.scene
     sc.render.engine = 'CYCLES'
@@ -99,18 +103,22 @@ def setup_and_render(blend_path, out_dir, tag, name, samples, scale):
     sc.collection.objects.link(cam)
     sc.camera = cam
 
-    # 头位（估）：找 HeadPivot（带驼背 y 偏移，机位必须跟着头走）
+    # 头位：直接取 Head/GodHead 网格的世界包围盒中心（r17 教训：对准 HeadPivot
+    # 会在头抬升后从下巴底仰拍，face 机位读成「仰视鼻孔」）
     head_p = None
     top_z = 0.0
+    dg = bpy.context.evaluated_depsgraph_get()
     for o in sc.objects:
-        if o.name.startswith('HeadPivot'):
-            head_p = o.matrix_world.translation.copy()
+        if o.type == 'MESH' and o.name.split('.')[0] in ('Head', 'GodHead'):
+            bb = [o.matrix_world @ Vector(c) for c in o.bound_box]
+            head_p = sum(bb, Vector()) / 8.0
         if o.type == 'MESH':
             for c in o.bound_box:
                 top_z = max(top_z, (o.matrix_world @ Vector(c)).z)
     if head_p is None:
-        # 场景件（神像）：冕旒/冠在包围盒顶上方 ~0.12m，头心再往下
         head_p = Vector((0, -0.05, max(0.6, top_z - 0.115)))
+    else:
+        head_p.z += 0.024   # 包围盒中心含颌下颈锥（偏低）——机位对准面部中心
     hy, head_z = head_p.y, head_p.z
 
     views = {
@@ -118,6 +126,8 @@ def setup_and_render(blend_path, out_dir, tag, name, samples, scale):
                  'res': (int(720 * scale), int(1080 * scale))},
         'face': {'loc': Vector((0.16, hy - 0.56, head_z + 0.02)), 'aim': Vector((0, hy, head_z + 0.02)), 'lens': 62,
                  'res': (int(760 * scale), int(860 * scale))},
+        'front': {'loc': Vector((0.0, hy - 0.62, head_z)), 'aim': Vector((0, hy, head_z)), 'lens': 70,
+                  'res': (int(760 * scale), int(860 * scale))},
         'prof': {'loc': Vector((0.55, hy - 0.06, head_z + 0.01)), 'aim': Vector((0, hy, head_z + 0.01)), 'lens': 62,
                  'res': (int(700 * scale), int(820 * scale))},
         'back': {'loc': Vector((-1.1, 2.5, 1.5)), 'aim': Vector((0, 0, 1.0)), 'lens': 45,
@@ -125,6 +135,8 @@ def setup_and_render(blend_path, out_dir, tag, name, samples, scale):
     }
     os.makedirs(out_dir, exist_ok=True)
     for vname, v in views.items():
+        if only_views and vname not in only_views:
+            continue
         cam.location = v['loc']
         cam_data.lens = v['lens']
         look_at(cam, v['aim'])
@@ -143,7 +155,7 @@ def main():
         if not os.path.exists(bp):
             print('[render] skip %s (no blend)' % name)
             continue
-        setup_and_render(bp, opts['out'], opts['round'], name, opts['samples'], opts['scale'])
+        setup_and_render(bp, opts['out'], opts['round'], name, opts['samples'], opts['scale'], opts['views'])
     print('[render] done.')
 
 

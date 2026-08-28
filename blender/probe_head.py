@@ -46,23 +46,27 @@ def probe(char='emcee'):
                     tag = ' <- ' + mk_name
             print('%7.1f |%s#%s' % (zc, ' ' * col, tag))
 
-    # —— 侧影：中线带最大前凸 ——
+    # —— 侧影：中线带最大前凸 ——（r17：地标 z 经 vstretch 映射到拉伸后空间）
     band = np.abs(lon_f) < 0.30
     prof_y = np.where(band, -P[:, 1], np.nan) * 1000
     z_mm = Pz * 1000
     LM = HF.LM
     rz = field.rz
-    marks = [(LM['brow_z'] * rz * 1000, 'brow'), (LM['nasion_z'] * rz * 1000, 'nasion'),
-             (LM['tip_z'] * rz * 1000, 'tip'), (LM['philtrum_z'] * rz * 1000, 'philtrum'),
-             (LM['lip_up_z'] * rz * 1000, 'lip_up'), (LM['seam_z'] * rz * 1000, 'seam'),
-             (LM['lip_dn_z'] * rz * 1000, 'lip_dn'), (LM['sulcus_z'] * rz * 1000, 'sulcus'),
-             (LM['chin_z'] * rz * 1000, 'chin')]
+    stretch_k = spec.get('head', {}).get('stretch', 0.12)
+
+    def vz(zc):
+        return HF.vstretch(zc, stretch_k)
+    marks = [(vz(LM['brow_z']) * rz * 1000, 'brow'), (vz(LM['nasion_z']) * rz * 1000, 'nasion'),
+             (vz(LM['tip_z']) * rz * 1000, 'tip'), (vz(LM['philtrum_z']) * rz * 1000, 'philtrum'),
+             (vz(LM['lip_up_z']) * rz * 1000, 'lip_up'), (vz(LM['seam_z']) * rz * 1000, 'seam'),
+             (vz(LM['lip_dn_z']) * rz * 1000, 'lip_dn'), (vz(LM['sulcus_z']) * rz * 1000, 'sulcus'),
+             (vz(LM['chin_z']) * rz * 1000, 'chin')]
     sel = ~np.isnan(prof_y)
     ascii_plot('侧影 -y(z) %s' % char, prof_y[sel], z_mm[sel], marks)
 
     # 关键台阶量化
     def max_at(zc, dz=0.02):
-        m = sel & (np.abs(Pz / rz - zc) < dz)
+        m = sel & (np.abs(Pz / rz - vz(zc)) < dz * (1 + stretch_k))
         return np.nanmax(prof_y[m]) if m.any() else float('nan')
     brow = max_at(LM['brow_z'])
     nas = max_at(LM['nasion_z'], 0.018)
@@ -76,13 +80,18 @@ def probe(char='emcee'):
     print('\n[量化] brow=%.1f nasion=%.1f (凹 %.1f)  tip=%.1f (出 %.1f)' % (brow, nas, brow - nas, tip, tip - nas))
     print('[量化] philtrum=%.1f lip_up=%.1f (唇凸 %.1f) seam=%.1f lip_dn=%.1f sulcus=%.1f chin=%.1f (颏凸 %.1f)'
           % (phil, lip_u, lip_u - phil, seam, lip_d, sul, chin, chin - sul))
+    ry = field.ry
+    print('[达标] 鼻梁突出量 = %.3f 单位（tip-nasion, 要求≥0.08）  颏前凸 = %.3f 单位（chin-sulcus, 要求≥0.06）'
+          % ((tip - nas) / 1000 / ry, (chin - sul) / 1000 / ry))
+    head_w = 2 * np.nanmax(np.abs(P[:, 0])) * 1000
+    print('[达标] 头全宽 = %.1f mm（颈宽上限 0.42×头宽 = %.1f mm）' % (head_w, head_w * 0.42))
 
     # —— 正面：每 z 档最大 |x|（前半球） ——
     fr = np.cos(lon_f) > -0.1
     wx = np.where(fr, np.abs(P[:, 0]), np.nan) * 1000
     sel2 = ~np.isnan(wx)
-    marks2 = [(LM['eye_z'] * rz * 1000, 'eye'), (LM['cheek_z'] * rz * 1000, 'cheek'),
-              (LM['gonion_z'] * rz * 1000, 'gonion'), (LM['chin_z'] * rz * 1000, 'chin')]
+    marks2 = [(vz(LM['eye_z']) * rz * 1000, 'eye'), (vz(LM['cheek_z']) * rz * 1000, 'cheek'),
+              (vz(LM['gonion_z']) * rz * 1000, 'gonion'), (vz(LM['chin_z']) * rz * 1000, 'chin')]
     ascii_plot('正面半宽 |x|(z) %s' % char, wx[sel2], z_mm[sel2], marks2)
 
 

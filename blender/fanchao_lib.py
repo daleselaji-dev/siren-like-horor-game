@@ -94,6 +94,23 @@ def flat_mat(name, rgb, rough=0.8, metal=0.0, sheen=0.0, bump=0.0, bump_scale=24
     return m
 
 
+def glass_mat(name, rough=0.05, alpha=0.12):
+    """透明光壳（角膜等）：Alpha 混合 + 低粗糙。glTF 导出带 alphaMode=BLEND。"""
+    key = name
+    if key in _mat_cache:
+        return _mat_cache[key]
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    m.blend_method = 'BLEND'
+    m.use_backface_culling = True
+    bsdf = m.node_tree.nodes['Principled BSDF']
+    bsdf.inputs['Base Color'].default_value = (0.9, 0.93, 0.95, 1.0)
+    bsdf.inputs['Roughness'].default_value = rough
+    bsdf.inputs['Alpha'].default_value = alpha
+    _mat_cache[key] = m
+    return m
+
+
 def tex_mat(name, img, rough=0.7, metal=0.0):
     key = name
     if key in _mat_cache:
@@ -278,7 +295,10 @@ def cloth_noise(p, seed, freq=22.0, amp=0.004, octaves=2):
 
 
 def build_clothed_torso(spec, m, mats, seed):
-    """外衣即躯干表面：高密放样 + 门襟棱 + 下摆卷边 + 立翻领 + 肩胛/胸/腰褶。"""
+    """外衣即躯干表面：高密放样 + 斜方肌轭肩（肩线漏斗收进领口）+ 门襟棱 +
+    下摆卷边 + 立翻领 + 肩胛/胸/腰褶。
+    r17 重构：躯干顶不再平盖封口——加 4 环轭肩从肩宽收到颈围，领子长在轭肩上，
+    根治「圆肩块 + 悬浮领圈 + 光杆颈」三连。"""
     rng = rng_stream(seed + 57)
     prof = torso_profile(spec, m)
     outfit = spec.get('outfit', 'zhongshan')
@@ -286,6 +306,9 @@ def build_clothed_torso(spec, m, mats, seed):
     hem = {'zhongshan': m['hip'] - 0.10, 'waiter': m['hip'] - 0.04,
            'padded': m['hip'] - 0.16, 'wet_padded': m['hip'] - 0.14}[outfit]
     quilt = outfit in ('padded', 'wet_padded')
+    nr_neck = neck_radius(spec, m)
+    neck_open_w = nr_neck + pad * 0.45 + 0.008
+    neck_open_d = nr_neck + pad * 0.40 + 0.007
     n_sec = 24
     ring_n = 36
     zs = [hem + (m['shoulder'] + 0.012 - hem) * (i / (n_sec - 1)) for i in range(n_sec)]
@@ -297,48 +320,64 @@ def build_clothed_torso(spec, m, mats, seed):
         depths.append(d + pad + flare * 0.7)
         path.append(Vector((0, 0, z)))
         yoffs.append(stoop_off(spec, m, z))
+    # —— 轭肩（trapezius yoke）：肩顶→颈根的漏斗环，宽向快收、深向慢收 ——
+    yoke_top = m['shoulder'] + 0.050
+    n_yoke = 4
+    w_sh, d_sh = widths[-1], depths[-1]
+    for iy in range(1, n_yoke + 1):
+        tq = iy / n_yoke
+        z = m['shoulder'] + 0.012 + (yoke_top - m['shoulder'] - 0.012) * tq
+        cw = math.cos(tq * math.pi / 2)
+        widths.append(neck_open_w + (w_sh - neck_open_w) * (cw ** 1.15))
+        depths.append(neck_open_d + (d_sh - neck_open_d) * (cw ** 0.75))
+        zs.append(z)
+        path.append(Vector((0, 0, z)))
+        yoffs.append(stoop_off(spec, m, z))
     wrk = rng.random(48)
     waist_t = (m['waist'] - hem) / (m['shoulder'] - hem)
 
     def bulge(i, a):
         z = zs[i]
+        if i >= n_sec:            # 轭肩环：只留微量布面不匀（褶堆在躯干）
+            return 1.0 + 0.010 * (wrk[int(a / TAU * 24) % 24] - 0.5)
         t = i / (n_sec - 1)
         r = 1.0
         fr = math.sin(a)          # 1=正前（a=TAU/4），-1=正后
         frontness = max(0.0, fr)
         backness = max(0.0, -fr)
         if quilt:
-            r *= 1 + 0.028 * math.sin(z * 30 + 0.8) * (1 + 0.3 * wrk[i % 16])   # 绗缝横棱（打散规整感）
-            r *= 1 + 0.016 * math.sin(a * 5 + wrk[i % 16] * 6) * (1 - t * 0.5)  # 竖绗道
+            r *= 1 + 0.034 * math.sin(z * 30 + 0.8) * (1 + 0.3 * wrk[i % 16])   # 绗缝横棱（打散规整感）
+            r *= 1 + 0.020 * math.sin(a * 5 + wrk[i % 16] * 6) * (1 - t * 0.5)  # 竖绗道
         else:
             # 门襟棱（前中一条竖脊 + 两侧缝线沟）
             da = abs(a - TAU / 4)
-            r += 0.012 * math.exp(-(da / 0.10) ** 2) * frontness
-            r -= 0.005 * math.exp(-((da - 0.16) / 0.05) ** 2) * frontness
+            r += 0.013 * math.exp(-(da / 0.10) ** 2) * frontness
+            r -= 0.006 * math.exp(-((da - 0.16) / 0.05) ** 2) * frontness
             # 长垂褶：胸下到下摆的 4-5 道低频竖褶（长褶才是「布」；碎波是高尔夫球）
-            r += 0.020 * math.sin(a * 4.3 + wrk[3] * 6) * smoothstep(max(0.0, waist_t + 0.22 - t) / 0.55) * (0.5 + 0.5 * backness)
-            r += 0.013 * math.sin(a * 2.6 + wrk[7] * 6 + 1.3) * smoothstep(max(0.0, waist_t + 0.30 - t) / 0.60) * frontness
+            # r17：幅度加档——512px 缩略图也要读出布
+            r += 0.028 * math.sin(a * 4.3 + wrk[3] * 6) * smoothstep(max(0.0, waist_t + 0.22 - t) / 0.55) * (0.5 + 0.5 * backness)
+            r += 0.019 * math.sin(a * 2.6 + wrk[7] * 6 + 1.3) * smoothstep(max(0.0, waist_t + 0.30 - t) / 0.60) * frontness
         # 腰部横向堆褶（背/侧明显）——低频大幅，柔光下仍可读
-        r += 0.020 * math.exp(-((t - waist_t) / 0.10) ** 2) * math.sin(z * 46 + a * 2 + wrk[9] * 5) * (0.35 + backness)
+        r += 0.027 * math.exp(-((t - waist_t) / 0.10) ** 2) * math.sin(z * 46 + a * 2 + wrk[9] * 5) * (0.35 + backness)
         # 肩胛两瓣（背面上部）
-        r += 0.016 * math.exp(-((t - 0.78) / 0.10) ** 2) * backness * math.exp(-((abs(a - 3 * TAU / 4) - 0.5) / 0.28) ** 2)
+        r += 0.020 * math.exp(-((t - 0.78) / 0.10) ** 2) * backness * math.exp(-((abs(a - 3 * TAU / 4) - 0.5) / 0.28) ** 2)
         # 腋下→前胸斜拉褶（袖根牵出的放射纹，低频化）
-        r += 0.012 * math.exp(-((t - 0.72) / 0.14) ** 2) * math.sin(a * 4 + z * 26 + wrk[(i + 9) % 48] * 5) * (0.3 + 0.7 * frontness)
+        r += 0.016 * math.exp(-((t - 0.72) / 0.14) ** 2) * math.sin(a * 4 + z * 26 + wrk[(i + 9) % 48] * 5) * (0.3 + 0.7 * frontness)
         # 布面低频不匀
-        r += 0.014 * (wrk[int(a / TAU * 24) % 24] - 0.5) * (1 - t * 0.4)
-        r += 0.009 * math.sin(a * 3 + z * 18 + wrk[(i * 3 + 1) % 48] * 7) * (0.4 + 0.6 * backness)
+        r += 0.017 * (wrk[int(a / TAU * 24) % 24] - 0.5) * (1 - t * 0.4)
+        r += 0.011 * math.sin(a * 3 + z * 18 + wrk[(i * 3 + 1) % 48] * 7) * (0.4 + 0.6 * backness)
         return r
     bm = bmesh.new()
     rings = tube(bm, path, widths, depths, ring_n=ring_n, cap_start=True, cap_end=True,
                  mat_index=0, bulge=bulge, y_off=yoffs)
-    # 肩坡场：把躯干上部的外侧角向下压——斜方肌从颈根斜下到肩峰（板箱→人肩的关键）
-    slope = 0.062 if outfit in ('zhongshan', 'waiter') else 0.078   # 棉袄垫厚要压更狠（顶盖甲板）
+    # 肩坡场（弱化版）：轭肩已给出主坡，这里只把外侧角再按下去一点（袖山藏根用）
+    slope = 0.040 if outfit in ('zhongshan', 'waiter') else 0.054
     x_in = 0.055
     yo_sh = stoop_off(spec, m, m['shoulder'])
-    d_top = depths[-1]
+    d_top = d_sh
     for v in bm.verts:
         zz = v.co.z
-        if zz > m['waist']:
+        if m['waist'] < zz < m['shoulder'] + 0.020:
             tz = smoothstep((zz - m['waist']) / (m['shoulder'] + 0.012 - m['waist']))
             tx = smoothstep(max(0.0, abs(v.co.x) - x_in) / max(1e-5, m['sw'] + pad - x_in))
             # 背侧坡：顶盖必须从领根向背下倾——驼背角色顶盖后仰时
@@ -363,23 +402,23 @@ def build_clothed_torso(spec, m, mats, seed):
     torso = finish_mesh('Torso', bm, [mats['coat']], subsurf=1)
 
     extras = []
-    # —— 领（立翻领：立带 + 翻沿 + 边厚，前开 V 口）——
-    # 领内径必须贴实际颈围（与 build_neck 同源公式），差 1cm 就是「悬浮垫圈」
-    nr_neck = 0.0345 * m['H'] / 1.72 * (1 + spec.get('bloat', 0.0) * 0.3)
+    # —— 领：长在轭肩口上的立领（底环半径=轭肩顶开口，零悬浮）——
     neck_r = nr_neck * 1.02
-    zc = m['shoulder'] + 0.016
+    zc = yoke_top - 0.006          # 领底埋进轭肩口 6mm
     yo = stoop_off(spec, m, zc)
     bm = bmesh.new()
     collar_subsurf = 1
     if outfit in ('zhongshan', 'waiter'):
         collar_subsurf = 0   # 开放条带+端盖经 subsurf 必收缩（窄缝被拉成大 V），自身密度已够
-        # 中山装立领：贴颈立带（气缝 6mm、布厚 3mm）——r10 的 stand=neck*1.12+7.5mm
-        # 在颈四周留出 1cm 空气壕，正面读成「两块悬浮护板」
-        stand = neck_r + 0.006
-        prof_pts = [(stand + 0.0025, -0.007), (stand + 0.0004, 0.004), (stand - 0.0006, 0.014),
-                    (stand + 0.0006, 0.0225), (stand + 0.0026, 0.0245), (stand + 0.0034, 0.013),
-                    (stand + 0.0028, -0.005)]
-        a0, a1 = TAU / 4 + 0.05, TAU / 4 + TAU - 0.05   # 前方留一道窄缝（不是敞开的 V）
+        # 立领截面：底缘接轭肩开口 → 内收贴颈上行 → 顶缘 3mm 布厚翻边 → 外壁下垂
+        base_r = neck_open_w + 0.0015
+        top_r = neck_r + 0.0065
+        stand = top_r   # 供领结定位
+        prof_pts = [(base_r + 0.0012, -0.009), (base_r, 0.000),
+                    (base_r * 0.42 + top_r * 0.58, 0.011), (top_r, 0.019),
+                    (top_r - 0.0004, 0.0260), (top_r + 0.0030, 0.0275),
+                    (top_r + 0.0040, 0.015), (top_r + 0.0048, 0.001)]
+        a0, a1 = TAU / 4 + 0.055, TAU / 4 + TAU - 0.055   # 前方留一道窄缝（不是敞开的 V）
         # 高角密度（40 环）：立带曲率要顺；r12 教训——端头把截面向质心整体塌陷会在
         # 缝区留出一截「矮桥」，正面读成两块板夹一段空缺。端头只允许收布厚。
         angs = [a0, a0 + 0.012] + [a0 + 0.035 + (a1 - a0 - 0.07) * i / 39 for i in range(40)] + [a1 - 0.012, a1]
@@ -390,8 +429,9 @@ def build_clothed_torso(spec, m, mats, seed):
             tk = 0.55 + 0.45 * smoothstep(min(1.0, edge_d / 0.05))   # 端头布厚渐收（圆角断口）
             row = []
             for rr, dz in prof_pts:
-                rr2 = stand + (rr - stand) * tk + max(0.0, 0.006 - dz) * 0.30  # 底缘外扩贴顺颈根锥度
-                dip = -0.003 * max(0.0, math.sin(a)) ** 3   # 领口前缘微下潜（真立领前低后高）
+                mid_r = (base_r + top_r) * 0.5
+                rr2 = mid_r + (rr - mid_r) * (0.72 + 0.28 * tk)
+                dip = -0.004 * max(0.0, math.sin(a)) ** 3   # 领口前缘微下潜（真立领前低后高）
                 row.append(bm.verts.new(Vector((ca * rr2, -sa * rr2 + yo, zc + dz + sa * 0.004 + dip))))
             ringsC.append(row)
         for ia in range(len(ringsC) - 1):
@@ -403,20 +443,20 @@ def build_clothed_torso(spec, m, mats, seed):
             except ValueError:
                 pass
     else:
-        # 棉袄披领：贴着躯干顶的一圈厚滚边（略锥形收向颈——顶缘贴颈皮 4mm 内）
-        zc2 = m['shoulder'] + 0.010
+        # 棉袄披领：骑在轭肩口上的一圈厚滚边（略锥形收向颈——顶缘贴颈皮 4mm 内）
+        zc2 = yoke_top - 0.008
         yo2 = stoop_off(spec, m, zc2)
-        tube(bm, [Vector((0, yo2, zc2 - 0.010)), Vector((0, yo2 - 0.002, zc2 + 0.012)),
-                  Vector((0, yo2 - 0.004, zc2 + 0.026))],
-             [neck_r + 0.012, neck_r + 0.007, neck_r + 0.004],
-             [neck_r + 0.011, neck_r + 0.006, neck_r + 0.003], ring_n=22)
+        tube(bm, [Vector((0, yo2, zc2 - 0.010)), Vector((0, yo2 - 0.002, zc2 + 0.014)),
+                  Vector((0, yo2 - 0.004, zc2 + 0.028))],
+             [neck_open_w + 0.004, neck_r + 0.008, neck_r + 0.004],
+             [neck_open_d + 0.004, neck_r + 0.007, neck_r + 0.003], ring_n=22)
     collar = finish_mesh('Collar', bm, [mats['coat']], subsurf=collar_subsurf)
     extras.append(collar)
     if outfit == 'waiter':
         # 黑领结：贴在立领正前下缘的扁蝶结（两翼楔形外窄内宽 + 小方结）
         # r14 教训：厚方块骑在领带正中读成两颗「黑土豆」——要扁、要贴、要在喉位
-        yf = yo - (stand + 0.0042)
-        zbow = zc + 0.002
+        yf = yo - (stand + 0.0052)
+        zbow = zc + 0.004
         for sgn in (-1, 1):
             bm = bmesh.new()
             r = bmesh.ops.create_cube(bm, size=1)
@@ -530,11 +570,13 @@ def build_arm(side, spec, m, mats, pose, seed=1):
         # 三角肌袖山鼓（幅度收敛：只留外侧下坡的一点肌量，不再顶出肩角）
         if i <= 2:
             r += 0.035 * math.exp(-((t - 0.20) / 0.14) ** 2) * max(0.0, math.cos(a - (TAU / 2 if side < 0 else 0.0))) * 0.8
-        # 肘弯内侧挤褶（环向波纹）
-        r += 0.055 * math.exp(-((i - eln) / 1.1) ** 2) * math.sin(a * 4 + wk[i % 8] * 6) * 0.5
+        # 肘弯内侧挤褶（环向波纹）——r17 加幅：512px 缩略图也要读出「布管」不是「橡胶管」
+        r += 0.085 * math.exp(-((i - eln) / 1.1) ** 2) * math.sin(a * 4 + wk[i % 8] * 6) * 0.5
+        # 袖口上方堆褶（布在腕上蹲住）
+        r += 0.055 * math.exp(-((i - 6.4) / 0.8) ** 2) * math.sin(a * 5 + wk[(i + 2) % 8] * 6) * 0.5
         # 布面低频
-        r += 0.016 * (wk[int(a / TAU * 12) % 12] - 0.5)
-        r += 0.012 * math.sin(a * 3 + i * 2.2 + wk[(i + 5) % 24] * 7)
+        r += 0.024 * (wk[int(a / TAU * 12) % 12] - 0.5)
+        r += 0.017 * math.sin(a * 3 + i * 2.2 + wk[(i + 5) % 24] * 7)
         return r
     bm = bmesh.new()
     rings = tube(bm, path, rads, rads, ring_n=18, cap_start=True, cap_end=False,
@@ -583,73 +625,76 @@ def _meta_to_mesh(obj, name, mat, decimate=0.55):
 
 
 def build_hand(side, wrist, hand_frame, spec, mats, curl=0.55, spread=0.0):
-    """metaball 连续皮肤手：掌腹/鱼际/四指三节（关节鼓）/拇指——无木节缝。
-    指梢背面贴指甲盖。返回 [手, 指甲] obj 列表。"""
+    """参数化手 v3（r17：metaball 退役——融球手无论分辨率多高都读成「棉手套」）：
+    · 掌 = 腕→掌指关节的椭圆放样（掌背 MCP 骨脊、掌侧鱼际/小鱼际肉垫）
+    · 五指 = 三节管：节间半径收细、关节处半径鼓——指节是「串珠轮廓」不是直管；
+      full 机位数得出 5 根，近景读得出三段指节
+    · 指梢贴指甲板；subsurf 渲染 2 级（限位面圆润，根治木板指）"""
     d = Vector(hand_frame['dir']).normalized()
     palm_n = Vector(hand_frame['palm']).normalized()
     sidev = d.cross(palm_n).normalized()
     bloat = spec.get('bloat', 0.0)
-    S = (1 + bloat * 0.28) * spec.get('H', 1.72) / 1.72 * 1.10   # 真人手长 ~0.105H；r13 小一号=火柴棍
-    key = 'HandMeta' + ('L' if side < 0 else 'R')
-    mb = bpy.data.metaballs.new(key)
-    mb.resolution = 0.0028
-    mb.render_resolution = 0.0028
-    obj = bpy.data.objects.new(key, mb)
-    bpy.context.collection.objects.link(obj)
+    S = (1 + bloat * 0.26) * spec.get('H', 1.72) / 1.72
+    bm = bmesh.new()
+    # —— 掌 ——
+    Lp = 0.086 * S
+    path = [wrist - d * 0.008 * S, wrist + d * Lp * 0.22, wrist + d * Lp * 0.52,
+            wrist + d * Lp * 0.80, wrist + d * Lp * 1.00]
+    wids = [0.0265 * S, 0.0305 * S, 0.0350 * S, 0.0385 * S, 0.0372 * S]
+    deps = [0.0130 * S, 0.0135 * S, 0.0140 * S, 0.0138 * S, 0.0122 * S]
 
-    def ball(p, r):
-        el = mb.elements.new(type='BALL')
-        el.co = p
-        el.radius = r
-
-    def chain(p0, p1, r0, r1):
-        """密排球链（步长 ≤0.45r，metaball 影响域=半径，必须密排才融合）。"""
-        L = (p1 - p0).length
-        rmin = min(r0, r1)
-        n = max(2, int(math.ceil(L / max(rmin * 0.45, 1e-5))))
-        for i in range(n + 1):
-            t = i / n
-            ball(p0.lerp(p1, t), r0 + (r1 - r0) * t)
-
-    # 掌体：2D 密网格布球（两个方向步长都 ≤0.5R，保证成一块连续掌）
-    n_rows = 9
-    for ir in range(n_rows):
-        t = ir / (n_rows - 1)
-        tpalm = 0.004 + t * 0.080
-        wpalm = (0.0092 + t * 0.0075) * S
-        rpalm = (0.0135 - t * 0.0025) * S
-        nk = max(2, int(math.ceil(2 * wpalm / (rpalm * 0.5))))
-        for ik in range(nk + 1):
-            kx = -1 + 2 * ik / nk
-            ball(wrist + d * tpalm * S + sidev * kx * wpalm - palm_n * 0.001, rpalm)
-    # 鱼际（拇指根肉）
-    ball(wrist + d * 0.030 * S - sidev * 0.022 * S - palm_n * 0.005, 0.0125 * S)
-    # 四指：三节密链 + 关节微鼓；记录指梢帧给指甲
-    fl = [0.86, 1.0, 0.95, 0.74]
+    def pbulge(i, a):
+        r = 1.0
+        backn = max(0.0, -math.sin(a))     # 手背
+        palmn = max(0.0, math.sin(a))
+        if i >= 3:   # 掌背 MCP 骨脊（伸肌腱扇）
+            r += 0.09 * backn * max(0.0, math.sin(a * 4.0 + 0.6)) * (i - 2)
+        if i <= 2:   # 鱼际/小鱼际肉垫（掌侧近腕两缘）
+            r += 0.13 * palmn * math.exp(-((abs(math.cos(a)) - 0.72) / 0.24) ** 2) * (1 - i * 0.25)
+        return r
+    tube(bm, path, wids, deps, ring_n=16, ref=palm_n, cap_start=True, cap_end=True, bulge=pbulge)
+    # —— 五指：三节管（关节鼓/节间收）——
+    fl = [0.80, 1.00, 0.94, 0.72]
+    frads = [0.0074, 0.0077, 0.0072, 0.0062]
     nail_frames = []
     for i in range(4):
-        off = sidev * ((i - 1.5) * 0.0190 * S)
-        base = wrist + d * 0.086 * S + off
-        chain(wrist + d * 0.076 * S + off * 0.9, base, 0.0088 * S, 0.0080 * S)  # 掌指过渡
-        L = 0.066 * fl[i] * S
-        dir1 = (d + sidev * (spread * (i - 1.5) * 0.16) - palm_n * curl * 0.30).normalized()
-        dir2 = (dir1 - palm_n * curl * 0.85).normalized()
-        dir3 = (dir2 - palm_n * curl * 1.05).normalized()
-        p = Vector(base)
-        for dseg, frac, rr in ((dir1, 0.42, 0.0074), (dir2, 0.34, 0.0066), (dir3, 0.24, 0.0058)):
-            q = p + dseg * (L * frac)
-            chain(p, q, rr * S, rr * S)
-            ball(q, rr * S * 1.14)   # 关节微鼓
-            p = q
-        nail_frames.append((Vector(q), dir3, 0.0058 * S))
-    # 拇指：两节
-    tb = wrist + d * 0.028 * S - sidev * 0.030 * S - palm_n * 0.004
-    t1 = tb - sidev * 0.020 * S + d * 0.024 * S - palm_n * 0.010
-    t2 = t1 - sidev * 0.008 * S + d * 0.030 * S - palm_n * 0.014 * curl
-    chain(tb, t1, 0.0100 * S, 0.0085 * S)
-    chain(t1, t2, 0.0082 * S, 0.0064 * S)
-    nail_frames.append((Vector(t2), (t2 - t1).normalized(), 0.0064 * S))
-    hand = _meta_to_mesh(obj, 'Hand' + ('L' if side < 0 else 'R'), mats['skin_flat'], decimate=0.62)
+        off = sidev * ((i - 1.5) * 0.0205 * S)
+        r0 = frads[i] * S
+        base = wrist + d * (Lp * 0.92) + off - palm_n * 0.0012
+        L = 0.088 * fl[i] * S
+        # 基础微张 0.06：并拢成坨读不出 5 指（full 机位铁律）
+        d0 = (d + sidev * ((spread + 0.06) * (i - 1.5) * 0.15) - palm_n * curl * 0.38).normalized()
+        d1 = (d0 - palm_n * curl * 0.80).normalized()
+        d2 = (d1 - palm_n * curl * 0.90).normalized()
+        p1 = base + d0 * (L * 0.46)
+        p2 = p1 + d1 * (L * 0.30)
+        p3 = p2 + d2 * (L * 0.24)
+        pts = [base - d0 * 0.014 * S, base, base + d0 * (L * 0.24), p1 - d0 * (L * 0.06),
+               p1 + d1 * (L * 0.05), p1 + d1 * (L * 0.16), p2 - d1 * (L * 0.05),
+               p2 + d2 * (L * 0.05), p2 + d2 * (L * 0.13), p3 - d2 * (L * 0.05), p3]
+        rads = [r0 * 1.06, r0 * 1.04, r0 * 0.94, r0 * 1.10, r0 * 1.08,
+                r0 * 0.89, r0 * 1.05, r0 * 1.02, r0 * 0.84, r0 * 0.74, r0 * 0.42]
+        tube(bm, pts, rads, [rr * 0.90 for rr in rads], ring_n=12, ref=palm_n,
+             cap_start=True, cap_end=True)
+        nail_frames.append((Vector(p3), Vector(d2), r0 * 0.92))
+    # —— 拇指（两节 + 虎口斜出）——
+    # r17b 教训：基点贴腕+横向支出=「腕上断桩」；垂手拇指应沿掌缘下伸、微离掌
+    tb = wrist + d * 0.038 * S - sidev * 0.024 * S - palm_n * 0.006 * S
+    r0 = 0.0092 * S
+    dt0 = (d * 0.78 - sidev * 0.46 - palm_n * 0.14).normalized()
+    dt1 = (d * 0.92 - sidev * 0.26 - palm_n * curl * 0.36).normalized()
+    t1 = tb + dt0 * 0.038 * S
+    t2 = t1 + dt1 * 0.034 * S
+    ptsT = [tb - dt0 * 0.012 * S, tb, tb + dt0 * 0.020 * S, t1 - dt0 * 0.006 * S,
+            t1 + dt1 * 0.008 * S, t1 + dt1 * 0.020 * S, t2 - dt1 * 0.006 * S, t2]
+    radsT = [r0 * 1.10, r0 * 1.05, r0 * 0.96, r0 * 1.06, r0 * 1.02, r0 * 0.86, r0 * 0.76, r0 * 0.40]
+    tube(bm, ptsT, radsT, [rr * 0.92 for rr in radsT], ring_n=12, ref=palm_n,
+         cap_start=True, cap_end=True)
+    nail_frames.append((Vector(t2), Vector(dt1), r0 * 0.85))
+    hand = finish_mesh('Hand' + ('L' if side < 0 else 'R'), bm, [mats['skin_flat']], subsurf=1)
+    for md in hand.modifiers:
+        if md.type == 'SUBSURF':
+            md.render_levels = 2
     # —— 指甲盖：指梢背面的一片微曲甲板（横向微拱、指向指尖） ——
     bm = bmesh.new()
     for tip, tdir, rr in nail_frames:
@@ -787,11 +832,17 @@ def build_feet(spec, m, mats):
     return objs
 
 
+def neck_radius(spec, m):
+    """颈半径唯一源（颈/领/躯干轭肩共用）。
+    r17 铁律：颈宽 ≤ 头宽×0.42（头宽=2×rx≈0.152 → 颈半径 ≤0.032）。"""
+    return 0.0300 * m['H'] / 1.72 * (1 + spec.get('bloat', 0.0) * 0.22)
+
+
 def build_neck(spec, m, mats):
     """颈：底部张进斜方肌/锁骨窝，中段圆柱微前倾，喉结鼓包——不是插棍。"""
-    r = 0.0345 * m['H'] / 1.72 * (1 + spec.get('bloat', 0.0) * 0.3)
+    r = neck_radius(spec, m)
     z0 = m['shoulder'] - 0.045
-    z1 = m['neck_top'] + 0.008
+    z1 = m['neck_top'] + 0.012
     yo0, yo1 = stoop_off(spec, m, z0), stoop_off(spec, m, z1)
     pitch = spec.get('head_pitch', 0.0)
     y_lean = -math.sin(pitch) * 0.02
@@ -799,8 +850,8 @@ def build_neck(spec, m, mats):
             Vector((0, yo0 * 0.7 + yo1 * 0.3, z0 + (z1 - z0) * 0.30)),
             Vector((0, yo0 * 0.4 + yo1 * 0.6 + y_lean * 0.4, z0 + (z1 - z0) * 0.62)),
             Vector((0, yo1 + y_lean, z1))]
-    rads_w = [r * 1.45, r * 1.12, r * 1.02, r * 1.04]
-    rads_d = [r * 1.22, r * 1.05, r * 0.99, r * 1.00]
+    rads_w = [r * 1.50, r * 1.10, r * 1.00, r * 1.02]
+    rads_d = [r * 1.28, r * 1.05, r * 0.98, r * 1.00]
     male = spec.get('anomaly') != 'drowned'
 
     def bulge(i, a):
@@ -905,12 +956,15 @@ def assemble_character(spec):
         'nail': flat_mat(name + '_nail',
                          tuple(srgb_to_linear(float(np.clip(c * 1.06 + 0.04, 0, 1))) for c in
                                ((0.52, 0.58, 0.58) if wet else skin_rgb)), rough=0.30),
+        # 角膜光壳：透明低粗糙——高光点由它接（湿眼读法，杀「干珠子眼」）
+        'cornea': glass_mat(name + '_cornea', rough=0.04, alpha=0.13),
         'band': flat_mat(name + '_bandm', (0.55, 0.08, 0.07), rough=0.75),
         'straw': flat_mat(name + '_straw', (0.55, 0.44, 0.26), rough=0.9),
         'tray': flat_mat(name + '_tray', (0.30, 0.20, 0.12), rough=0.55),
         'bowl': flat_mat(name + '_bowl', (0.85, 0.83, 0.78), rough=0.25),
         'kelp': flat_mat(name + '_kelp', (0.115, 0.165, 0.105), rough=0.45),
-        'pearl': flat_mat(name + '_pearl', (0.78, 0.74, 0.63), rough=0.38),
+        # 钙化痂壳：石灰岩灰白哑光（r16「珠状牙」根治：不许珍珠亮）
+        'pearl': flat_mat(name + '_pearl', (0.50, 0.49, 0.44), rough=0.72),
         'salt': flat_mat(name + '_salt', (0.92, 0.94, 0.94), rough=0.55),
     }
 
@@ -966,7 +1020,9 @@ def assemble_character(spec):
     pivot.parent = root
 
     field, head_objs = HF.forge_head(spec, seed, mats)
-    head_lift = field.rz * 0.41   # 头压低：下颌落到领口，不露木偶长颈
+    # 头抬升：双侧 vstretch 后颏底 ~-0.67 单位，抬升系数按
+    # 「颏底落在领口上缘 +12mm」标定（领顶 = 轭肩顶 +0.028）
+    head_lift = field.rz * 0.78
     if spec.get('hat') == 'straw':
         hat = add_straw_hat(mats)
         crown = field.pos(Vector((0, -0.12, 1.0)))
