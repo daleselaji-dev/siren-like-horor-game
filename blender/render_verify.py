@@ -109,7 +109,8 @@ def setup_and_render(blend_path, out_dir, tag, name, samples, scale):
             for c in o.bound_box:
                 top_z = max(top_z, (o.matrix_world @ Vector(c)).z)
     if head_p is None:
-        head_p = Vector((0, 0, max(0.6, top_z - 0.22)))  # 场景件：以包围盒顶估「头位」
+        # 场景件（神像）：冕旒/冠在包围盒顶上方 ~0.12m，头心再往下
+        head_p = Vector((0, -0.05, max(0.6, top_z - 0.115)))
     hy, head_z = head_p.y, head_p.z
 
     views = {

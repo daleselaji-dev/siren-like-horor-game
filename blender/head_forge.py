@@ -584,7 +584,7 @@ def build_scalp(field, spec, mats):
     for v in bm.verts:
         d = v.co.normalized()
         lon = math.atan2(d.x, -d.y)
-        sideburn = (abs(abs(lon) - TAU / 4) < 0.22) and d.z > -0.12
+        sideburn = (abs(abs(lon) - 1.36) < 0.15) and d.z > -0.12
         if not (d.z > hl_at(lon) - 0.14 or sideburn):
             kill.append(v)
     bmesh.ops.delete(bm, geom=kill, context='VERTS')
@@ -609,7 +609,7 @@ def build_scalp(field, spec, mats):
     return _new_obj('Scalp', me, [mats.get('hair_dk', mats['hair'])])
 
 
-def build_hair_cards(field, spec, mats, count=560):
+def build_hair_cards(field, spec, mats, count=680):
     """碎发卡群（≥300/头）：卡骑在发壳表面（根部厚度=壳厚场同源），沿梳向走全头，
     梢部收尖微翘；发际线/鬓角/颈后另加细碎越线短茬。湿客改为重力垂落贴脸的湿绺。"""
     style = spec.get('hair', 'short')
@@ -629,7 +629,10 @@ def build_hair_cards(field, spec, mats, count=560):
         lon = math.atan2(d.x, -d.y)
         hl = _hairline_z(lon, style)
         edge_zone = abs(d.z - hl) < 0.14
-        sideburn_root = (abs(abs(lon) - TAU / 4) < 0.20 and -0.10 < d.z < hl)
+        sideburn_root = (abs(abs(lon) - 1.36) < 0.13 and -0.10 < d.z < hl)
+        in_ear = abs(abs(lon) - 1.62) < 0.22 and -0.28 < zz < 0.30   # 耳廓窗：发绕耳不盖耳
+        if in_ear:
+            continue
         if not (d.z > hl - 0.03 or sideburn_root):
             continue
         made += 1
@@ -644,7 +647,7 @@ def build_hair_cards(field, spec, mats, count=560):
             comb = Vector((d.x * 0.45, 0.55 * front + 0.35, -0.15 - 0.45 * max(0.0, -front) - 0.3 * max(0.0, 0.3 - d.z)))
         comb = (comb - nrm * comb.dot(nrm)).normalized()
         comb = (comb + Vector((rng.random() - 0.5, rng.random() - 0.5, rng.random() - 0.5)) * 0.35).normalized()
-        L = (0.012 + rng.random() * 0.014) * (0.92 if edge_zone else 1.0)
+        L = (0.014 + rng.random() * 0.016) * (0.92 if edge_zone else 1.0)
         if sideburn_root:
             if rng.random() < 0.5:
                 made -= 1
@@ -657,7 +660,7 @@ def build_hair_cards(field, spec, mats, count=560):
         if wet:
             L = (0.030 + rng.random() * 0.028) * (0.55 if math.cos(lon) > 0.45 else 1.0)
             comb = (comb * 0.4 + Vector((0, 0, -1)) + Vector((d.x, d.y, 0)).normalized() * 0.35).normalized()
-        w0 = (0.0013 if not wet else 0.0040) + rng.random() * 0.0008
+        w0 = (0.0010 if not wet else 0.0040) + rng.random() * 0.0007
         pts = [Vector(p)]
         dirv = comb.copy()
         for sgi in range(segs):
@@ -678,7 +681,9 @@ def build_hair_cards(field, spec, mats, count=560):
                 lift = sl + 0.0004 + 0.0009 * (t ** 2) + rng.random() * 0.0002
                 q = surf + nq * lift
                 lon_q = math.atan2(dq.x, -dq.y)
-                if dq.z < -0.24 or (dq.z < _hairline_z(lon_q, style) - 0.06 and abs(abs(lon_q) - TAU / 4) > 0.28):
+                if abs(abs(lon_q) - 1.62) < 0.20 and -0.26 < dq.z < 0.26:
+                    break  # 走线进耳廓窗：截断
+                if dq.z < -0.24 or (dq.z < _hairline_z(lon_q, style) - 0.06 and abs(abs(lon_q) - 1.36) > 0.24):
                     break  # 滑进面颊/颌区：截断
                 dirv = (q - pts[-1]).normalized()
                 dirv = (dirv - nq * dirv.dot(nq) * 0.65).normalized()
@@ -714,7 +719,7 @@ def build_hair_cards(field, spec, mats, count=560):
                 lon = (rng.random() - 0.5) * 1.6
                 zz = _hairline_z(lon, style) + (rng.random() - 0.62) * 0.07
             elif which < 0.75:    # 鬓角（短茬贴皮，长了在颊侧剪影上读成天线）
-                lon = (1 if rng.random() < 0.5 else -1) * (TAU / 4 + (rng.random() - 0.5) * 0.30)
+                lon = (1 if rng.random() < 0.5 else -1) * (1.36 + (rng.random() - 0.5) * 0.24)
                 zz = -0.14 + rng.random() * 0.26
                 L_cap = 0.0045
             else:                 # 颈后

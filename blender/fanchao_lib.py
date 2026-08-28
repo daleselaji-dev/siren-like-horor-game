@@ -332,14 +332,20 @@ def build_clothed_torso(spec, m, mats, seed):
     rings = tube(bm, path, widths, depths, ring_n=ring_n, cap_start=True, cap_end=True,
                  mat_index=0, bulge=bulge, y_off=yoffs)
     # 肩坡场：把躯干上部的外侧角向下压——斜方肌从颈根斜下到肩峰（板箱→人肩的关键）
-    slope = 0.062 if outfit in ('zhongshan', 'waiter') else 0.050   # 棉袄垫厚坡缓
+    slope = 0.062 if outfit in ('zhongshan', 'waiter') else 0.078   # 棉袄垫厚要压更狠（顶盖甲板）
     x_in = 0.055
+    yo_sh = stoop_off(spec, m, m['shoulder'])
+    d_top = depths[-1]
     for v in bm.verts:
         zz = v.co.z
         if zz > m['waist']:
             tz = smoothstep((zz - m['waist']) / (m['shoulder'] + 0.012 - m['waist']))
             tx = smoothstep(max(0.0, abs(v.co.x) - x_in) / max(1e-5, m['sw'] + pad - x_in))
-            v.co.z -= slope * (tx ** 1.6) * (tz ** 2.2)
+            # 背侧坡：顶盖必须从领根向背下倾——驼背角色顶盖后仰时
+            # 纯 x 向坡会留一块受顶光的水平甲板（townsman 肩后亮包根治）；
+            # 胸侧不压（压了成碟形凹胸）
+            ty = smoothstep(max(0.0, (v.co.y - yo_sh) - 0.028) / max(1e-5, d_top - 0.028))
+            v.co.z -= slope * (tz ** 2.2) * min(1.0, tx ** 1.35 + 0.60 * ty ** 1.5)
     # 下摆卷边：底环向外下再折入（布有厚度）
     r0 = rings[0]
     out_ring, in_ring = [], []
@@ -473,8 +479,13 @@ def build_arm(side, spec, m, mats, pose, seed=1):
     """袖管：袖山三角肌鼓 + 肘内侧挤褶 + 翻边袖口（开口见内里）+ 腕内衬皮肤管。
     返回（[obj...], 腕位置Vector, 手朝向dict）。"""
     yo_sh = stoop_off(spec, m, m['shoulder'])
-    # 袖根内收下沉：肩峰在斜方肌坡的下端，袖山必须塞进坡底而不是并排搭板
-    sh = Vector((side * m['sw'] * 0.90, yo_sh, m['shoulder'] - 0.034))
+    # 袖根内收下沉：肩峰在斜方肌坡的下端，袖山顶必须没入坡面以下——
+    # r16 复盘：坡场外缘压深 0.062，袖顶只沉 0.028 → 高出坡缘 3cm 读成泡泡袖；
+    # 棉袄坡场更深(0.078)+背侧坡，袖根要跟着沉得更狠、收得更进
+    outfit0 = spec.get('outfit', 'zhongshan')
+    padded0 = outfit0 not in ('zhongshan', 'waiter')
+    sh = Vector((side * m['sw'] * (0.84 if padded0 else 0.86), yo_sh,
+                 m['shoulder'] - (0.066 if padded0 else 0.048)))
     outfit = spec.get('outfit', 'zhongshan')
     pad = 0.011 if outfit in ('zhongshan', 'waiter') else 0.022
     bloat = spec.get('bloat', 0.0)
@@ -500,13 +511,13 @@ def build_arm(side, spec, m, mats, pose, seed=1):
     # 9 节点路径（肩帽→袖口）。袖山顶环必须是「正上方的水平小环」：
     # 任何侧向偏移都会让首环平面立起来，整个环半径变成竖直方向的出头量——
     # r10–r12 的「肩角」全部源于此。水平环的顶=cap.z，确定压在肩坡线以下。
-    cap = sh + Vector((0.0, 0.0, 0.010))
+    cap = sh + Vector((0.0, 0.0, 0.006))
     mid_u1 = sh.lerp(el, 0.33) + Vector((side * 0.009, -0.004, 0))
     mid_u2 = sh.lerp(el, 0.66) + Vector((side * 0.005, -0.002, 0))
     mid_f1 = el.lerp(wr, 0.35)
     mid_f2 = el.lerp(wr, 0.72)
     path = [cap, sh, mid_u1, mid_u2, el, mid_f1, mid_f2, wr]
-    rads = [upper_r * 0.30 + pad * 0.3, upper_r * 1.00 + pad, upper_r + pad, upper_r * 0.93 + pad,
+    rads = [upper_r * 0.24 + pad * 0.25, upper_r * 0.88 + pad * 0.9, upper_r + pad, upper_r * 0.93 + pad,
             fore_r + pad + 0.005, fore_r * 0.97 + pad, fore_r * 0.88 + pad, wrist_r + pad + 0.003]
     axis = (wr - sh).normalized()
     eln = 4  # 肘节点下标
@@ -779,7 +790,7 @@ def build_feet(spec, m, mats):
 def build_neck(spec, m, mats):
     """颈：底部张进斜方肌/锁骨窝，中段圆柱微前倾，喉结鼓包——不是插棍。"""
     r = 0.0345 * m['H'] / 1.72 * (1 + spec.get('bloat', 0.0) * 0.3)
-    z0 = m['shoulder'] - 0.028
+    z0 = m['shoulder'] - 0.045
     z1 = m['neck_top'] + 0.008
     yo0, yo1 = stoop_off(spec, m, z0), stoop_off(spec, m, z1)
     pitch = spec.get('head_pitch', 0.0)
@@ -788,8 +799,8 @@ def build_neck(spec, m, mats):
             Vector((0, yo0 * 0.7 + yo1 * 0.3, z0 + (z1 - z0) * 0.30)),
             Vector((0, yo0 * 0.4 + yo1 * 0.6 + y_lean * 0.4, z0 + (z1 - z0) * 0.62)),
             Vector((0, yo1 + y_lean, z1))]
-    rads_w = [r * 1.70, r * 1.14, r * 1.02, r * 1.04]
-    rads_d = [r * 1.35, r * 1.06, r * 0.99, r * 1.00]
+    rads_w = [r * 1.45, r * 1.12, r * 1.02, r * 1.04]
+    rads_d = [r * 1.22, r * 1.05, r * 0.99, r * 1.00]
     male = spec.get('anomaly') != 'drowned'
 
     def bulge(i, a):
@@ -797,7 +808,7 @@ def build_neck(spec, m, mats):
         fr = math.sin(a)
         # 斜方肌后坡（底环后侧加宽）
         if i == 0:
-            b += 0.28 * max(0.0, -fr)
+            b += 0.16 * max(0.0, -fr)
         # 喉结（中上段前面）
         if male and i == 2:
             b += 0.10 * math.exp(-((a - TAU / 4) / 0.5) ** 2)
@@ -886,7 +897,7 @@ def assemble_character(spec):
                                                     for c in spec.get('hair_rgb', (0.09, 0.08, 0.07))), rough=0.8),
         'brow': flat_mat(name + '_brow', spec.get('brow_rgb', tuple(c * 0.7 for c in spec.get('hair_rgb', (0.09, 0.08, 0.07)))), rough=0.9),
         'coat': flat_mat(name + '_coat', spec.get('coat_rgb', (0.30, 0.32, 0.34)),
-                         rough=0.42 if wet else 0.88, bump=0.10 if wet else 0.16, bump_scale=230.0),
+                         rough=0.64 if wet else 0.88, bump=0.10 if wet else 0.16, bump_scale=230.0),
         'trouser': flat_mat(name + '_trouser', spec.get('trouser_rgb', (0.16, 0.17, 0.19)),
                             rough=0.5 if wet else 0.9, bump=0.09 if wet else 0.14, bump_scale=280.0),
         'shoe': flat_mat(name + '_shoe', spec.get('shoe_rgb', (0.06, 0.055, 0.05)), rough=0.45),
@@ -988,15 +999,16 @@ def save_and_export(name, blend_dir, glb_dir):
 
 # ============================= 场景关键件：无面海神像 =============================
 
-def _flake_weather(obj, mats_pair, seed, freq=30.0, ratio=0.48, relief=0.0013, cuts=3):
-    """漆面剥落（几何+材质对齐）：先把 subsurf 提到 2 级真实应用得到平滑密网，
-    再三角化 + 切向抖动打散网格走向（材质逐面赋值，边界只能沿棱走——规则四边网格
-    必成数字迷彩，不规则三角网才像漆片沿棱角崩裂），最后用中频 fbm 连片成岛：
-    顶点噪声抬出漆层台地（有台阶厚度），同阈值把露木面换材质。"""
-    for m in obj.modifiers:
-        if m.type == 'SUBSURF':
-            m.levels = 3
-            m.render_levels = 3
+def _cyl_flake_texture(obj, seed, name, freq=8.0, ratio=0.46, relief=0.0022,
+                       lacquer_rgb=(0.30, 0.062, 0.048), wood_rgb=(0.33, 0.262, 0.196),
+                       tex_w=1024, tex_h=512, rough=0.62, top_lac=False):
+    """圆柱参数化漆面剥落：贴图与顶点位移共用 F(θ,z) 场。
+    r13–r15 教训：逐面材质赋值的剥落边界只能沿三角棱走——任何网格密度下都是
+    锯齿数码迷彩；像素级贴图边界 + 同场位移台地才读成「漆片崩裂」。"""
+    for mmod in obj.modifiers:
+        if mmod.type == 'SUBSURF':
+            mmod.levels = 2
+            mmod.render_levels = 2
     dg = bpy.context.evaluated_depsgraph_get()
     me_new = bpy.data.meshes.new_from_object(obj.evaluated_get(dg))
     old = obj.data
@@ -1004,80 +1016,113 @@ def _flake_weather(obj, mats_pair, seed, freq=30.0, ratio=0.48, relief=0.0013, c
     obj.modifiers.clear()
     bpy.data.meshes.remove(old)
     me = obj.data
-    bm = bmesh.new()
-    bm.from_mesh(me)
-    bmesh.ops.triangulate(bm, faces=bm.faces)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    for f in bm.faces:
-        f.smooth = True
-    bm.to_mesh(me)
-    bm.free()
     n_v = len(me.vertices)
     co = np.empty(n_v * 3)
     me.vertices.foreach_get('co', co)
     co = co.reshape(-1, 3)
+    zmin, zmax = co[:, 2].min(), co[:, 2].max()
+    height = max(zmax - zmin, 1e-5)
+    cx, cy = float(co[:, 0].mean()), float(co[:, 1].mean())
+    R0 = float(np.hypot(co[:, 0] - cx, co[:, 1] - cy).mean())
+    theta = np.arctan2(co[:, 0] - cx, -(co[:, 1] - cy))
+
+    def F(th, zz):
+        # 柱面嵌入采样（θ 向天然无缝）；域扭曲揉弯等值线防「数码迷彩」
+        p = np.stack([np.cos(th) * R0, np.sin(th) * R0, zz], axis=1)
+        warp = np.stack([HF.fbm3(p * (freq * 0.55) + o, seed + 31 + k * 5, octaves=2) - 0.5
+                         for k, o in enumerate((5.2, 17.8, 43.1))], axis=1) * (2.6 / freq)
+        q = p + warp
+        base = HF.fbm3(q * freq, seed, octaves=4)
+        edge = (HF.fbm3(q * (freq * 4.2), seed + 11, octaves=2) - 0.5) * 0.14
+        out = base + edge
+        if top_lac:   # 领口一圈保漆：袍顶盖环不许露浅木色（脖根亮楔根治）
+            out = out + np.clip((zz - (zmin + 0.86 * height)) / (0.14 * height), 0, 1) * 0.40
+        return out
+
+    # 顶点位移：漆岛台地（与贴图同场）
     nrm = np.empty(n_v * 3)
     me.vertices.foreach_get('normal', nrm)
     nrm = nrm.reshape(-1, 3)
-    # 切向抖动 ~7mm：打断规则网格线，让剥落边界成不规则多边形
-    J = np.stack([HF.fbm3(co * 41.0 + off, seed + k * 7, octaves=2) - 0.5
-                  for k, off in enumerate((13.7, 71.3, 29.1))], axis=1) * 2.0
-    J -= nrm * (J * nrm).sum(axis=1, keepdims=True)
-    co = co + J * 0.0075
-    me.vertices.foreach_set('co', co.ravel())
-    def flake_noise(pts):
-        # 域扭曲是关键：值噪声的等值线贴着立方晶格走，直接采样必出轴对齐的
-        # 「数码迷彩」方块；先用低频场把采样域揉弯，岛的边界才像漆片崩裂。
-        # 中频定岛 + 高频锯碎边缘（同一公式喂顶点和面心，几何台地与材质边严格对齐）
-        warp = np.stack([HF.fbm3(pts * (freq * 0.55) + o, seed + 31 + k * 5, octaves=2) - 0.5
-                         for k, o in enumerate((5.2, 17.8, 43.1))], axis=1) * (2.3 / freq)
-        q = pts + warp
-        base = HF.fbm3(q * freq, seed, octaves=4)
-        edge = (HF.fbm3(q * (freq * 4.6), seed + 11, octaves=2) - 0.5) * 0.17
-        return base + edge
-    n = flake_noise(co)
-    lift = np.clip((n - ratio) / 0.030, 0, 1)
-    co2 = co + nrm * (lift * relief)[:, None]
-    me.vertices.foreach_set('co', co2.ravel())
-    me.materials.append(mats_pair[1])   # index1 = 露木
-    cen = np.array([p.center[:] for p in me.polygons])
-    nf = flake_noise(cen)
-    for poly, v in zip(me.polygons, nf):
-        if v <= ratio:
-            poly.material_index = 1
+    fv = F(theta, co[:, 2])
+    lift = np.clip((fv - ratio) / 0.025, 0, 1)
+    me.vertices.foreach_set('co', (co + nrm * (lift * relief)[:, None]).ravel())
+
+    # UV：θ→u（跨缝面修正）、z→v
+    uu = theta / TAU + 0.5
+    vv = (co[:, 2] - zmin) / height
+    if not me.uv_layers:
+        me.uv_layers.new(name='UVMap')
+    uvl = me.uv_layers.active.data
+    for poly in me.polygons:
+        lis = range(poly.loop_start, poly.loop_start + poly.loop_total)
+        us = [uu[me.loops[li].vertex_index] for li in lis]
+        seam = max(us) - min(us) > 0.5
+        for li in lis:
+            vi = me.loops[li].vertex_index
+            u2 = uu[vi] + (1.0 if seam and uu[vi] < 0.5 else 0.0)
+            uvl[li].uv = (u2, vv[vi])
+
+    # 贴图光栅化：漆/木、断口暗缘、漆面陈化斑、竖向木纹、立面淌灰
+    W, H = tex_w, tex_h
+    tg = ((np.arange(W) + 0.5) / W - 0.5) * TAU
+    zg = zmin + (np.arange(H) + 0.5) / H * height
+    TH, ZZ = np.meshgrid(tg, zg)
+    ft = F(TH.ravel(), ZZ.ravel()).reshape(H, W)
+    rng2 = np.random.default_rng(seed + 7)
+    m_lac = np.clip((ft - ratio) / 0.006, 0, 1)
+    edge_m = np.exp(-(((ft - ratio) / 0.014) ** 2))
+    mottle = HF._fbm2(rng2, H, W, 8, 3)
+    grain = np.sin(TH * 80 + HF._fbm2(rng2, H, W, 5, 2) * 10) * 0.5 + 0.5
+    lac = np.array(lacquer_rgb)
+    wod = np.array(wood_rgb)
+    wood_c = wod[None, None, :] * (0.72 + 0.22 * grain[:, :, None]) * (0.80 + 0.28 * mottle[:, :, None]) * 0.92
+    lac_c = lac[None, None, :] * (0.72 + 0.52 * mottle[:, :, None])
+    canvas = wood_c * (1 - m_lac[:, :, None]) + lac_c * m_lac[:, :, None]
+    canvas *= 1 - 0.42 * edge_m[:, :, None]
+    streak = HF._vnoise2(rng2, 1, W, 44)[0]
+    VN = (np.arange(H) + 0.5) / H
+    canvas *= (1 - 0.30 * np.clip(streak - 0.42, 0, 1)[None, :, None] * (1 - VN)[:, None, None])
+    img = np_to_image(name, np.clip(canvas, 0, 1))
+    me.materials.clear()
+    me.materials.append(tex_mat(name + '_m', img, rough=rough))
+    for poly in me.polygons:
+        poly.material_index = 0
+    smooth = [True] * len(me.polygons)
+    me.polygons.foreach_set('use_smooth', smooth)
     me.update()
 
 
 def assemble_seagod(spec):
     """塌祠里请出来的木胎海神像。核心读法：那张脸不是没雕过——
     眉弓、鼻梁、闭着的眼、唇缝都还剩三成起伏，是被手掌一天一天顺着往下抹平的，
-    脸上留着五道竖向的指痕槽。朱漆剥落成真实台地，衣褶是深放样密度。"""
+    脸上留着五道竖向的指痕槽；摸到哪里，漆就褪到哪里（包浆渐变，不是贴片面具）。
+    袍身漆片剥落是像素级贴图边界 + 同场台地位移。"""
     seed = spec.get('seed', 7)
     rng = rng_stream(seed)
     name = spec['name']
     mats = {
-        'lacquer': flat_mat(name + '_lacquer', (0.27, 0.055, 0.045), rough=0.62),
-        'wood': flat_mat(name + '_wood', (0.21, 0.175, 0.14), rough=0.88),
-        'woodface': flat_mat(name + '_woodface', (0.40, 0.33, 0.25), rough=0.42),  # 被摸出包浆
-        'stone': flat_mat(name + '_stone', (0.20, 0.20, 0.21), rough=0.92),
-        'gilt': flat_mat(name + '_gilt', (0.55, 0.42, 0.18), rough=0.45, metal=0.7),
+        'stone': flat_mat(name + '_stone', (0.16, 0.16, 0.17), rough=0.92),
+        'gilt': flat_mat(name + '_gilt', (0.50, 0.38, 0.16), rough=0.5, metal=0.7),
+        'cord': flat_mat(name + '_cord', (0.030, 0.017, 0.008), rough=0.9),
         'ash': flat_mat(name + '_ash', (0.20, 0.19, 0.18), rough=0.95),
         'ember': flat_mat(name + '_ember', (0.9, 0.35, 0.12), rough=0.4),
+        'wood': flat_mat(name + '_woodn', (0.052, 0.037, 0.024), rough=0.88),
+        # 颈缝件：AgX 下 0.05 反照率会被主光洗成米白——领口阴影必须给近黑
+        'crev': flat_mat(name + '_crev', (0.014, 0.010, 0.007), rough=0.96),
     }
     root = bpy.data.objects.new(name + '_root', None)
     bpy.context.collection.objects.link(root)
     parts = []
 
-    # —— 底座（石，錾边 + 风化噪声）——
+    # —— 底座（石，方中带圆 + 錾边）——
     bm = bmesh.new()
     prof = [(0.30, 0.00), (0.315, 0.035), (0.285, 0.06), (0.27, 0.20), (0.295, 0.235), (0.30, 0.26)]
-    N = 4  # 方形四角
+    N = 4
     rings = []
     for (rr, zz) in prof:
         ring = []
         for k in range(N * 4):
             a = (k + 0.5) / (N * 4) * TAU
-            # 方中带圆的截面
             ca, sa = math.cos(a), math.sin(a)
             mx = max(abs(ca), abs(sa))
             ring.append(bm.verts.new(Vector((ca / mx * rr * 0.92, sa / mx * rr * 0.76, zz))))
@@ -1091,24 +1136,24 @@ def assemble_seagod(spec):
     plinth = finish_mesh('Plinth', bm, [mats['stone']], subsurf=0)
     parts.append(plinth)
 
-    # —— 袍身（深垂褶放样 + 下摆厚边）——
-    prof = [(0.26, 0.210), (0.32, 0.198), (0.45, 0.165), (0.58, 0.140), (0.70, 0.126),
-            (0.80, 0.128), (0.88, 0.134), (0.95, 0.140), (1.01, 0.118), (1.045, 0.082), (1.075, 0.056)]
+    # —— 袍身：收肩宽摆 + 深垂褶放样 + 肩坡场 ——
+    prof = [(0.26, 0.212), (0.32, 0.202), (0.45, 0.176), (0.58, 0.150), (0.70, 0.132),
+            (0.80, 0.121), (0.88, 0.112), (0.95, 0.103), (1.005, 0.086), (1.04, 0.058), (1.065, 0.040)]
     path = [Vector((0, -(z - 0.26) * 0.045, z)) for z, _ in prof]
     widths = [pr for _, pr in prof]
-    depths = [pr * 0.82 for _, pr in prof]
+    depths = [pr * 0.80 for _, pr in prof]
     wr = rng.random(24)
 
     def bulge(i, a):
         t = i / (len(prof) - 1)
         r = 1.0
         # 深垂褶：下摆深、上身浅；相位打散；前面开襟两道对称大褶
-        r += 0.115 * abs(math.sin(a * 4.5 + wr[i % 12] * 2.2)) ** 0.6 * (1 - t) ** 1.2 - 0.055 * (1 - t)
-        r += 0.05 * math.exp(-((abs(a - TAU / 4) - 0.35) / 0.16) ** 2) * (1 - t) * 0.8   # 开襟折
-        r += 0.028 * math.sin(a * 9 + i * 1.7 + wr[(i + 7) % 24] * 5) * (1 - t * 0.6)    # 碎褶
+        r += 0.150 * abs(math.sin(a * 4.5 + wr[i % 12] * 2.2)) ** 0.6 * (1 - t) ** 1.25 - 0.070 * (1 - t)
+        r += 0.055 * math.exp(-((abs(a - TAU / 4) - 0.35) / 0.16) ** 2) * (1 - t) * 0.8   # 开襟折
+        r += 0.026 * math.sin(a * 9 + i * 1.7 + wr[(i + 7) % 24] * 5) * (1 - t * 0.6)     # 碎褶
         return r
     bm = bmesh.new()
-    ringsR = tube(bm, path, widths, depths, ring_n=30, cap_start=True, cap_end=True, bulge=bulge)
+    ringsR = tube(bm, path, widths, depths, ring_n=34, cap_start=True, cap_end=True, bulge=bulge)
     r0 = ringsR[0]
     out_ring = []
     for v in r0:
@@ -1120,96 +1165,149 @@ def assemble_seagod(spec):
     for k in range(nn):
         k2 = (k + 1) % nn
         bm.faces.new((out_ring[k], out_ring[k2], r0[k2], r0[k]))
-    robe = finish_mesh('Robe', bm, [mats['lacquer']], subsurf=1)
+    # 肩坡场：袍顶外角下压——神像不是保龄球瓶
+    for v in bm.verts:
+        if v.co.z > 0.88:
+            tx = min(1.0, abs(v.co.x) / 0.105)
+            v.co.z -= (tx ** 2) * 0.055 * min(1.0, (v.co.z - 0.88) / 0.16)
+    robe = finish_mesh('Robe', bm, [mats['wood']], subsurf=1)
     parts.append(robe)
 
     # —— 交袖（垂褶密环 + 袖口黑洞——手是看不见的）——
     for sgn in (-1, 1):
-        sh = Vector((sgn * 0.135, -0.070, 0.945))
-        mid = Vector((sgn * 0.105, -0.185, 0.79))
-        end = Vector((-sgn * 0.035, -0.222, 0.665))
-        drop = Vector((sgn * 0.075, -0.205, 0.60))   # 袖口垂角
+        sh = Vector((sgn * 0.108, -0.058, 0.892))
+        mid = Vector((sgn * 0.098, -0.172, 0.775))
+        end = Vector((-sgn * 0.030, -0.205, 0.662))
+        drop = Vector((sgn * 0.068, -0.192, 0.598))   # 袖口垂角
         wk = rng.random(12)
 
         def sbulge(i, a):
             return 1 + 0.13 * abs(math.sin(a * 3.5 + wk[i % 6] * 3)) ** 0.7 * (0.4 + i / 4)
         bm = bmesh.new()
-        tube(bm, [sh, mid, end, drop], [0.055, 0.050, 0.046, 0.030], [0.048, 0.044, 0.040, 0.026],
-             ring_n=18, cap_start=True, cap_end=True, bulge=sbulge)
-        slv = finish_mesh('Sleeve', bm, [mats['lacquer']], subsurf=1)
+        tube(bm, [sh, mid, end, drop], [0.050, 0.047, 0.043, 0.028], [0.044, 0.041, 0.037, 0.024],
+             ring_n=20, cap_start=True, cap_end=True, bulge=sbulge)
+        slv = finish_mesh('Sleeve', bm, [mats['wood']], subsurf=1)
         parts.append(slv)
 
-    # —— 头：曾经有脸（低幅五官场 + 抹平 + 五道指痕竖槽 + 闭目丘）——
+    # —— 头：曾经有脸（低幅五官场 + 抹平 + 五道指痕竖槽 + 闭目丘 + 包浆渐变贴图）——
     god_head_spec = {'head': {'age': 0.0, 'brow_k': 1.0, 'nose_k': 1.0, 'cheek_k': 1.0,
-                              'hollow': 0.012, 'jaw_k': 1.0, 'chin_k': 1.0,
-                              'rx': 0.070, 'ry': 0.080, 'rz': 0.094, 'asym': 0.004}}
+                              'hollow': 0.010, 'jaw_k': 1.0, 'chin_k': 1.0,
+                              'rx': 0.075, 'ry': 0.085, 'rz': 0.100, 'asym': 0.003}}
     field = HF.HeadField(god_head_spec, seed + 3)
     bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=72, v_segments=54, radius=1.0)
+    bmesh.ops.create_uvsphere(bm, u_segments=88, v_segments=64, radius=1.0)
     vs = list(bm.verts)
     D = np.array([v.co[:] for v in vs])
     D /= np.linalg.norm(D, axis=1, keepdims=True)
-    P = field.unit_pos(D)
-    # 抹平：五官幅度衰到 42%（往单位球回退），只在脸区——「曾经是脸」要读得出
     lon = np.arctan2(D[:, 0], -D[:, 1])
+    uv_map = {}
+    for v, l, zz in zip(vs, lon, D[:, 2]):
+        uv_map[v] = (0.5 + l / TAU, 0.5 + math.asin(max(-1, min(1, zz))) / math.pi)
+    P = field.unit_pos(D)
+    # 抹平：五官幅度衰到 58%（往单位球回退），只在脸区——「曾经是脸」要读得出
     frontm = np.clip(np.cos(lon), 0, 1) ** 1.2 * (D[:, 2] < 0.55) * (D[:, 2] > -0.9)
-    P = P + (D - P) * (0.58 * frontm)[:, None]
+    P = P + (D - P) * (0.42 * frontm)[:, None]
     # 指痕：五道竖槽（手掌顺着脸往下抹的方向）
     for k, xg in enumerate((-0.30, -0.15, 0.0, 0.15, 0.30)):
         gm = np.exp(-((lon - xg) / 0.050) ** 2) * frontm * np.clip((0.38 - np.abs(D[:, 2] + 0.05)) / 0.38, 0, 1)
         P[:, 1] += gm * 0.026
-    # 闭目丘（眼睑鼓包，闭着）
+    # 闭目丘（眼睑鼓包，闭着）+ 睑缝横线
     for sgn in (-1, 1):
         E = np.array(field.eye_dirs[sgn])
         ang = np.arccos(np.clip(D @ E, -1, 1))
         P += D * (np.exp(-(ang / 0.20) ** 2) * 0.038)[:, None]
-        # 睑缝横线
         seam = np.exp(-(ang / 0.22) ** 2) * np.exp(-((D[:, 2] - HF.LM['eye_z'] + 0.03) / 0.022) ** 2)
         P[:, 1] += seam * 0.011
     P *= np.array([field.rx, field.ry, field.rz])
     for v, p in zip(vs, P):
         v.co = Vector(p)
+    uvl_bm = bm.loops.layers.uv.verify()
+    for f in bm.faces:
+        f.material_index = 0
+        us_face = [uv_map[lp.vert][0] for lp in f.loops]
+        seam_f = max(us_face) - min(us_face) > 0.5
+        for lp in f.loops:
+            u2, v2 = uv_map[lp.vert]
+            if seam_f and u2 < 0.5:
+                u2 += 1.0
+            lp[uvl_bm].uv = (u2, v2)
     me = bpy.data.meshes.new('GodHead')
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me)
     bm.free()
     head = new_object('GodHead', me)
-    head.data.materials.append(mats['woodface'])
+    # 头贴图：包浆木脸（掌摸渐变）↔ 颅侧残漆——渐变边界，不是贴片面具
+    Wt, Ht = 768, 384
+    rngh = np.random.default_rng(seed + 21)
+    us = (np.arange(Wt) + 0.5) / Wt
+    vsg = (np.arange(Ht) + 0.5) / Ht
+    UU, VV = np.meshgrid(us, vsg)
+    lon_t = (UU - 0.5) * TAU
+    z_t = np.sin((VV - 0.5) * math.pi)
+    touch = np.clip(np.cos(lon_t), 0, 1) ** 1.3 * np.exp(-((z_t - -0.05) / 0.52) ** 2)
+    touch = np.clip(touch * 1.35 - 0.12, 0, 1)
+    grain_h = np.sin(lon_t * 20 + HF._fbm2(rngh, Ht, Wt, 5, 2) * 7) * 0.5 + 0.5
+    mott_h = HF._fbm2(rngh, Ht, Wt, 8, 3)
+    lac_h = np.array((0.30, 0.062, 0.048))[None, None, :] * (0.70 + 0.55 * mott_h[:, :, None])
+    # 掌摸包浆区＝抛光面：木纹对比压到 4%，靠几何残余五官读脸，不靠条纹
+    face_h = np.array((0.47, 0.368, 0.272))[None, None, :] * (0.96 + 0.04 * grain_h[:, :, None])
+    flake_h = np.clip((HF._fbm2(rngh, Ht, Wt, 10, 3) - 0.45) * 6, 0, 1)
+    lac_mix = lac_h * (1 - flake_h[:, :, None] * 0.5) + np.array((0.24, 0.19, 0.145))[None, None, :] * flake_h[:, :, None] * 0.5
+    canvas_h = lac_mix * (1 - touch[:, :, None]) + face_h * touch[:, :, None]
+    # 指痕槽里的暗积垢 + 闭目缝影
+    for xg in (-0.30, -0.15, 0.0, 0.15, 0.30):
+        gm = np.exp(-((lon_t - xg) / 0.045) ** 2) * np.exp(-((z_t + 0.05) / 0.36) ** 2)
+        canvas_h *= 1 - 0.16 * gm[:, :, None]
+    for sgn in (-1, 1):
+        el = HF.LM['eye_lon'] * sgn
+        gm = np.exp(-((lon_t - el) / 0.16) ** 2) * np.exp(-((z_t - (HF.LM['eye_z'] - 0.03)) / 0.035) ** 2)
+        canvas_h *= 1 - 0.30 * gm[:, :, None]
+    # 颌下积垢渐暗：手掌摸不到的下半球积灰返潮——不许亮木楔顶在领口上
+    canvas_h *= (1 - 0.60 * np.clip((-z_t - 0.32) / 0.42, 0, 1))[:, :, None]
+    img_h = np_to_image(name + '_head', np.clip(canvas_h, 0, 1))
+    me.materials.append(tex_mat(name + '_headm', img_h, rough=0.46))
     shade_smooth(head)
-    head.location = Vector((0, -0.048, 1.145))
-    # 颅侧/后仍带漆（脸被摸成包浆露木）
-    head.data.materials.append(mats['lacquer'])
-    for poly in head.data.polygons:
-        c = poly.center
-        plon = math.atan2(c.x, -c.y)
-        if abs(plon) > 1.05 or c.z > 0.062:
-            poly.material_index = 1
+    head.location = Vector((0, -0.048, 1.128))
     parts.append(head)
 
     # 颈（袍领接头）
     bm = bmesh.new()
-    tube(bm, [Vector((0, -0.040, 1.05)), Vector((0, -0.046, 1.13))],
-         [0.040, 0.036], [0.037, 0.034], ring_n=14, cap_start=True, cap_end=True)
-    parts.append(finish_mesh('GodNeck', bm, [mats['wood']], subsurf=1))
+    tube(bm, [Vector((0, -0.040, 1.02)), Vector((0, -0.045, 1.10))],
+         [0.043, 0.038], [0.040, 0.036], ring_n=14, cap_start=True, cap_end=True)
+    parts.append(finish_mesh('GodNeck', bm, [mats['crev']], subsurf=1))
 
-    # —— 冕板 + 珠旒（前后各五串×5珠）——
+    # —— 冕板 + 珠旒（前后各五串×5珠，串绳可见）——
+    crown_z = 1.229
     bm = bmesh.new()
     r = bmesh.ops.create_cube(bm, size=1)
     for v in r['verts']:
-        v.co = Vector((v.co.x * 0.082, v.co.y * 0.125, v.co.z * 0.010))
-        v.co += Vector((0, -0.048, 1.240))
+        # 冕板必须罩住全部旒绳挂点（x±0.052 / y±0.100），且窄长（非学位帽）
+        v.co = Vector((v.co.x * 0.125, v.co.y * 0.225, v.co.z * 0.009))
+        v.co += Vector((0, -0.048, crown_z))
     parts.append(finish_mesh('Crown', bm, [mats['gilt']], subsurf=0))
+    # 冠束带：贴颅顶的一圈金箍（冕板不再是悬浮 UFO）
     bm = bmesh.new()
+    tube(bm, [Vector((0, -0.048, 1.185)), Vector((0, -0.048, 1.212)), Vector((0, -0.048, 1.228))],
+         [0.0655, 0.0605, 0.050], [0.0725, 0.0685, 0.058], ring_n=20)
+    parts.append(finish_mesh('CrownBand', bm, [mats['gilt']], subsurf=1))
+    bm = bmesh.new()
+    bm_cord = bmesh.new()
     for sy in (-1, 1):   # 前后垂旒
+        yq = -0.048 - 0.100 if sy > 0 else -0.048 + 0.100
         for k in range(5):
-            x0 = (k - 2) * 0.028
-            for j in range(5):
-                ret = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=0.0038)
-                off = Vector((x0, -0.048 - 0.118 if sy > 0 else -0.048 + 0.115, 1.234 - j * 0.0105))
+            x0 = (k - 2) * 0.026
+            # 串绳
+            rc = bmesh.ops.create_cube(bm_cord, size=1)
+            for v in rc['verts']:
+                v.co = Vector((v.co.x * 0.0012, v.co.y * 0.0012, v.co.z * 0.070))
+                v.co += Vector((x0, yq, crown_z - 0.040))
+            for j in range(6):
+                ret = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=0.0036)
+                off = Vector((x0, yq, crown_z - 0.012 - j * 0.0122))
                 for v in ret['verts']:
                     v.co += off
-    beads = finish_mesh('Tassels', bm, [mats['gilt']], subsurf=0)
-    parts.append(beads)
+    parts.append(finish_mesh('Tassels', bm, [mats['gilt']], subsurf=0))
+    parts.append(finish_mesh('TasselCords', bm_cord, [mats['cord']], subsurf=0))
 
     # —— 三足香炉 + 香灰丘 + 三炷香（中间一炷还红着）——
     bm = bmesh.new()
@@ -1240,13 +1338,14 @@ def assemble_seagod(spec):
         stick = finish_mesh('Incense', bm, [mats['ash'] if k != 1 else mats['ember']], subsurf=0)
         parts.append(stick)
 
-    # —— 漆面剥落（几何台地 + 材质对齐）——
+    # —— 漆面剥落（像素级贴图 + 同场台地）——
     wi = 0
     for o in parts:
         if o.name.startswith(('Robe', 'Sleeve')):
             wi += 1
-            _flake_weather(o, (mats['lacquer'], mats['wood']), seed + wi * 37,
-                           freq=21.0, ratio=0.415, relief=0.0018, cuts=4)
+            _cyl_flake_texture(o, seed + wi * 37, name + '_flake%d' % wi,
+                               freq=8.5, ratio=0.455, relief=0.0020,
+                               top_lac=o.name.startswith('Robe'))
 
     for o in parts:
         o.parent = root
