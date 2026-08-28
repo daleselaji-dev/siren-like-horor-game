@@ -993,9 +993,11 @@ def assemble_character(spec):
                             tuple(srgb_to_linear(float(np.clip(c * 0.42, 0, 1))) for c in skin_rgb), rough=0.55),
         'caruncle': flat_mat(name + '_caruncle', (srgb_to_linear(0.36), srgb_to_linear(0.19), srgb_to_linear(0.17)),
                              rough=0.45),
+        # r22：发色三档对比收敛（dk 0.55→0.72 / lt 1.7→1.30）——r21 亮暗卡对比
+        # 太狠，每根卡被单独读出来（茅草读法帮凶）；同色近档才读成一整块头发
         'hair': flat_mat(name + '_hair', spec.get('hair_rgb', (0.09, 0.08, 0.07)), rough=0.85),
-        'hair_dk': flat_mat(name + '_hairdk', tuple(c * 0.55 for c in spec.get('hair_rgb', (0.09, 0.08, 0.07))), rough=0.92),
-        'hair_lt': flat_mat(name + '_hairlt', tuple(min(1, c * (1.25 if wet else 1.7) + (0.008 if wet else 0.03))
+        'hair_dk': flat_mat(name + '_hairdk', tuple(c * 0.72 for c in spec.get('hair_rgb', (0.09, 0.08, 0.07))), rough=0.92),
+        'hair_lt': flat_mat(name + '_hairlt', tuple(min(1, c * (1.20 if wet else 1.30) + (0.008 if wet else 0.012))
                                                     for c in spec.get('hair_rgb', (0.09, 0.08, 0.07))), rough=0.8),
         'brow': flat_mat(name + '_brow', spec.get('brow_rgb', tuple(c * 0.7 for c in spec.get('hair_rgb', (0.09, 0.08, 0.07)))), rough=0.9),
         'coat': flat_mat(name + '_coat', spec.get('coat_rgb', (0.30, 0.32, 0.34)),
@@ -1174,6 +1176,235 @@ def assemble_character(spec):
         anchor.location = HF.eye_anchor(field, sgn) + Vector((0, 0, head_lift))
         anchor.parent = pivot
     return root
+
+
+# ============================= 宴会厅坐姿宾客（轻量剪影件） =============================
+
+def assemble_guest(spec):
+    """宴会厅坐姿宾客（r22）：≤8k tris 的轻量 bpy 剪影件——
+    低密放样躯干/袖/裤 + 低密头雕（44×32 球 + 真耳 + 低发壳）+ 连指手；
+    眼与发影画进贴图（painted_eyes）。坐姿烧死在网格里：原点=凳心地面，
+    -Y 朝桌（glTF 导出后 = three.js +Z）。无关节 pivot——背景群像不动，
+    运行时按材质烘焙合并（三变体 ≤18 draw call 摆满全厅）。
+    读法目标：同一场宴席的镇民（中山装/的确良），不是玩具球关节。"""
+    seed = spec.get('seed', 1)
+    name = spec['name']
+    k = spec.get('H', 1.70) / 1.72
+    lean = spec.get('lean', 0.10)          # 坐姿前倾（向桌）
+    belly = spec.get('belly', 0.12)
+
+    face_img = np_to_image(name + '_face', HF.paint_face(spec, seed))
+    mats = {
+        'skin': tex_mat(name + '_skin', face_img, rough=0.72),
+        'skin_flat': flat_mat(name + '_skinf',
+                              tuple(srgb_to_linear(c * 0.96) for c in spec.get('skin', (0.70, 0.54, 0.43))),
+                              rough=0.72),
+        'coat': flat_mat(name + '_coat', spec.get('coat_rgb', (0.14, 0.155, 0.19)),
+                         rough=spec.get('coat_rough', 0.88), bump=0.14, bump_scale=220.0),
+        'trouser': flat_mat(name + '_trouser', spec.get('trouser_rgb', (0.10, 0.105, 0.12)), rough=0.9),
+        'shoe': flat_mat(name + '_shoe', spec.get('shoe_rgb', (0.07, 0.065, 0.06)), rough=0.5),
+        'hair': flat_mat(name + '_hair', spec.get('hair_rgb', (0.10, 0.09, 0.085)), rough=0.88),
+        'button': flat_mat(name + '_btn', (0.30, 0.29, 0.26), rough=0.5),
+    }
+
+    root = bpy.data.objects.new(name + '_root', None)
+    bpy.context.collection.objects.link(root)
+    objs = []
+    rng = rng_stream(seed + 17)
+    wk = rng.random(24)
+
+    seat = 0.48                        # 方凳顶面
+    hip_z = seat + 0.035
+    sh_z = hip_z + 0.415 * k           # 坐高肩线
+    sw = 0.112 * spec.get('H', 1.70) * spec.get('shoulder_k', 1.0)
+    neck_top = sh_z + 0.070
+
+    def yo(z):
+        """坐姿前倾：hip 以上向 -Y 渐移。"""
+        t = max(0.0, (z - hip_z) / (neck_top - hip_z))
+        return -lean * t * t * (neck_top - hip_z)
+
+    # —— 躯干（低密：10 环 ×14 边 + 2 环轭肩）——
+    n_sec, ring_n = 10, 14
+    zs = [seat - 0.02 + (sh_z + 0.01 - (seat - 0.02)) * i / (n_sec - 1) for i in range(n_sec)]
+    nrk = 0.030 * k
+    path, ws, ds, yoffs = [], [], [], []
+    for z in zs:
+        t = max(0.0, min(1.0, (z - hip_z) / (sh_z - hip_z)))
+        w = 0.105 * k * (1.06 - 0.10 * t) + (sw * 0.97 - 0.105 * k) * smoothstep(max(0, t - 0.42) / 0.58) * 0.9
+        d = 0.072 * k * (1 + belly * math.sin(min(1, t / 0.55) * math.pi) * 0.55)
+        d *= (0.96 + 0.20 * smoothstep(max(0, t - 0.5) / 0.5))
+        ws.append(w + 0.015)
+        ds.append(d + 0.015)
+        path.append(Vector((0, 0, z)))
+        yoffs.append(yo(z))
+    for tq in (0.55, 1.0):             # 轭肩两环收进领口
+        z = sh_z + 0.01 + 0.045 * tq
+        cw = math.cos(tq * math.pi / 2)
+        ws.append(nrk + 0.012 + (ws[n_sec - 1] - nrk - 0.012) * cw ** 1.1)
+        ds.append(nrk + 0.011 + (ds[n_sec - 1] - nrk - 0.011) * cw ** 0.8)
+        path.append(Vector((0, 0, z)))
+        yoffs.append(yo(z))
+
+    def tbulge(i, a):
+        r = 1.0 + 0.020 * (wk[int(a / TAU * 12) % 12] - 0.5)
+        r += 0.022 * math.sin(a * 4.2 + wk[3] * 6) * (1 - i / 11 * 0.6)      # 低频竖褶
+        da = abs(a - TAU / 4)
+        r += 0.010 * math.exp(-(da / 0.11) ** 2)                              # 门襟棱
+        return r
+    bm = bmesh.new()
+    tube(bm, path, ws, ds, ring_n=ring_n, cap_start=True, cap_end=True,
+         mat_index=0, bulge=tbulge, y_off=yoffs)
+    # 肩坡：外侧角按下去（轭肩两环收得急，不压坡读成「垫肩木箱」）
+    for v in bm.verts:
+        zz = v.co.z
+        if zz > hip_z + (sh_z - hip_z) * 0.55:
+            tz = smoothstep((zz - (hip_z + (sh_z - hip_z) * 0.55)) / max(1e-5, sh_z + 0.055 - hip_z - (sh_z - hip_z) * 0.55))
+            tx = smoothstep(max(0.0, abs(v.co.x) - 0.045) / max(1e-5, sw - 0.03))
+            v.co.z -= 0.052 * (tz ** 2.0) * (tx ** 1.3)
+    objs.append(finish_mesh('GTorso', bm, [mats['coat']], subsurf=0))
+    # 立领/衬衫领（一圈短管）
+    bm = bmesh.new()
+    zc = sh_z + 0.055
+    tube(bm, [Vector((0, yo(zc), zc)), Vector((0, yo(zc) - 0.002, zc + 0.020))],
+         [nrk + 0.013, nrk + 0.009], [nrk + 0.012, nrk + 0.008], ring_n=12)
+    objs.append(finish_mesh('GCollar', bm, [mats['coat']], subsurf=0))
+    # 前襟扣 ×4
+    for i in range(4):
+        z = sh_z - 0.045 - i * (sh_z - hip_z - 0.06) / 3.2
+        t = max(0.0, min(1.0, (z - hip_z) / (sh_z - hip_z)))
+        d = (0.072 * k * (1 + belly * math.sin(min(1, t / 0.55) * math.pi) * 0.55)) * (0.96 + 0.20 * smoothstep(max(0, t - 0.5) / 0.5))
+        bm = bmesh.new()
+        bmesh.ops.create_uvsphere(bm, u_segments=6, v_segments=4, radius=0.006)
+        for v in bm.verts:
+            v.co += Vector((0, -(d + 0.017) + yo(z), z))
+        objs.append(finish_mesh('GBtn', bm, [mats['button']], subsurf=0))
+
+    # —— 袖 + 连指手（搁膝）——
+    for side in (-1, 1):
+        sh = Vector((side * sw * 0.86, yo(sh_z) - 0.004, sh_z - 0.040))
+        el = Vector((side * (sw * 0.92 + 0.012), yo(sh_z) - 0.075, sh_z - 0.225 * k))
+        wr = Vector((side * 0.105, -0.285 - lean * 0.2, seat + 0.085))
+        wr += Vector(((wk[side + 3] - 0.5) * 0.03, (wk[side + 5] - 0.5) * 0.05, (wk[side + 7] - 0.5) * 0.02))
+        cap = sh + Vector((0, 0, 0.005))
+        pathA = [cap, sh, sh.lerp(el, 0.5), el, el.lerp(wr, 0.45), el.lerp(wr, 0.8), wr]
+        upper_r = 0.037 * k + 0.011
+        fore_r = 0.029 * k + 0.010
+        radsA = [upper_r * 0.3, upper_r * 0.9, upper_r, fore_r + 0.004, fore_r, fore_r * 0.9, 0.026 * k + 0.010]
+
+        def abulge(i, a, _s=side):
+            return 1.0 + 0.05 * math.exp(-((i - 3) / 1.0) ** 2) * math.sin(a * 4 + wk[(i + _s) % 8] * 6) * 0.5 \
+                + 0.02 * (wk[int(a / TAU * 8) % 8] - 0.5)
+        bm = bmesh.new()
+        tube(bm, pathA, radsA, radsA, ring_n=10, cap_start=True, cap_end=True, bulge=abulge)
+        objs.append(finish_mesh('GSleeve' + ('L' if side < 0 else 'R'), bm, [mats['coat']], subsurf=0))
+        # 连指手：腕→掌→指坨（搁在膝上，微下扣）
+        hd = Vector((side * 0.05, -0.85, -0.5)).normalized()
+        bm = bmesh.new()
+        ph = [wr - hd * 0.005, wr + hd * 0.030, wr + hd * 0.062, wr + hd * 0.088]
+        rh = [0.020 * k, 0.026 * k, 0.022 * k, 0.010 * k]
+        tube(bm, ph, rh, [r * 0.55 for r in rh], ring_n=8, ref=Vector((0, 0, 1)),
+             cap_start=True, cap_end=True)
+        objs.append(finish_mesh('GHand' + ('L' if side < 0 else 'R'), bm, [mats['skin_flat']], subsurf=0))
+
+    # —— 坐姿腿（大腿向桌、小腿垂地）+ 鞋 ——
+    for side in (-1, 1):
+        hx = side * 0.078 * k
+        hip = Vector((hx, 0.010, hip_z - 0.020))
+        knee = Vector((hx + side * 0.012, -0.355 * k, seat - 0.015))
+        ankle = Vector((hx + side * 0.018, -0.392 * k, 0.075))
+        pathL = [hip, hip.lerp(knee, 0.5), knee - (knee - hip).normalized() * 0.04,
+                 knee + Vector((0, -0.01, -0.055)), knee.lerp(ankle, 0.55) + Vector((0, 0.008, 0)),
+                 ankle]
+        thr = 0.058 * k + 0.014
+        cfr = 0.043 * k + 0.013
+        radsL = [thr, thr * 0.97, thr * 0.86, cfr + 0.004, cfr, 0.028 * k + 0.011]
+
+        def lbulge(i, a, _s=side):
+            return 1.0 + 0.05 * math.exp(-((i - 3.2) / 0.9) ** 2) * math.sin(a * 5 + wk[(i + _s + 4) % 8] * 6) * 0.5 \
+                + 0.018 * (wk[int(a / TAU * 8) % 8] - 0.5)
+        bm = bmesh.new()
+        tube(bm, pathL, radsL, radsL, ring_n=12, cap_start=True, cap_end=True, bulge=lbulge)
+        objs.append(finish_mesh('GLeg' + ('L' if side < 0 else 'R'), bm, [mats['trouser']], subsurf=0))
+        # 鞋
+        bm = bmesh.new()
+        pF = [Vector((ankle.x, ankle.y + 0.028, 0.052)), Vector((ankle.x, ankle.y - 0.02, 0.042)),
+              Vector((ankle.x, ankle.y - 0.09, 0.032)), Vector((ankle.x, ankle.y - 0.145, 0.024))]
+        wF = [0.030, 0.038, 0.037, 0.020]
+        dF = [0.034, 0.033, 0.026, 0.013]
+        tube(bm, pF, wF, dF, ring_n=10, ref=Vector((0, 0, 1)), cap_start=True, cap_end=True)
+        objs.append(finish_mesh('GFoot' + ('L' if side < 0 else 'R'), bm, [mats['shoe']], subsurf=0))
+
+    # —— 颈 ——
+    bm = bmesh.new()
+    tube(bm, [Vector((0, yo(sh_z - 0.02), sh_z - 0.02)), Vector((0, yo(neck_top), neck_top + 0.012))],
+         [nrk * 1.35, nrk * 1.02], [nrk * 1.2, nrk * 1.0], ring_n=10, cap_start=True, cap_end=True)
+    objs.append(finish_mesh('GNeck', bm, [mats['skin_flat']], subsurf=0))
+    for o in objs:
+        o.parent = root
+
+    # —— 头（低密 44×32 + 真耳 + 低发壳；眼画在贴图里）——
+    field = HF.HeadField(spec, seed)
+    head_objs = [HF.build_head_mesh(field, mats, useg=44, vseg=32)]
+    for sgn in (-1, 1):
+        ear = HF.build_ear(field, sgn, mats)
+        for md in ear.modifiers:      # 剪影件不给耳上 subsurf 预算
+            md.levels = 0
+            md.render_levels = 0
+        head_objs.append(ear)
+    # 低发壳：低密球全壳贴皮——发区抬 4.5mm、发际以下沉进头面 2mm 渐隐
+    # （r22 复盘：沿发际删顶点会留锯齿断口，读成「破头盔」；用连续收没代替裁切）
+    style = spec.get('hair', 'short')
+    if style != 'none':
+        bm = bmesh.new()
+        bmesh.ops.create_uvsphere(bm, u_segments=26, v_segments=18, radius=1.0)
+        kill = []
+        for v in bm.verts:
+            d = Vector(v.co).normalized()
+            lon = math.atan2(d.x, -d.y)
+            hl = HF._hairline_z(lon, style)
+            # 颈以下不要；前脸低区也裁（沉壳在鼻根凹处切弦外露成「灰刺」——
+            # 裁边本身沉在皮下 2mm，不可见）
+            if d.z < -0.30 or (math.cos(lon) > 0.12 and d.z < min(hl - 0.10, 0.20)):
+                kill.append(v)
+                continue
+            t = smoothstep(min(1.0, max(0.0, (d.z - (hl - 0.10)) / 0.14)))
+            lift = -0.0022 + (0.0045 + 0.0022) * t
+            nrm = field.normal(d)
+            v.co = field.pos(d) + nrm * lift
+        bmesh.ops.delete(bm, geom=kill, context='VERTS')
+        head_objs.append(HF._new_obj('GHairShell', finish_bm_to_mesh(bm, 'GHairShell'), [mats['hair']]))
+    if spec.get('bun'):
+        bun_d = Vector((0, 0.78, 0.58)).normalized()
+        bp_ = field.pos(bun_d)
+        bn = Vector(field.normal(bun_d))
+        bm = bmesh.new()
+        ret = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=0.030)
+        c = bp_ + bn * 0.008
+        for v in ret['verts']:
+            v.co = Vector((v.co.x * 1.04, v.co.y, v.co.z * 0.78)) + c
+        head_objs.append(HF._new_obj('GBun', finish_bm_to_mesh(bm, 'GBun'), [mats['hair']]))
+
+    pitch = spec.get('head_pitch', 0.10)
+    hp = bpy.data.objects.new('GHead', None)
+    bpy.context.collection.objects.link(hp)
+    hp.location = Vector((0, yo(neck_top) - math.sin(pitch) * 0.015, neck_top))
+    hp.rotation_euler = Euler((pitch, 0, spec.get('head_yaw', 0.0)), 'XYZ')
+    hp.parent = root
+    head_lift = field.rz * 0.74
+    for o in head_objs:
+        o.location = Vector(o.location) + Vector((0, 0, head_lift))
+        o.parent = hp
+    return root
+
+
+def finish_bm_to_mesh(bm, name):
+    """bmesh → Mesh（平滑，不建 obj——供 HF._new_obj 挂材质）。"""
+    me = bpy.data.meshes.new(name)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    return me
 
 
 def save_and_export(name, blend_dir, glb_dir):

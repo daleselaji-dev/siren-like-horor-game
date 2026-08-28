@@ -127,7 +127,9 @@ class HeadField:
         self.mouth_open = g.get('mouth_open', 0.0)
         rng = np.random.default_rng(seed + 5)
         self.asym_phase = rng.random() * TAU
-        self.asym = g.get('asym', 0.006)   # 0.010 在颊侧读成单边肿腮（r10 司仪）
+        # r22：0.006→0.0035——r21 复盘：正脸双眼一圆一眯（不对称横移扫过眶缘，
+        # 睑壳单边错位读成「破睑」），恐怖偶主源之一；普通人的不对称是毫米级
+        self.asym = g.get('asym', 0.0035)
         # 眼方向（附着计算用）
         el, ez = LM['eye_lon'], LM['eye_z']
         cl = math.sqrt(1 - ez * ez)
@@ -253,12 +255,14 @@ class HeadField:
         nz, tz = LM['nasion_z'], LM['tip_z']
         t = np.clip((nz - z) / (nz - tz), 0, 1)
         wz = smooth((z - (tz - 0.035)) / 0.05) * smooth((nz + 0.03 - z) / 0.07)
-        push_y(G(lon, 0.100 - 0.022 * t) * wz * (0.032 + 0.076 * t), k_nose)   # 鼻梁直脊（突出量≥0.08：0.032+0.076）
+        # r22：脊 0.076→0.068 / 尖球加宽 0.100→0.118 收幅 0.094→0.086 / 垂 0.016→0.010——
+        # r21 侧影鼻子读成「锥刺」：尖太窄太出且下垂，中年普通人的鼻尖是钝球
+        push_y(G(lon, 0.100 - 0.022 * t) * wz * (0.032 + 0.068 * t), k_nose)   # 鼻梁直脊
         push_y(g2(0.19, 0.06, 0.075, 0.10), -0.026)                # 梁侧壁凹（鼻梁要从脸里「立起来」）
-        push_y(g2(0, tz, 0.100, 0.052, False), 0.094 * k_nose)     # 鼻尖球（紧凑，不是锥刺）
-        push_y(g2(0, tz + 0.048, 0.080, 0.028, False), -0.015)     # supratip 微断（尖与梁分界）
-        P[:, 2] -= g2(0, tz - 0.005, 0.06, 0.045, False) * 0.016   # 尖微垂
-        push_y(g2(0, -0.112, 0.045, 0.032, False), 0.040 * k_nose)  # 鼻小柱
+        push_y(g2(0, tz, 0.118, 0.052, False), 0.086 * k_nose)     # 鼻尖球（钝球，不是锥刺）
+        push_y(g2(0, tz + 0.048, 0.080, 0.028, False), -0.013)     # supratip 微断（尖与梁分界）
+        P[:, 2] -= g2(0, tz - 0.005, 0.06, 0.045, False) * 0.010   # 尖微垂
+        push_y(g2(0, -0.112, 0.045, 0.032, False), 0.034 * k_nose)  # 鼻小柱
         push_y(g2(0, -0.178, 0.075, 0.028, False), -0.020)         # 鼻底回收（subnasale 台阶）
         push_y(g2(LM['alae_lon'], LM['alae_z'], 0.070, 0.042), 0.080 * k_nose)  # 鼻翼球
         push_y(g2(0.245, -0.092, 0.030, 0.050), -0.026)            # 鼻翼沟（翼与颊分界）
@@ -267,10 +271,12 @@ class HeadField:
         # ---------- 7 人中/唇 ----------
         push_y(g2(0, LM['philtrum_z'], 0.060, 0.062, False), 0.022)
         push_y(g2(0, LM['philtrum_z'] + 0.005, 0.018, 0.050, False), -0.014)   # 人中沟
-        push_y(G(lon, 0.36) * G(z + 0.35, 0.105), 0.018)           # 口轮匝肌基座（唇丘，压回——凸吻读法）
+        # r22：基座 0.018→0.011、上唇 0.050→0.044、下唇 0.053→0.046——
+        # r21 婆/司仪侧影口周整体前探读成「凸吻/鸟喙」，唇要贴在牙弓上不是探出去
+        push_y(G(lon, 0.36) * G(z + 0.35, 0.105), 0.011)           # 口轮匝肌基座
         cup = g2(0.065, LM['lip_up_z'], 0.105, 0.038) + 0.55 * G(lon, 0.055) * G(z - (LM['lip_up_z'] + 0.006), 0.040)
-        push_y(cup, 0.050 * k_lip)                                 # 上唇（丘比特弓双峰）
-        push_y(g2(0.07, LM['lip_dn_z'], 0.11, 0.046), 0.053 * k_lip)  # 下唇
+        push_y(cup, 0.044 * k_lip)                                 # 上唇（丘比特弓双峰）
+        push_y(g2(0.07, LM['lip_dn_z'], 0.11, 0.046), 0.046 * k_lip)  # 下唇
         push_y(g2(0, LM['lip_dn_z'] - 0.004, 0.020, 0.030, False), -0.008)     # 下唇中缝微凹
         mo = self.mouth_open
         push_y(G(lon, 0.22) * G(z - LM['seam_z'], 0.014), -(0.046 + 0.03 * mo))  # 口裂缝（锐）
@@ -302,11 +308,12 @@ class HeadField:
 
         # ---------- 10 不对称 + 皮肤微形 ----------
         # 眼区豁免：不对称横移若扫过眶窝，眼球/睑壳（对称摆放）就会单边错位成「歪眼」
+        # r22：豁免半径 0.42→0.56——r21 眶缘外圈仍被扫到，双眼一圆一眯
         eye_guard = np.ones(len(D))
         for sgn in (-1, 1):
             E = np.array(self.eye_dirs[sgn])
             ang_e = np.arccos(np.clip(D @ E, -1, 1))
-            eye_guard *= 1 - np.exp(-(ang_e / 0.42) ** 2)
+            eye_guard *= 1 - np.exp(-(ang_e / 0.56) ** 2)
         P[:, 0] += self.asym * np.sin(z * 3.1 + self.asym_phase) * (0.4 + 0.6 * np.abs(y)) * eye_guard
         mid = fbm3(D * 5.0, self.seed + 11, octaves=2) - 0.5
         fine = vnoise3(D * 16.0, self.seed + 23) - 0.5
@@ -602,7 +609,9 @@ def build_lids(field, sgn, mats):
 # ------------------------- 眉：羽状簇 -------------------------
 
 def build_brow(field, sgn, mats):
-    """沿眉弓的碎毛簇（不是一根漂浮胶条）。"""
+    """沿眉弓的碎毛簇（不是一根漂浮胶条）。
+    r22 收敛：毛长 6.0→4.0mm / 毛宽 0.7-1.2→0.4-0.7mm / 离皮量与外翘减半——
+    r21 眉毛读成两条悬浮的毛刺毛虫（恐怖偶主源之二），普通人的眉是「贴在骨上的影」。"""
     rng = np.random.default_rng(field.seed + 41 + sgn)
     bm = bmesh.new()
     n = 22
@@ -612,19 +621,19 @@ def build_brow(field, sgn, mats):
         zz = LM['brow_z'] - 0.045 + 0.10 * math.sin(t * math.pi) ** 0.8 - t * t * 0.10
         cl = math.sqrt(max(0.0, 1 - zz * zz))
         d = Vector((math.sin(lon) * cl, -math.cos(lon) * cl, zz)).normalized()
-        p = field.pos(d) + field.normal(d) * 0.0004
+        p = field.pos(d) + field.normal(d) * 0.0003
         nrm = field.normal(d)
         # 毛流：眉头向上、眉身向外、眉梢向外下
         flow = (Vector((sgn * (0.35 + t * 0.75), -0.15, 0.55 - t * 1.05)).normalized())
         flow = (flow - nrm * flow.dot(nrm)).normalized()
         side = flow.cross(nrm).normalized()
-        L = 0.0060 * (0.7 + 0.6 * math.sin(t * math.pi) ** 0.7)
-        w = 0.0007 + 0.0005 * math.sin(t * math.pi)
+        L = 0.0040 * (0.75 + 0.45 * math.sin(t * math.pi) ** 0.7)
+        w = 0.0004 + 0.0003 * math.sin(t * math.pi)
         for k in range(4):  # 每站 4 根小簇（叠瓦覆盖，不露皮）
             j = (rng.random() - 0.5)
-            q0 = p + side * (j * 0.005) + nrm * 0.0002
-            fl = (flow + side * (rng.random() - 0.5) * 0.5 + nrm * 0.15).normalized()
-            q1 = q0 + fl * L * 0.6 + nrm * 0.0008
+            q0 = p + side * (j * 0.0032) + nrm * 0.0002
+            fl = (flow + side * (rng.random() - 0.5) * 0.35 + nrm * 0.06).normalized()
+            q1 = q0 + fl * L * 0.6 + nrm * 0.0003
             q2 = q1 + fl * L * 0.4 - nrm * 0.0002
             a = bm.verts.new(q0 - side * w)
             b = bm.verts.new(q0 + side * w)
@@ -655,8 +664,12 @@ def _hairline_z(lon, style):
     return 0.44 * max(0.0, front) ** 1.2 + 0.31 - 0.65 * max(0.0, -front) ** 0.9
 
 
-def build_hair_cards(field, spec, mats, count=1100):
+def build_hair_cards(field, spec, mats, count=1500):
     """发卡群 v3（≥800/头，顶区无整体壳）：
+    r22 收敛：卡宽 1.6-2.6→1.0-1.6mm / 外层离皮 2.2-3.6→1.2-2.1mm / 梢翘 1.1→0.4mm /
+    梳向抖动 0.32→0.18 / 根数 1100→1500——r21 头发读成「茅草/木刨花」（恐怖偶
+    主源之三）：卡太宽太翘太乱，每一根都被单独读出来；普通人的短发是一整块
+    受光体，卡只负责边缘碎化。
     · 皮上直接种双层弧面卡（内层贴皮打底、外层供体积），卡是 3 列顶点的弯瓦
       （横截面拱起），不是纸片——r16「碎纸屑落在头盔上」的读法两个根都拔掉：
       壳没了、卡有了曲率。
@@ -724,7 +737,7 @@ def build_hair_cards(field, spec, mats, count=1100):
         made += 1
         nrm = field.normal(d)
         outer = rng.random() < 0.45          # 双层：内层打底贴皮 / 外层供体积
-        lift0 = (0.0022 + rng.random() * 0.0014) if outer else (0.0007 + rng.random() * 0.0006)
+        lift0 = (0.0012 + rng.random() * 0.0009) if outer else (0.0005 + rng.random() * 0.0005)
         if style == 'slick':
             lift0 *= 0.55                     # 油头抿平
         p = field.pos(d) + nrm * lift0
@@ -735,15 +748,18 @@ def build_hair_cards(field, spec, mats, count=1100):
         else:
             comb = Vector((d.x * 0.45, 0.55 * front + 0.35, -0.15 - 0.45 * max(0.0, -front) - 0.3 * max(0.0, 0.3 - d.z)))
         comb = (comb - nrm * comb.dot(nrm)).normalized()
-        comb = (comb + Vector((rng.random() - 0.5, rng.random() - 0.5, rng.random() - 0.5)) * 0.32).normalized()
+        comb = (comb + Vector((rng.random() - 0.5, rng.random() - 0.5, rng.random() - 0.5)) * 0.18).normalized()
         L = (0.020 + rng.random() * 0.017) * (0.92 if edge_zone else 1.0)
         if style == 'slick':
             L *= 0.8
         if sideburn_root:
-            if rng.random() < 0.5:
+            if rng.random() < 0.6:
                 made -= 1
                 continue
-            L = 0.006 + rng.random() * 0.007   # 鬓角只留短茬
+            L = 0.005 + rng.random() * 0.005   # 鬓角只留短茬
+            w0_cap = 0.0006                     # r22：细茬——宽卡在颊侧读成黑刮痕
+        else:
+            w0_cap = 1.0
         if wet and front > 0.45 and rng.random() < 0.45:
             made -= 1
             continue  # 湿客：前帘稀疏（别糊死眉眼）
@@ -751,7 +767,7 @@ def build_hair_cards(field, spec, mats, count=1100):
         if wet:
             L = (0.034 + rng.random() * 0.030) * (0.55 if front > 0.45 else 1.0)
             comb = (comb * 0.4 + Vector((0, 0, -1)) + Vector((d.x, d.y, 0)).normalized() * 0.35).normalized()
-        w0 = ((0.0016 + rng.random() * 0.0010) if not wet else (0.0028 + rng.random() * 0.0016))
+        w0 = min(w0_cap, (0.0010 + rng.random() * 0.0006) if not wet else (0.0028 + rng.random() * 0.0016))
         pts = [Vector(p)]
         nrms = [Vector(nrm)]
         dirv = comb.copy()
@@ -769,7 +785,7 @@ def build_hair_cards(field, spec, mats, count=1100):
             else:
                 # 干短发：贴皮投影（皮面 + 层高 + 梢部渐翘）
                 t = (sgi + 1) / segs
-                lift = lift0 + 0.0011 * (t ** 1.8) * (1.6 if outer else 1.0) + rng.random() * 0.0002
+                lift = lift0 + 0.0004 * (t ** 1.8) * (1.3 if outer else 1.0) + rng.random() * 0.0001
                 q = surf + nq * lift
                 lon_q = math.atan2(dq.x, -dq.y)
                 if abs(abs(lon_q) - 1.62) < 0.20 and -0.26 < dq.z < 0.20:
@@ -795,8 +811,14 @@ def build_hair_cards(field, spec, mats, count=1100):
             which = rng.random()
             L_cap = 1.0
             if which < 0.45:      # 前发际
+                # r22：油头（slick）前额茬砍七成、压短——抿过的头发不掉帘，
+                # r21 婆/侍应额上一排「亮茬帘」正源于此
+                if style == 'slick' and rng.random() < 0.7:
+                    continue
                 lon = (rng.random() - 0.5) * 1.6
                 zz = _hairline_z(lon, style) + (rng.random() - 0.62) * 0.07
+                if style == 'slick':
+                    L_cap = 0.005
             elif which < 0.75:    # 鬓角（短茬贴皮，长了在颊侧剪影上读成天线）
                 lon = (1 if rng.random() < 0.5 else -1) * (1.36 + (rng.random() - 0.5) * 0.24)
                 zz = -0.14 + rng.random() * 0.26
@@ -1257,6 +1279,17 @@ def paint_face(spec, seed):
     for s in (-1, 1):
         L(_blob(U, V, 0.5 + s * (ub - 0.5), vb, 0.045, 0.013), brow_rgb, 0.40)
 
+    # ---- 画眼（轻量宾客件：无眼球/睑壳几何，眼在贴图里）----
+    # 6m 外的读法只需要：眼裂横线 + 上睑影 + 虹膜暗点 + 一粒高光
+    if spec.get('painted_eyes'):
+        for s in (-1, 1):
+            uex = 0.5 + s * due
+            L(_blob(U, V, uex, ve + 0.012, 0.034, 0.016), dark, 0.38)                # 上睑影
+            L(_blob(U, V, uex, ve - 0.002, 0.030, 0.0050, 2.2), dark * 0.38, 0.92)   # 眼裂横线
+            L(_blob(U, V, uex - s * 0.004, ve - 0.001, 0.0090, 0.0080), dark * 0.20, 0.92)  # 虹膜
+            L(_blob(U, V, uex - s * 0.007, ve + 0.003, 0.0022, 0.0022), base * 1.55, 0.7)   # 高光点
+            L(_blob(U, V, uex, ve, 0.040, 0.014) * 0.5, brow_rgb * 0.4 + base * 0.5, 0.10)  # 眼周统色
+
     # ---- 额纹 / 老年斑 / 胡茬 ----
     for k in range(g.get('forehead_lines', spec.get('forehead_lines', 0))):
         lv = vb + 0.035 + k * 0.024
@@ -1282,6 +1315,9 @@ def paint_face(spec, seed):
         z_g = np.sin((V - 0.5) * math.pi)
         hl_cols = np.array([_hairline_z(l, style) for l in lon_g[0]])
         hlw = hl_cols[None, :] + 0.010 * np.sin(lon_g * 7 + 1.7) + 0.006 * np.sin(lon_g * 13 + 3.4)
+        # r22：耳周下拉——耳廓窗上方（|lon|≈1.62、z 0.22-0.30）卡与漆双缺，
+        # r21 婆侧影耳上一块肉色「秃斑」；发是绕耳梳的，皮底也要跟着绕下来
+        hlw = hlw - 0.15 * np.exp(-(((np.abs(lon_g) - 1.62) / 0.30) ** 2))
         scalp_m = np.clip((z_g - hlw) / 0.055, 0, 1)
         scalp_m = scalp_m * scalp_m * (3 - 2 * scalp_m)
         sb = (np.abs(np.abs(lon_g) - 1.36) < 0.13) & (z_g > -0.10) & (z_g < hlw + 0.06)

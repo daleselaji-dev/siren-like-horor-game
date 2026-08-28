@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { Humanoid, poseAs } from '../entities/humanoid.js';
+import { bakeGuestCrowd } from '../world/guestCrowd.js';
 
 // ---------------- 文书全文 ----------------
 export const NOTES = [
@@ -370,28 +371,38 @@ export class Story {
     const hb = HI.origin.y;
 
     // —— 宴会厅满员（正常态·验户前）：每桌 5 客围坐 ——
-    // 凳子在 hotel.js 摆在 a=(k/8)·2π、r=1.05 的 cos/sin 圆上——人要坐到凳子上
+    // 凳子在 hotel.js 摆在 a=(k/8)·2π、r=1.05 的 cos/sin 圆上——人要坐到凳子上。
+    // r22：三十席全部改 bpy 轻量剪影 GLB（guest_a/b/c ≤8k tris/人，坐姿烧死在网格，
+    // 按材质烘焙合并）——宴会厅背景不再有程序化 Humanoid 球关节
     const roles = ['guest_m', 'guest_f', 'guest_m2', 'guest_m', 'guest_f'];
-    const defs = [];
     let seed = 40001;
+    const guestDefs = [];
     for (const t of D.banquetTables) {
       for (let k = 0; k < 5; k++) {
         const a = ((k * 2 + (seed % 2)) / 8) * Math.PI * 2; // 隔凳而坐，桌桌错位
         const sx = t.x + Math.cos(a) * 1.03;
         const sz = t.z + Math.sin(a) * 1.03;
-        defs.push({
-          role: roles[k % roles.length], seed: seed++, pose: 'sit', phase: k * 1.3,
+        seed++;
+        guestDefs.push({
           x: sx, y: hb + 0.02, z: sz,
-          ry: Math.atan2(t.x - sx, t.z - sz), // 面朝桌心
+          ry: Math.atan2(t.x - sx, t.z - sz) + (((seed * 7) % 5) - 2) * 0.06, // 面朝桌心±坐相
+          variant: (seed * 13 + k) % 3,
+          s: 0.965 + ((seed * 31) % 8) * 0.01, // 身量抖动 ±4%
         });
       }
     }
-    // 大堂里三两站着寒暄的
+    this.crowdNormal = new THREE.Group();
+    this.g.scene.add(this.crowdNormal);
+    bakeGuestCrowd(guestDefs).then((grp) => {
+      this.crowdNormal.add(grp);
+      this.crowdGlb = grp; // verify 断言口径：宴席群像=GLB 剪影件
+    }).catch((err) => console.error('[story] guest crowd bake failed:', err));
+    // 大堂里三两站着寒暄的（非宴会厅——仍走烘焙 Humanoid）
+    const defs = [];
     for (const [lx, lz, ry] of [[-2.2, 7.6, 0.6], [-1.4, 7.2, -2.4], [2.6, 3.5, 1.8], [3.3, 3.9, -1.2]]) {
       defs.push({ role: seed % 2 ? 'guest_m' : 'guest_m2', seed: seed++, pose: 'idle', x: HI.origin.x + lx, y: hb + 0.02, z: HI.origin.z + lz, ry });
     }
-    this.crowdNormal = this.bakeCrowd(defs);
-    this.g.scene.add(this.crowdNormal);
+    this.crowdNormal.add(this.bakeCrowd(defs));
 
     // —— 渗漏态人群（验户后）：席位不空，人却"浮"了——脚尖离地的静止宾客 ——
     const leakDefs = [];

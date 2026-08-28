@@ -1,20 +1,22 @@
-// P0 工位 GLB 取证（r21）：报数员(emcee_stage)/三名侍应(waiter)/理册婆(matron)
-// 的 gameplay 身体必须是 Blender bpy 细模（StationBody），不是程序化 Humanoid——
+// P0 工位 GLB 取证（r21 装配 / r22 群像）：报数员(emcee_stage)/三名侍应(waiter)/
+// 理册婆(matron) 的 gameplay 身体必须是 Blender bpy 细模（StationBody）——
 //   ① 装配断言：五具身体 loaded / 三角面数过细模门槛 / 六关节 pivot 齐 /
 //      道具在场（麦头/托盘/第三眼矿盘）/ 「舞台禁止胶囊 Humanoid」（headMesh 不存在）
 //   ② 行为断言：步态 pivot 真的在摆（LegPivot 四元数随 animate 变化）/
 //      眼点冷光警戒才亮 / 视奸 viewYawPitch 口径可用
-//   ③ 近景取证：verify/station/r21_*（舞台/宴会厅/3F 走廊 + 麦缝/托盘/第三眼特写）
+//   ③ 宴会厅群像断言（r22）：三十席坐姿宾客=bpy 剪影 GLB 烘焙合并
+//      （crowdGlb.guestCount=30、≤8k tris/人），宴席背景禁止球关节 Humanoid
+//   ④ 近景取证：verify/station/r22_*（舞台/宴会厅/3F 走廊 + 麦缝/托盘/第三眼特写）
 //      并复制三张进 verify/keep/station/
 import fs from 'node:fs';
 
 export async function run(page, h) {
   fs.mkdirSync('verify/station', { recursive: true });
   fs.mkdirSync('verify/keep/station', { recursive: true });
-  // r21_* 与 keep/ 是入库取证（FULLSPEC 灯档标定）——十步链的常规跑
+  // r22_* 与 keep/ 是入库取证（FULLSPEC 灯档标定）——十步链的常规跑
   // 只落 chk_*（gitignore），防低配画质覆写交付图
   const FULL = process.env.FULLSPEC === '1';
-  const tag = FULL ? 'station/r21_' : 'station/chk_';
+  const tag = FULL ? 'station/r22_' : 'station/chk_';
 
   await page.click('#title-start');
   await h.sleep(1500);
@@ -108,6 +110,26 @@ export async function run(page, h) {
   console.log('[station] eye:', JSON.stringify(eye));
   assert(!eye.idleVisible, '常态眼点应熄灭（潮光只归警戒态）');
   assert(eye.alertOpacity > 0.5, '警戒眼点应点亮（opacity=' + eye.alertOpacity + ')');
+
+  // ---------- 2b. 宴会厅群像（r22）：坐姿宾客必须是 GLB 剪影件，不是球关节 ----------
+  await page.waitForFunction(() => !!window.__game.story.crowdGlb, { timeout: 20000, polling: 300 });
+  const crowd = await page.evaluate(() => {
+    const g = window.__game;
+    const grp = g.story.crowdGlb;
+    let tris = 0;
+    let meshes = 0;
+    grp.traverse((o) => {
+      if (!o.isMesh) return;
+      meshes++;
+      tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
+    });
+    return { count: grp.userData.guestCount, glb: grp.userData.glbGuests === true, meshes, tris: Math.round(tris) };
+  });
+  console.log('[station] banquet crowd:', JSON.stringify(crowd));
+  assert(crowd.glb, '宴席群像必须是 GLB 剪影件烘焙（禁止球关节 Humanoid）');
+  assert(crowd.count === 30, `宴会厅应有 30 席 GLB 宾客（实得 ${crowd.count}）`);
+  assert(crowd.tris / crowd.count < 8000, `宾客面数预算 ≤8k tris/人（实得 ${Math.round(crowd.tris / crowd.count)}）`);
+  assert(crowd.meshes <= 24, `群像应按材质合并（draw call ≤24，实得 ${crowd.meshes}）`);
 
   // 视奸口径：viewPos 取头位、viewYawPitch 可读（StationBody 代理 neck/torso）
   const vj = await page.evaluate(() => {
@@ -242,9 +264,9 @@ export async function run(page, h) {
 
   // ---------- 5. keep 交付图（审计指定路径；仅 FULLSPEC 覆写） ----------
   if (FULL) {
-    fs.copyFileSync('verify/station/r21_emcee_stage.png', 'verify/keep/station/emcee_stage.png');
-    fs.copyFileSync('verify/station/r21_waiter_banquet.png', 'verify/keep/station/waiter_banquet.png');
-    fs.copyFileSync('verify/station/r21_matron_close.png', 'verify/keep/station/matron_close.png');
+    fs.copyFileSync('verify/station/r22_emcee_stage.png', 'verify/keep/station/emcee_stage.png');
+    fs.copyFileSync('verify/station/r22_waiter_banquet.png', 'verify/keep/station/waiter_banquet.png');
+    fs.copyFileSync('verify/station/r22_matron_close.png', 'verify/keep/station/matron_close.png');
   }
 
   console.log('[station] ✅ 工位 GLB 细模装配/步态/眼点/视奸/取证 全部通过');
