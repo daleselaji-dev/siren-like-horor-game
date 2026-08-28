@@ -1,7 +1,8 @@
-// HUD / UI：字幕队列、目标提示、互动提示、文书阅读、暂停、死亡、结局、危险与共鸣指示
+// HUD / UI：字幕队列、目标提示、互动提示、文书阅读、暂停、死亡、结局、危险/振动/议程指示
 export class HUD {
   constructor() {
     this.el = {
+      agenda: document.getElementById('agenda-indicator'),
       subtitles: document.getElementById('subtitles'),
       objToast: document.getElementById('objective-toast'),
       objText: document.querySelector('#objective-toast .obj-text'),
@@ -30,6 +31,7 @@ export class HUD {
       fader: document.getElementById('fader'),
       drown: document.getElementById('drown-overlay'),
       crosshair: document.getElementById('crosshair'),
+      tools: document.getElementById('tools-bar'),
     };
     this.subQueue = [];
     this.subActive = null;
@@ -40,6 +42,17 @@ export class HUD {
 
   /** 电影黑边（演出用） */
   setLetterbox(on) { this.el.letterbox.classList.toggle('on', !!on); }
+
+  /** 核册议程推进指示（报数员每念一条，右上角亮一次） */
+  agenda(stage, name) {
+    const el = this.el.agenda;
+    if (!el) return;
+    el.textContent = `核册议程 · ${name}`;
+    el.classList.add('show');
+    el.classList.remove('flash');
+    void el.offsetWidth; // 重触发动画
+    el.classList.add('flash');
+  }
 
   /** 检查点提示（左下角一闪） */
   checkpointToast() {
@@ -106,6 +119,22 @@ export class HUD {
   }
 
   setCrosshair(on) { this.el.crosshair.classList.toggle('hidden', !on); }
+
+  /** 反击工具栏：拿到过什么才显示什么 */
+  setTools(t) {
+    const el = this.el.tools;
+    if (!el) return;
+    const rows = [];
+    if (t.camera) rows.push(`<div class="tool-item${t.bulbs > 0 ? '' : ' empty'}"><kbd>F</kbd>镁光闪 × ${t.bulbs}</div>`);
+    if (t.clocks > 0 || this._hadClock) { this._hadClock = true; rows.push(`<div class="tool-item${t.clocks > 0 ? '' : ' empty'}"><kbd>G</kbd>发条闹钟 × ${t.clocks}</div>`); }
+    if (t.lime > 0 || this._hadLime) { this._hadLime = true; rows.push(`<div class="tool-item${t.lime > 0 ? '' : ' empty'}"><kbd>V</kbd>贝灰线 × ${t.lime}</div>`); }
+    if (t.recorder) rows.push(`<div class="tool-item${t.tapes > 0 ? '' : ' empty'}"><kbd>R</kbd>录音对照 × ${t.tapes}</div>`);
+    if (t.fusesEver) rows.push(`<div class="tool-item${t.fuses > 0 ? '' : ' empty'}">⌁ 保险丝 × ${t.fuses}</div>`);
+    el.innerHTML = rows.join('');
+    // 数量变化时闪一下边框
+    const last = el.lastElementChild;
+    if (last) { void last.offsetWidth; }
+  }
 
   update(dt, state) {
     // 字幕队列

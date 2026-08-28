@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:," />
-  <title>咸潮 SALT TIDE — 中式民俗海洋恐怖 Demo</title>
+  <title>返潮 FANCHAO — 蚀湾 2001 · 中式民俗海洋恐怖 Demo</title>
   <style>
     :root {
       --paper: #d8cfb8;
@@ -181,13 +181,13 @@
       background: radial-gradient(ellipse at center, transparent 52%, rgba(122,20,14,.55) 100%);
       transition: opacity .5s;
     }
-    /* 共鸣（歌唱者）指示：屏幕边缘泛紫 + 波纹 */
+    /* 振动（上宾循振）指示：屏幕边缘泛木褐 + 波纹 */
     #resonance-vignette {
       position: fixed; inset: 0; z-index: 12; pointer-events: none; opacity: 0;
-      background: radial-gradient(ellipse at center, transparent 40%, rgba(90,40,110,.6) 100%);
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(96,66,28,.6) 100%);
       transition: opacity .4s;
     }
-    /* 共鸣计量：喉咙被灌满的竖槽 */
+    /* 振动计量：楼板往外递你脚步的竖槽 */
     #resonance-meter {
       position: fixed; right: 4.5%; top: 50%; transform: translateY(-50%);
       z-index: 21; pointer-events: none; text-align: center;
@@ -195,23 +195,23 @@
     }
     #resonance-meter.show { opacity: 1; }
     #resonance-meter .res-label {
-      font-size: 11px; letter-spacing: .5em; color: #b58a9a; writing-mode: vertical-rl;
-      margin-bottom: 10px; text-shadow: 0 0 8px rgba(150,60,90,.6);
+      font-size: 11px; letter-spacing: .5em; color: #b59a7a; writing-mode: vertical-rl;
+      margin-bottom: 10px; text-shadow: 0 0 8px rgba(150,100,50,.6);
     }
     #resonance-tube {
       width: 7px; height: 170px; margin: 10px auto 0; position: relative;
-      border: 1px solid rgba(170,110,140,.4); border-radius: 4px;
-      background: rgba(10,6,10,.5); overflow: hidden;
+      border: 1px solid rgba(170,140,100,.4); border-radius: 4px;
+      background: rgba(10,8,6,.5); overflow: hidden;
     }
     #resonance-fill {
       position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
-      background: linear-gradient(to top, #5c1030, #a03050, #d06080);
-      box-shadow: 0 0 12px rgba(180,60,100,.8);
+      background: linear-gradient(to top, #4a2c10, #906030, #d0a060);
+      box-shadow: 0 0 12px rgba(180,130,60,.8);
       transition: height .2s linear;
     }
     #resonance-fill::before {
       content: ""; position: absolute; top: -3px; left: 0; right: 0; height: 4px;
-      background: rgba(230,160,190,.9); border-radius: 2px;
+      background: rgba(230,200,150,.9); border-radius: 2px;
       animation: resSurface 1.1s ease-in-out infinite;
     }
     @keyframes resSurface { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
@@ -250,6 +250,45 @@
       opacity: 0; transition: opacity .3s;
     }
     #stealth-indicator.show { opacity: .8; }
+
+    /* 核册议程指示：报数员每念一条亮一次 */
+    #agenda-indicator {
+      position: fixed; right: 4%; top: 7%; z-index: 21; pointer-events: none;
+      font-size: 13px; letter-spacing: .3em; color: #c8a468;
+      background: rgba(8,5,3,.55); border: 1px solid rgba(190,140,70,.35);
+      padding: 8px 16px; border-radius: 2px;
+      opacity: 0; transition: opacity 1.4s;
+      text-shadow: 0 0 10px rgba(200,140,60,.35), 0 1px 2px #000;
+    }
+    #agenda-indicator.show { opacity: .92; }
+    #agenda-indicator.flash { animation: agendaFlash 2.6s ease; }
+    @keyframes agendaFlash {
+      0% { box-shadow: 0 0 0 rgba(210,150,60,0); color: #c8a468; }
+      12% { box-shadow: 0 0 28px rgba(210,150,60,.55); color: #f0d0a0; }
+      100% { box-shadow: 0 0 0 rgba(210,150,60,0); color: #c8a468; }
+    }
+
+    /* 反击工具栏（左下角：拿到过什么才显示什么） */
+    #tools-bar {
+      position: fixed; left: 4%; bottom: 10%; z-index: 20; pointer-events: none;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    #tools-bar .tool-item {
+      font-size: 12px; letter-spacing: .18em; color: #97a6a4;
+      background: rgba(4,6,8,.5); border: 1px solid rgba(120,140,138,.22);
+      padding: 5px 12px; border-radius: 2px; text-shadow: 0 1px 2px #000;
+      transition: opacity .4s;
+    }
+    #tools-bar .tool-item.empty { color: #55605e; opacity: .6; }
+    #tools-bar .tool-item kbd {
+      font-family: monospace; color: #cdb87e; border: 1px solid #5a4f36;
+      padding: 0 5px; border-radius: 3px; margin-right: 8px;
+    }
+    #tools-bar .tool-item.used { animation: toolUsed .5s ease; }
+    @keyframes toolUsed {
+      0% { border-color: rgba(230,220,180,.85); color: #e8e0c4; }
+      100% { border-color: rgba(120,140,138,.22); color: #97a6a4; }
+    }
 
     /* 检查点提示 */
     #checkpoint-toast {
@@ -402,10 +441,12 @@
   <div id="objective-toast"><div class="obj-label">目 标</div><div class="obj-rule"></div><div class="obj-text"></div></div>
   <div id="interact-prompt"><kbd>E</kbd><span></span></div>
   <div id="stealth-indicator">— 潜 行 —</div>
+  <div id="tools-bar"></div>
   <div id="checkpoint-toast">潮位记住了你</div>
+  <div id="agenda-indicator"></div>
 
   <div id="resonance-meter">
-    <div class="res-label">共 鸣</div>
+    <div class="res-label">振 动</div>
     <div id="resonance-tube"><div id="resonance-fill"></div></div>
   </div>
 
@@ -428,18 +469,19 @@
   </div>
 
   <div id="pause-overlay" class="hidden">
-    <h2>咸 潮</h2>
+    <h2>返 潮</h2>
     <div class="pause-item" id="pause-resume">继 续</div>
     <div id="pause-notes"></div>
     <div id="pause-controls">
       <kbd>WASD</kbd> 移动 · <kbd>鼠标</kbd> 视角 · <kbd>Shift</kbd> 潜行 · <kbd>E</kbd> 互动<br/>
-      <kbd>Q</kbd>/<kbd>Tab</kbd> 视奸（切入他者视野） · <kbd>Esc</kbd> 暂停
+      <kbd>Q</kbd>/<kbd>Tab</kbd> 视奸（切入他者视野） · <kbd>Esc</kbd> 暂停<br/>
+      <kbd>F</kbd> 镁光闪（定住看见光的） · <kbd>G</kbd> 发条闹钟（响给别人听） · <kbd>V</kbd> 贝灰线（划一道界）
     </div>
   </div>
 
   <div id="death-overlay">
-    <div id="death-text">溺</div>
-    <div id="death-sub">潮水替你记住了这里 —— 正在回到检查点</div>
+    <div id="death-text">席</div>
+    <div id="death-sub">名册不许缺页 —— 正在回到检查点</div>
     <div id="death-stats"></div>
   </div>
 
@@ -451,15 +493,15 @@
   <div id="title-screen">
     <canvas id="title-sea"></canvas>
     <div id="title-vignette"></div>
-    <div id="title-freq">AM 1170 kHz　盐门渔汛台
-信号　·　微弱　·　三年前</div>
+    <div id="title-freq">AM 1043 kHz　蚀湾广播站
+转播 · 南方大酒店核册实况 · 二〇〇一</div>
     <div id="title-center">
-      <div id="title-name"><span>咸</span><span>潮</span><div id="title-seal">永涨潮</div></div>
-      <div id="title-sub">盐门村 · 永涨潮之夜</div>
-      <div id="title-en">S A L T &nbsp; T I D E</div>
-      <button id="title-start">入 村</button>
-      <div id="title-warn">本作为虚构民俗恐怖作品，其中神祇、祭祀均为虚构，与任何真实信仰无关。<br/>建议佩戴耳机。游戏包含闪烁画面与压抑音效。</div>
-      <div id="title-loading" class="hidden">正在涨潮……</div>
+      <div id="title-name"><span>返</span><span>潮</span><div id="title-seal">还地</div></div>
+      <div id="title-sub">蚀湾 · 二〇〇一 · 核册之夜</div>
+      <div id="title-en">F A N C H A O</div>
+      <button id="title-start">入 镇</button>
+      <div id="title-warn">本作为虚构民俗恐怖作品，其中风俗、仪式均为虚构，与任何真实信仰无关。<br/>建议佩戴耳机。游戏包含闪烁画面与压抑音效。</div>
+      <div id="title-loading" class="hidden">正在开席……</div>
     </div>
   </div>
 

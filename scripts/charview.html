@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" href="data:," />
+<title>角色查看器</title>
+<style>html,body{margin:0;background:#111}canvas{display:block}</style>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { buildMaterials } from '/src/world/materials.js';
+import { bakeFaces } from '/src/world/faces.js';
+import { Humanoid, bakeFigure, poseAs } from '/src/entities/humanoid.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1714);
+const cam = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 100);
+
+// 酒店式灯光：暖钨丝主光 + 荧光顶光 + 弱冷补（跟随取景移动）
+scene.add(new THREE.HemisphereLight(0x9a948a, 0x2a241e, 0.55));
+const key = new THREE.SpotLight(0xffd9a0, 80, 30, 0.75, 0.5);
+key.position.set(3, 4, 4); key.castShadow = true;
+scene.add(key, key.target);
+const fill = new THREE.PointLight(0xcfe0d8, 10, 20);
+fill.position.set(-4, 2.5, 2);
+scene.add(fill);
+
+const M = buildMaterials(false);
+await bakeFaces(M); // 等照片脸皮烘焙完成再截（查看器要的就是脸）
+M.terrazzo.map.repeat.set(10, 10); M.terrazzo.normalMap.repeat.set(10, 10); M.terrazzo.roughnessMap.repeat.set(10, 10);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), M.terrazzo);
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+scene.add(floor);
+
+const roles = [
+  ['emcee', { role: 'emcee', seed: 11 }, 'mc'],
+  ['waiter', { role: 'waiter', seed: 22 }, 'serve'],
+  ['matron', { role: 'matron', seed: 33 }, 'backstep'],
+  ['booth', { role: 'booth', seed: 2001 }, 'post'],
+  ['osteo', { role: 'osteo', seed: 3001 }, 'work_brush'],
+  ['guest_m', { role: 'guest_m', seed: 44 }, 'float'],
+  ['guest_f', { role: 'guest_f', seed: 55 }, 'float'],
+  ['townsman', { role: 'townsman', seed: 66 }, 'walk'],
+  ['fisher', { role: 'fisher', seed: 77, hat: true, tool: 'rake' }, 'work_rake'],
+  ['gaze', { role: 'guest_m2', seed: 88, ghost: true }, 'watch'],
+  ['returnee', { role: 'returnee', seed: 4104 }, 'walk'],
+  ['bride', { role: 'bride', seed: 99 }, 'sing'],
+  // 同角色不同种子：证明「逐种子独特面孔」不是一张脸复制粘贴
+  ['face_a', { role: 'townsman', seed: 1017 }, 'idle'],
+  ['face_b', { role: 'townsman', seed: 2029 }, 'idle'],
+  ['face_c', { role: 'townsman', seed: 3043 }, 'idle'],
+  ['face_d', { role: 'guest_f', seed: 4057 }, 'idle'],
+  ['face_e', { role: 'guest_f', seed: 5077 }, 'idle'],
+  ['sit_baked', null, null],
+];
+const figures = [];
+for (let i = 0; i < roles.length; i++) {
+  const [name, opts, mode] = roles[i];
+  if (name === 'sit_baked') {
+    const g = bakeFigure(M, { role: 'guest_m', seed: 123 }, poseAs('sit'));
+    g.position.set(i * 2.2, 0, 0);
+    scene.add(g);
+    figures.push({ name, group: g, h: null, mode: null });
+    continue;
+  }
+  const h = new Humanoid(M, opts);
+  h.group.position.set(i * 2.2, 0, 0);
+  scene.add(h.group);
+  figures.push({ name, group: h.group, h, mode });
+}
+
+let t = 0;
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = 1 / 60; t += dt;
+  Humanoid.viewer.copy(cam.position); // 近距 LOD 视点
+  for (const f of figures) if (f.h) f.h.animate(f.mode, dt, 1);
+  renderer.render(scene, cam);
+}
+tick();
+
+window.__names = figures.map((f) => f.name);
+// 轮17 比例铁律断言口：每个活体角色的数值化人体测量（米）
+window.__metrics = figures.map((f) => (f.h ? { name: f.name, ...f.h.metrics } : null));
+// 轮18 渲染后世界空间测量口：逐顶点过 matrixWorld 实测（颏底/领口顶/露颈段/颈头宽比）——
+// 断言测的就是画面里那段颈，不再是内部骨骼公式
+window.__measure = (i) => {
+  const f = figures[i];
+  return f.h ? { name: f.name, ...f.h.measureWorld() } : null;
+};
+const moveLights = (x) => {
+  key.position.set(x + 2.5, 3.5, 3.5);
+  key.target.position.set(x, 1.2, 0);
+  fill.position.set(x - 3, 2.5, 2);
+};
+const setFov = (fov) => { cam.fov = fov; cam.updateProjectionMatrix(); };
+window.__lookAt = (i, dist = 2.6, height = 1.4) => {
+  const f = figures[i];
+  setFov(45);
+  moveLights(f.group.position.x);
+  cam.position.set(f.group.position.x + dist * 0.3, height, dist);
+  cam.lookAt(f.group.position.x, 1.05, 0);
+};
+window.__face = (i) => {
+  const f = figures[i];
+  // 轮19二稿：45°/0.64m 的广角近摄是「头大肩窄」错觉的放大器（鼻-耳距差 18%）。
+  // 改人像焦段：FOV 36 + 0.78m（仍在父审 0.5-0.8m 近景带内），框幅基本不变
+  setFov(36);
+  moveLights(f.group.position.x);
+  // 用头部世界坐标取景——姿态低头/歪头时也能框住脸
+  const p = f.h ? f.h.headWorldPos(new THREE.Vector3()) : new THREE.Vector3(f.group.position.x, 1.62, 0);
+  cam.position.set(p.x + 0.245, p.y + 0.06, p.z + 0.73);
+  cam.lookAt(p.x, p.y, p.z);
+};
+window.__profile = (i) => {
+  const f = figures[i];
+  setFov(36);
+  moveLights(f.group.position.x);
+  // 侧脸机位：鼻突/眉弓-鼻根-鼻梁三段线/颌缘的证据位
+  const p = f.h ? f.h.headWorldPos(new THREE.Vector3()) : new THREE.Vector3(f.group.position.x, 1.62, 0);
+  cam.position.set(p.x + 0.79, p.y + 0.04, p.z + 0.12);
+  cam.lookAt(p.x, p.y, p.z);
+};
+window.__lookAt(0);
+// 动态挂载口：按游戏内真实 seed 造角色（r25look 等取证快环用）——
+// 造完追加进 figures，__face/__profile/__measure 全部通用
+window.__mk = (name, opts, mode = 'idle') => {
+  const h = new Humanoid(M, opts);
+  const i = figures.length;
+  h.group.position.set(i * 2.2, 0, 0);
+  scene.add(h.group);
+  figures.push({ name, group: h.group, h, mode });
+  window.__names.push(name);
+  return i;
+};
+// 调试探针口（eggprobe 等临时脚本射线定位用）
+window.__THREE = THREE;
+window.__camera = cam;
+window.__scene = scene;
+window.__M = M;
+window.__ready = true;
+</script>
+</body>
+</html>

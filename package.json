@@ -1,13 +1,14 @@
 {
-  "name": "salt-tide",
+  "name": "fanchao",
   "version": "1.0.0",
-  "description": "咸潮 SALT TIDE — 中式民俗海洋恐怖 · 类《死魂曲》第一人称潜行 Demo",
+  "description": "返潮 FANCHAO — 蚀湾 2001 · 中式民俗海洋恐怖 · 类《死魂曲》第一人称潜行 Demo",
   "main": "desktop/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "verify": "node scripts/verify.mjs",
+    "verify": "node scripts/verify.mjs smoke && node scripts/verify.mjs gameplay && node scripts/verify.mjs round4tools && node scripts/verify.mjs round5leak && node scripts/verify.mjs round6guest && node scripts/verify.mjs round7mech && node scripts/verify.mjs blenderglb && node scripts/verify.mjs station && node scripts/verify.mjs looks && node scripts/verify.mjs playthrough",
+    "verify:one": "node scripts/verify.mjs",
     "desktop": "vite build && electron .",
     "dist": "vite build && electron-builder --win portable --linux AppImage",
     "dist:win": "vite build && electron-builder --win portable",
@@ -15,8 +16,13 @@
     "dist:linux": "vite build && electron-builder --linux AppImage"
   },
   "build": {
-    "appId": "com.salttide.demo",
-    "productName": "SaltTide",
+    "appId": "com.fanchao.demo",
+    "productName": "Fanchao",
+    "compression": "maximum",
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
     "directories": {
       "output": "release"
     },
@@ -31,14 +37,14 @@
       ]
     },
     "portable": {
-      "artifactName": "SaltTide-${version}-win-portable.exe"
+      "artifactName": "Fanchao-${version}-win-portable.exe"
     },
     "linux": {
       "target": [
         "AppImage"
       ],
       "category": "Game",
-      "artifactName": "SaltTide-${version}-linux.AppImage"
+      "artifactName": "Fanchao-${version}-linux.AppImage"
     }
   },
   "repository": {
@@ -58,6 +64,7 @@
   "devDependencies": {
     "electron": "^44.0.0",
     "electron-builder": "^26.15.3",
+    "gltfpack": "^1.2.0",
     "puppeteer-core": "^24.43.1",
     "vite": "^8.2.2"
   },

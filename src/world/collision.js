@@ -1,13 +1,17 @@
 // 碰撞与视线工具：圆形动体 vs AABB/圆柱 静态碰撞；2.5D 视线检测
 // 碰撞体格式：
-//   AABB: { minX, maxX, minZ, maxZ, maxY? }   maxY 为顶面高（低于视线可看过去/高处可跨越判断）
-//   圆柱: { x, z, r, maxY? }
+//   AABB: { minX, maxX, minZ, maxZ, maxY?, minY? }   maxY 顶面高；minY 底面高（多层楼：楼上的墙不挡楼下的人）
+//   圆柱: { x, z, r, maxY?, minY? }
+//   noCollide: 仅遮挡视线不阻挡移动（楼板等）；noSightBlock: 仅阻挡移动不遮视线（栏杆等）
 
 /** 圆形动体滑动移动，返回新位置（原地修改 pos） */
 export function slideMove(pos, dx, dz, radius, colliders, bounds, footY = 0) {
   const fits = (nx, nz) => {
     for (const c of colliders) {
+      if (c.off) continue;                                         // 关闭中的碰撞体（异化态路线切换）
+      if (c.noCollide) continue;                                   // 仅视线遮挡体
       if (c.maxY !== undefined && footY > c.maxY - 0.15) continue; // 站得比它高 → 可跨
+      if (c.minY !== undefined && footY + 1.55 < c.minY) continue; // 整个人在它下面 → 可从下方通过
       if (c.r !== undefined) {
         const ddx = nx - c.x, ddz = nz - c.z;
         const rr = c.r + radius;
@@ -80,13 +84,21 @@ function segCircle(ax, az, bx, bz, c) {
 export function hasLineOfSight(a, b, colliders, heightAt) {
   const ax = a.x, az = a.z, bx = b.x, bz = b.z;
   for (const c of colliders) {
+    if (c.off) continue;
     if (c.noSightBlock) continue;
     const hit = c.r !== undefined ? segCircle(ax, az, bx, bz, c) : segAABB(ax, az, bx, bz, c);
     if (hit) {
-      // 遮挡体的高度是否挡住视线（在相交点处的视线高度）
-      const eyeY = a.y + (b.y - a.y) * hit.t;
       const topY = c.maxY ?? Infinity;
-      if (topY > eyeY - 0.1) return false;
+      const botY = c.minY ?? -Infinity;
+      if (c.slab) {
+        // 水平楼板：视线在其 XZ 覆盖内竖直跨过楼板高度带 → 遮挡
+        const yLo = Math.min(a.y, b.y), yHi = Math.max(a.y, b.y);
+        if (yHi > botY && yLo < topY) return false;
+      } else {
+        // 墙体：相交点处的视线高度落在墙的高度带内 → 遮挡
+        const eyeY = a.y + (b.y - a.y) * hit.t;
+        if (topY > eyeY - 0.1 && botY < eyeY + 0.1) return false;
+      }
     }
   }
   // 地形遮挡：沿线采样

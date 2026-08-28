@@ -11,16 +11,20 @@ const FinalShader = {
   uniforms: {
     tDiffuse: { value: null },
     uTime: { value: 0 },
-    uGrain: { value: 0.05 },        // 颗粒强度
-    uVignette: { value: 1.12 },     // 暗角强度
-    uAberration: { value: 0.0009 }, // 色差
+    // 轮24·门3纪律：胶片壳层整体减弱——颗粒 0.05→0.03、暗角 1.12→0.85、
+    // 色差 0.0009→0.00045、黑位提升 0.015→0.010。低模糊不许再靠噪声遮羞，
+    // 几何与材质自己成立；取证模式另有 setFilmLook() 可再减半/关闭
+    uGrain: { value: 0.03 },        // 颗粒强度
+    uVignette: { value: 0.85 },     // 暗角强度
+    uAberration: { value: 0.00045 }, // 色差
     uDesat: { value: 0.12 },        // 去饱和
-    uLift: { value: 0.015 },        // 黑位提升(湿雾感)
+    uLift: { value: 0.010 },        // 黑位提升(湿雾感)
     uRedShift: { value: 0.0 },      // 血潮/受伤时整体偏红
     uPulse: { value: 0.0 },         // 心跳脉冲(视奸/共鸣)
     uDistort: { value: 0.0 },       // 桶形畸变(借来的眼睛不合自己的眼眶)
     uFlash: { value: 0.0 },         // 远处无声闪电
     uTint: { value: new THREE.Vector3(1, 1, 1) }, // 借眼色偏(每种载体的眼睛看到的世界不一样)
+    uWetLens: { value: 0.0 },       // 镜头水膜(开场雨拍：滑落水珠折射)
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -28,7 +32,7 @@ const FinalShader = {
   `,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
-    uniform float uTime, uGrain, uVignette, uAberration, uDesat, uLift, uRedShift, uPulse, uDistort, uFlash;
+    uniform float uTime, uGrain, uVignette, uAberration, uDesat, uLift, uRedShift, uPulse, uDistort, uFlash, uWetLens;
     uniform vec3 uTint;
     varying vec2 vUv;
 
@@ -47,6 +51,28 @@ const FinalShader = {
       // 心跳脉冲：轻微径向缩放
       float pulse = uPulse * 0.012 * sin(uTime * 7.0);
       uv = 0.5 + c * (1.0 - pulse);
+
+      // 镜头水膜（开场雨拍）：格胞里各自一颗慢慢滑落的水珠——
+      // 珠内向珠心翻折采样（倒像折射），珠上方一线纵向拖痕，珠缘留一圈冷高光
+      float wetHi = 0.0;
+      if (uWetLens > 0.001) {
+        vec2 ruv = vUv * vec2(11.0, 7.0);
+        vec2 rid = floor(ruv);
+        float rn = hash(rid);
+        if (rn > 0.42) {
+          vec2 rf = fract(ruv) - 0.5;
+          float slide = fract(uTime * (0.045 + rn * 0.05) + rn * 7.0);
+          vec2 dpos = vec2((rn - 0.5) * 0.7, 0.34 - slide * 0.82);
+          vec2 dvec = (rf - dpos) * vec2(1.0, 0.72);
+          float dr = length(dvec);
+          float rad = (0.09 + rn * 0.07) * (0.75 + 0.25 * sin(rn * 40.0));
+          float inside = smoothstep(rad, rad * 0.5, dr);
+          uv -= dvec * inside * 1.5 * uWetLens;
+          float trail = smoothstep(0.03, 0.0, abs(rf.x - dpos.x)) * smoothstep(dpos.y, dpos.y + 0.6, rf.y);
+          uv.y += trail * 0.012 * uWetLens;
+          wetHi = (smoothstep(rad * 1.12, rad * 0.9, dr) - smoothstep(rad * 0.72, rad * 0.4, dr)) * uWetLens;
+        }
+      }
 
       // 色差（边缘更强）
       float ab = uAberration * (1.0 + r2 * 6.0 + uPulse * 2.0);
@@ -75,6 +101,9 @@ const FinalShader = {
 
       // 远处无声闪电：整屏抬亮一瞬，偏冷
       col += uFlash * vec3(0.42, 0.48, 0.56) * (0.5 + 0.5 * (1.0 - r2 * 2.0));
+
+      // 水珠缘高光：珠壳接住场里的冷光
+      col += wetHi * 0.09 * vec3(0.78, 0.9, 1.0);
 
       // 暗角
       float vig = 1.0 - uVignette * r2 * (1.3 + uPulse);
@@ -108,17 +137,20 @@ export class Engine {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 900);
 
-    // 后处理链
-    this.composer = new EffectComposer(this.renderer);
+    // 后处理链——自带模板缓冲的 RT：幻潮镜洼要水洼写模板、镜像层限洼绘制
+    const rtSize = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(rtSize.x, rtSize.y, {
+      type: THREE.HalfFloatType, stencilBuffer: true,
+    }));
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
 
     if (!lowspec) {
       this.bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.55,  // strength：只让灯火与眼点溢光
-        0.62,  // radius
-        0.78   // threshold
+        0.42,  // strength：轮24 0.55→0.42——月亮/灯箱把半张夜景糊成白雾的元凶
+        0.55,  // radius
+        0.84   // threshold：只让真正的灯火溢光
       );
       this.composer.addPass(this.bloomPass);
     }
@@ -144,6 +176,15 @@ export class Engine {
   /** 切换主渲染相机（视奸时切入他者视野） */
   setCamera(cam) {
     this.renderPass.camera = cam;
+  }
+
+  /** 胶片壳层强度（取证模式）：k=1 默认 / 0.5 减半 / 0 全关——
+   *  只缩放颗粒/暗角/色差三件「滤镜壳」，调色与曝光不动 */
+  setFilmLook(k = 1) {
+    const u = this.finalPass.uniforms;
+    u.uGrain.value = 0.03 * k;
+    u.uVignette.value = 0.85 * k;
+    u.uAberration.value = 0.00045 * k;
   }
 
   render(time) {

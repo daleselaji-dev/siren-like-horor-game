@@ -1,6 +1,5 @@
-// 潜行聚合系统：噪音事件总线 + 威胁度(HUD/音乐) + 歌唱者共鸣
-import * as THREE from 'three';
-
+// 潜行聚合系统：噪音事件总线 + 威胁度(HUD/音乐) + 地面振动（上宾感知）
+// 振动规则：硬地（水磨石/瓷砖）走动传远；红毯减振；蹲行几乎无振。
 export class StealthSystem {
   constructor(world, player) {
     this.world = world;
@@ -8,16 +7,26 @@ export class StealthSystem {
     this.noiseEvents = [];      // {x,z,r,ttl}
     this.danger = 0;            // 0..1 被怀疑/追踪程度（驱动 HUD 红边与音乐）
     this.chaseCount = 0;
-    this.resonance = 0;         // 0..1 歌唱者共鸣（满 → 强制视奸崩溃）
-    this.resonanceActive = false;
-    this.envSightFactor = 1;    // 血潮浓雾时 0.75
+    this.vibration = 0;         // 0..1 地面振动累积（满 → 被上宾点名）
+    this.vibrationActive = false; // 上宾在场时开启
+    this.envSightFactor = 1;    // 渗漏态浓雾时略降
   }
 
   emitNoise(x, z, r) {
     this.noiseEvents.push({ x, z, r, ttl: 0.6 });
   }
 
-  update(dt, enemies, singer) {
+  /** 玩家当前是否踩在减振地面（大堂红毯等） */
+  onDampSurface() {
+    const rects = this.world.dynamic.dampRects ?? [];
+    const p = this.player.pos;
+    for (const r of rects) {
+      if (p.x >= r.minX && p.x <= r.maxX && p.z >= r.minZ && p.z <= r.maxZ) return true;
+    }
+    return false;
+  }
+
+  update(dt, enemies) {
     // 噪音事件老化
     for (const n of this.noiseEvents) n.ttl -= dt;
     this.noiseEvents = this.noiseEvents.filter((n) => n.ttl > 0);
@@ -34,19 +43,18 @@ export class StealthSystem {
     this.chaseCount = chases;
     this.danger += (d - this.danger) * Math.min(1, dt * (d > this.danger ? 6 : 1.2));
 
-    // 歌唱者共鸣：靠近歌声 → 共鸣涨；远离 → 慢慢退
-    if (singer && singer.enabled && this.resonanceActive && !this.player.dead) {
-      const dist = Math.hypot(singer.pos.x - this.player.pos.x, singer.pos.z - this.player.pos.z);
-      const R = 17;
-      if (dist < R) {
-        // 蹲下捂住耳朵？不行——歌是从喉咙里进来的。只有拉开距离。
-        const rate = (1 - dist / R) * 0.16 * (this.player.crouching ? 0.8 : 1);
-        this.resonance = Math.min(1, this.resonance + rate * dt * 60 * 0.016);
+    // 地面振动：上宾在场时，走动往楼板里灌振动
+    if (this.vibrationActive && !this.player.dead) {
+      const moving = this.player.noiseLevel > 0.5;
+      if (moving) {
+        let rate = this.player.crouching ? 0.045 : 0.24;
+        if (this.onDampSurface()) rate *= 0.18;   // 红毯吃掉振动
+        this.vibration = Math.min(1, this.vibration + rate * dt);
       } else {
-        this.resonance = Math.max(0, this.resonance - dt * 0.09);
+        this.vibration = Math.max(0, this.vibration - dt * 0.14);
       }
     } else {
-      this.resonance = Math.max(0, this.resonance - dt * 0.15);
+      this.vibration = Math.max(0, this.vibration - dt * 0.3);
     }
   }
 }

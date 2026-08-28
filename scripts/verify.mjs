@@ -49,8 +49,9 @@ try {
 
   console.log('[verify] loading page...');
   const query = process.env.FULLSPEC ? '' : '?lowspec=1';
-  await page.goto(`http://127.0.0.1:${PORT}/${query}`, { waitUntil: 'networkidle0', timeout: 60000 });
-  await page.waitForFunction(() => window.__game !== undefined, { timeout: 30000 });
+  // domcontentloaded：FULLSPEC 下贴图程序化生成会长时间占住主线程，networkidle0 会误超时
+  await page.goto(`http://127.0.0.1:${PORT}/${query}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction(() => window.__game !== undefined, { timeout: 90000, polling: 500 });
 
   const stepFile = process.argv[2] || 'smoke';
   const mod = await import(path.resolve(`scripts/verify-steps/${stepFile}.mjs`));
@@ -71,10 +72,22 @@ try {
         window.dispatchEvent(new KeyboardEvent('keyup', { code: c, bubbles: true }));
       }, code);
     },
+    // 帧感知点按：按下后等游戏真的跑过 2 帧再抬起（FULLSPEC/SwiftShader 低帧率下固定毫秒等待会整帧踏空）
     tapKey: async (code) => {
       await page.evaluate((c) => {
         window.dispatchEvent(new KeyboardEvent('keydown', { code: c, bubbles: true }));
-        setTimeout(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: c, bubbles: true })), 60);
+        return new Promise((res) => {
+          let n = 0;
+          const t0 = performance.now();
+          const tick = () => {
+            n++;
+            if (n >= 2 || performance.now() - t0 > 8000) {
+              window.dispatchEvent(new KeyboardEvent('keyup', { code: c, bubbles: true }));
+              res();
+            } else requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
       }, code);
       await new Promise((r) => setTimeout(r, 120));
     },

@@ -26,7 +26,8 @@ export class Batcher {
     _scale.set(sx, sy, sz);
     _m4.compose(_pos, _quat, _scale);
     const g = geo.clone().applyMatrix4(_m4);
-    if (geo === GEO.box) worldScaleBoxUV(g);
+    // 文字招牌等「整幅贴图」材质保持 0..1 UV，不做世界空间平铺
+    if (geo === GEO.box && !material.userData?.fullUV) worldScaleBoxUV(g);
     if (!this.byMaterial.has(material)) this.byMaterial.set(material, []);
     this.byMaterial.get(material).push(g);
   }

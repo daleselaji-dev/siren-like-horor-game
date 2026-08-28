@@ -55,7 +55,7 @@ export class Ocean {
           varying float vShoreD;`)
         .replace('#include <begin_vertex>', `
           #include <begin_vertex>
-          float chop = 1.0 + uBlood * 0.9;      // 血潮时浪更躁
+          float chop = 1.0 + uBlood * 0.9;      // 返潮后浪更躁
           float wa = sin(position.x * 0.11 + uTime * 0.9) * 0.14 * chop
                    + cos(position.z * 0.13 + uTime * 0.7) * 0.12 * chop
                    + sin((position.x + position.z) * 0.05 + uTime * 0.45) * 0.2
@@ -84,29 +84,29 @@ export class Ocean {
         .replace('#include <color_fragment>', `
           #include <color_fragment>
           // 血潮变色：暗红 + 轻微自发光感
-          vec3 bloodCol = vec3(0.30, 0.045, 0.035);
+          vec3 bloodCol = vec3(0.045, 0.082, 0.074);  // 返潮：来的不是血，是深度
           diffuseColor.rgb = mix(diffuseColor.rgb, bloodCol, uBlood);
           // 近岸浅水：悬浮泥沙让水色变浊变浅
           float shallow = 1.0 - smoothstep(0.0, 2.6, vShoreD);
-          vec3 shallowCol = mix(vec3(0.215, 0.285, 0.265), vec3(0.33, 0.10, 0.08), uBlood);
+          vec3 shallowCol = mix(vec3(0.215, 0.285, 0.265), vec3(0.10, 0.14, 0.12), uBlood);
           diffuseColor.rgb = mix(diffuseColor.rgb, shallowCol, shallow * 0.5);
           // 岸线白沫：贴着潮线的一条不肯退的碎沫（噪声破碎 + 缓慢呼吸）
           float foamN = texture2D( normalMap, vNormalMapUv * 3.1 + vec2(uTime*0.020, -uTime*0.013) ).y;
           float band = 1.0 - smoothstep(0.02, 0.85, abs(vShoreD - 0.22));
           float foam = band * smoothstep(0.34, 0.78, foamN + sin(uTime*0.7 + vShoreD*8.0) * 0.13);
-          vec3 foamCol = mix(vec3(0.70, 0.75, 0.73), vec3(0.58, 0.32, 0.29), uBlood);
+          vec3 foamCol = mix(vec3(0.70, 0.75, 0.73), vec3(0.44, 0.52, 0.48), uBlood);
           diffuseColor.rgb = mix(diffuseColor.rgb, foamCol, foam * 0.8);
           // 浪尖碎沫：只有掀得最高的浪头翻出一线白（血潮翻出粉灰）
           float capN = texture2D( normalMap, vNormalMapUv * 2.3 + vec2(uTime*0.017, -uTime*0.009) ).x;
           float cap = smoothstep(0.30, 0.46, vWave) * smoothstep(0.45, 0.75, capN);
-          vec3 capCol = mix(vec3(0.62, 0.68, 0.66), vec3(0.55, 0.30, 0.28), uBlood);
+          vec3 capCol = mix(vec3(0.62, 0.68, 0.66), vec3(0.40, 0.48, 0.44), uBlood);
           diffuseColor.rgb = mix(diffuseColor.rgb, capCol, cap * 0.55);
         `)
         .replace('#include <emissivemap_fragment>', `
           #include <emissivemap_fragment>
           // 血潮：水体从内部透出的一点血光，随潮歌节律呼吸
           float pulse = 0.5 + 0.5 * sin(uTime * 0.8);
-          totalEmissiveRadiance += vec3(0.10, 0.008, 0.006) * uBlood * (0.6 + pulse * 0.4);
+          totalEmissiveRadiance += vec3(0.008, 0.032, 0.026) * uBlood * (0.6 + pulse * 0.4);
         `);
     };
 
