@@ -378,16 +378,29 @@ function handleInput(dt) {
 // 前向渲染下每盏点光源都参与全部片元计算——小镇灯笼+酒店灯箱加起来 40+ 盏会把
 // 低端 GPU（尤其 SwiftShader 无头验证）拖到个位数帧。只保留离相机最近的 N 盏可见；
 // 数量恒定，three.js 不会反复重编译着色器。
-const allPointLights = [
-  ...world.lights,
-  ...(world.dynamic.hotelLights ?? []).map((h) => h.pl),
-];
-const LIGHT_BUDGET = Math.min(LOWSPEC ? 10 : 16, allPointLights.length);
+// r20 修复：英雄件 GLB 是异步装配的，它们的实用光/轮廓光在这行代码执行之后
+// 才 push 进 world.lights——旧版用扩展运算符快照数组，这些灯永远进不了预算、
+// visible 永远是 false（「英雄件读成黑管」的第一元凶）。改成 world.lights
+// 长度变化时重建预算数组。
+let allPointLights = [];
+let lightCountSeen = -1;
+function rebuildLightList() {
+  allPointLights = [
+    ...world.lights,
+    ...(world.dynamic.hotelLights ?? []).map((h) => h.pl),
+  ];
+}
+rebuildLightList();
+const LIGHT_BUDGET = LOWSPEC ? 10 : 16;
 let lightBudgetT = 0;
 function updateLightBudget(dt, camPos) {
   lightBudgetT -= dt;
   if (lightBudgetT > 0) return;
   lightBudgetT = 0.3;
+  if (world.lights.length !== lightCountSeen) {
+    lightCountSeen = world.lights.length;
+    rebuildLightList();
+  }
   for (const pl of allPointLights) {
     const dx = pl.position.x - camPos.x, dy = pl.position.y - camPos.y, dz = pl.position.z - camPos.z;
     pl._d2 = dx * dx + dy * dy + dz * dz;

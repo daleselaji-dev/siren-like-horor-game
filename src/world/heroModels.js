@@ -36,12 +36,18 @@ export class HeroFigures {
     const HI = world.dynamic.hotelInfo;
     const hx = HI?.origin.x ?? 0, hb = HI?.origin.y ?? 0, hz = HI?.origin.z ?? 0;
     // —— 摆位表（世界坐标；face=看向的点；track=转头行为）——
+    // r20 游戏内可读性：r19 复盘——固定机位中近景里五件读成「黑管/无五官」。
+    // 三个根：①守夜人/侍应完全没有实用光，只吃半球底光；②环反射 0.55 太弱，
+    // 阴面死黑；③没有轮廓光，深色衣料剪影融进夜景。逐件补「实用键光 + 冷轮
+    // 廓光」（rim 从背向面方向的反侧上方打），全部进灯光预算调度，远了自动灭。
     this.defs = [
       {
         key: 'townsman', label: '守夜的人',
         pos: [62.2, 5.4], face: [110, 16], track: 'slow', trackR: 7,
         sub: '站台边守夜的人没有看车。他看的是海。', subR: 6.5,
-        light: null,
+        // 站台灯的冷白洒下来（同款 0xd8e4dc）：斗笠下的脸才有明暗
+        light: { color: 0xd8e4dc, intensity: 2.6, dist: 6, dy: 2.35, dxz: [1.1, 0.5] },
+        rim: { color: 0x8fb4c8, intensity: 2.4, dist: 4.5, dy: 1.9 },
       },
       {
         // 大新照相馆橱窗内的「立牌人形」——照相馆不做人形立牌。
@@ -51,13 +57,17 @@ export class HeroFigures {
         groundAt: [14, 2.8], yOff: 0.44, // 照相馆抬高木地板：以铺面基座地面为准
 
         sub: '橱窗里立着个人形：中山装，红袖章，落着灰。大新照相不做人形立牌。', subR: 4.5,
-        light: { color: 0xffb066, intensity: 3.2, dist: 4.5, dy: 2.3, dxz: [0, -0.35] },
+        // r20：键光从头顶正上挪到脸前上方 45°（顶光把眶窝/人中打成黑洞）
+        light: { color: 0xffb066, intensity: 3.2, dist: 4.5, dy: 1.9, dxz: [0.25, -1.1] },
+        rim: { color: 0x9fb4c8, intensity: 2.0, dist: 4, dy: 2.0 },
       },
       {
         key: 'waiter', label: '迎宾的侍应',
         pos: [hx + 5.9, hz + 8.4], y: hb, face: [hx + 3.0, hz + 5.2], track: 'none',
         sub: '迎宾的侍应鞠得太低了。托盘里那只碗，擦得太亮。', subR: 5,
-        light: null,
+        // 大堂门灯的暖光从他迎宾的方向打来：白衫/黑领结/托盘立起来
+        light: { color: 0xffc088, intensity: 2.6, dist: 5.5, dy: 2.1, dxz: [-1.3, -1.4] },
+        rim: { color: 0x8fb4c8, intensity: 2.2, dist: 4.5, dy: 2.0 },
       },
       {
         // 场景关键件：塌祠里请出来的无面海神像（Blender bpy 细模）
@@ -65,12 +75,14 @@ export class HeroFigures {
         pos: [-18.4, -31.4], face: [-14.5, -30.6], track: 'none',
         sub: '祠塌了，像被请出来立在道边。脸不是风磨平的——是手，一天一天，把眉眼抹掉。', subR: 4.5,
         light: { color: 0xff8a3a, intensity: 1.6, dist: 4, dy: 0.35, dxz: [0, -0.5] },
+        rim: { color: 0x9fc0d4, intensity: 2.0, dist: 4.5, dy: 2.2 },
       },
       {
         key: 'wetguest', label: '数床单的人',
         pos: [17.55, -25.45], face: [17.55, -24.6], track: 'creep', trackR: 6, needLeak: true,
         sub: '床单巷里多了一个人。他面对着床单站着，离布只有一拳。别打扰他数。', subR: 6,
-        light: { color: 0x5a7a86, intensity: 1.4, dist: 5, dy: 2.2, dxz: [0, -1.2] },
+        light: { color: 0x5a7a86, intensity: 1.8, dist: 5, dy: 2.2, dxz: [0, -1.2] },
+        rim: { color: 0x7da4b8, intensity: 2.6, dist: 4.5, dy: 1.85 },
       },
     ];
 
@@ -95,7 +107,9 @@ export class HeroFigures {
         o.receiveShadow = true;
         const m = o.material;
         if (m) {
-          m.envMapIntensity = 0.55;
+          // r20：0.55→1.0——夜景环反射是阴面唯一的补光来源，0.55 时
+          // 深色衣料/背光半张脸直接读成死黑（「黑管」主因之一）
+          m.envMapIntensity = 1.0;
           if (def.dusty) { // 祠像落灰三年：压彩、哑光
             if (m.color) m.color.multiply(new THREE.Color(0.80, 0.78, 0.74));
             m.roughness = Math.min(1, (m.roughness ?? 0.8) * 1.25);
@@ -124,6 +138,18 @@ export class HeroFigures {
         fig.light = pl;
         if (def.needLeak) { pl._base = pl.intensity; pl.intensity = 0; }
       }
+      if (def.rim) {
+        // 冷轮廓光：立在「面向」的反方向后上方——剪影从夜景里剥出来
+        const fl = Math.hypot(def.face[0] - def.pos[0], def.face[1] - def.pos[1]) || 1;
+        const bx = -(def.face[0] - def.pos[0]) / fl, bz = -(def.face[1] - def.pos[1]) / fl;
+        const rl = new THREE.PointLight(def.rim.color, def.rim.intensity, def.rim.dist, 2);
+        rl.position.set(def.pos[0] + bx * 1.0, gy + def.rim.dy, def.pos[1] + bz * 1.0);
+        rl.visible = false;
+        this.scene.add(rl);
+        this.world.lights.push(rl);
+        fig.rim = rl;
+        if (def.needLeak) { rl._base = rl.intensity; rl.intensity = 0; }
+      }
       this.figures.push(fig);
       this.ready++;
     }, (err) => console.error('[heroModels] parse failed:', def.key, err));
@@ -140,6 +166,7 @@ export class HeroFigures {
         fig.root.visible = true;
         if (fig.collider) fig.collider.off = false;
         if (fig.light && fig.light._base) fig.light.intensity = fig.light._base;
+        if (fig.rim && fig.rim._base) fig.rim.intensity = fig.rim._base;
       }
       if (!fig.enabled) continue;
       const dx = player.pos.x - fig.root.position.x;
