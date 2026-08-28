@@ -61,7 +61,7 @@ SPECS = {
         'outfit': 'zhongshan', 'coat_rgb': (0.21, 0.225, 0.25), 'trouser_rgb': (0.115, 0.12, 0.135),
         'skin': (0.70, 0.53, 0.42), 'hair_rgb': (0.07, 0.065, 0.06), 'hair': 'short',
         'armband': True, 'belly': 0.12,
-        'pose_l': 'sides', 'pose_r': 'mic', 'curl': 0.72,
+        'pose_l': 'sides', 'pose_r': 'mic', 'curl': 0.42, 'curl_r': 1.0,
         'head_pitch': -0.06,
         'head': {'age': 0.55, 'brow_k': 1.10, 'nose_k': 1.05, 'cheek_k': 1.18, 'hollow': 0.015,
                  'jaw_k': 1.06, 'chin_k': 1.05, 'lid': 0.40, 'socket_k': 1.05,

@@ -551,8 +551,15 @@ def build_arm(side, spec, m, mats, pose, seed=1):
         el = sh + Vector((side * 0.001, -0.100, -0.170))
         wr = Vector((side * 0.060, -0.175, nt - 0.085))
         mic_head = Vector((side * 0.012, -0.168, nt + 0.018))
-        hand = {'dir': (mic_head - wr).normalized(),
-                'palm': (mic_head - wr).normalized().cross(Vector((0, 0, 1))).normalized()}
+        mic_axis = (mic_head - wr).normalized()
+        # 环握读法（r21 复盘：旧 palm 朝脸——指梢朝前卷、盖住麦头+糊上口鼻，
+        # 读成「捂脸」）：掌仍沿柄轴（前臂的自然延长），palm 法向改取
+        # 「垂直柄轴的水平外侧」——指绕柄向体内侧卷拢，卷指平面横过柄身，
+        # 麦头从拳顶探出，口缝在麦头与拳之间可读
+        pn = mic_axis.cross(Vector((0, -1, 0))).normalized()
+        if pn.x * side < 0:
+            pn = -pn
+        hand = {'dir': mic_axis, 'palm': pn, 'mic_axis': mic_axis}
     else:  # sides：垂手贴缝（肘微屈、腕略前——死直管是玩具站姿）
         el = sh + Vector((side * 0.012, -0.006, -0.148 * m['H']))
         wr = el + Vector((side * 0.006, -0.034, -0.150 * m['H']))
@@ -926,8 +933,9 @@ def build_armband(spec, m, mats):
 
 def build_mic(spec, m, wr, hand, mats):
     """手持麦克风（舞台报数员）：海绵麦头 + 锥柄 + 垂到台面没入的麦线。
-    柄轴沿手的握向（hand['dir']），麦头压在钙化口缝前一拳。"""
-    d = Vector(hand['dir']).normalized()
+    柄轴 = hand['mic_axis']（腕→口缝方向；r21 起手指改环握、不再顺柄），
+    麦头压在钙化口缝前一拳。"""
+    d = Vector(hand.get('mic_axis', hand['dir'])).normalized()
     objs = []
     # 柄：从掌心穿出的锥管
     p0 = wr + d * 0.010
@@ -1012,7 +1020,9 @@ def assemble_character(spec):
         'pearl': flat_mat(name + '_pearl', (0.43, 0.41, 0.36), rough=0.80),
         'salt': flat_mat(name + '_salt', (0.92, 0.94, 0.94), rough=0.55),
         # 理册婆第三眼：矿盘青灰哑光 + 孔缝近黑
-        'mineral': flat_mat(name + '_mineral', (0.185, 0.20, 0.175), rough=0.62),
+        # r21 二稿：0.185 档在额光下读成「浅色钮扣」——压到暗矿档，
+        # 6m 外只是眉间一粒暗痣，2m 内才读出盘面与孔缝
+        'mineral': flat_mat(name + '_mineral', (0.092, 0.10, 0.088), rough=0.48),
         'poredark': flat_mat(name + '_poredark', (0.045, 0.05, 0.045), rough=0.85),
         # 舞台麦克风：漆壳柄 + 海绵头
         'micbody': flat_mat(name + '_micbody', (0.13, 0.13, 0.145), rough=0.42, metal=0.35),
@@ -1042,10 +1052,11 @@ def assemble_character(spec):
     slv_r, wr_r, hf_r = build_arm(1, spec, m, mats, poseR, seed)
     g_armL += slv_l
     g_armR += slv_r
+    # 逐侧 curl 覆写（curl_l/curl_r）：持麦手要握拢、垂侧手保持松弛——同值会顾此失彼
     g_armL += build_hand(-1, wr_l, hf_l, spec, mats,
-                         curl=spec.get('curl', 0.55), spread=spec.get('spread', 0.0))
+                         curl=spec.get('curl_l', spec.get('curl', 0.55)), spread=spec.get('spread', 0.0))
     g_armR += build_hand(1, wr_r, hf_r, spec, mats,
-                         curl=spec.get('curl', 0.55), spread=spec.get('spread', 0.0))
+                         curl=spec.get('curl_r', spec.get('curl', 0.55)), spread=spec.get('spread', 0.0))
 
     if spec.get('armband'):
         g_armL.append(build_armband(spec, m, mats))

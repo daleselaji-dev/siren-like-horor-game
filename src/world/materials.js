@@ -122,7 +122,9 @@ export function buildMaterials(lowspec = false) {
   M.serviceWall = std(T.paintedWall, { color: 0xaeb6ac, normalScale: 0.6, envInt: 0.5 }); // 后勤冷灰漆（上方配机关绿墙裙）
   M.tile = std(T.tile, { normalScale: 1.45, envInt: 1.6 }); // 轮24：外墙瓷砖法线 0.8→1.45——砖缝在侧光下起真阴影
   M.veneer = std(T.veneer, { normalScale: 0.9, envInt: 1.0, roughness: 0.85 });
-  M.veneerRed = std(T.veneer, { color: 0xb05540, normalScale: 0.9, envInt: 1.1, roughness: 0.8 }); // 红漆总台
+  // 红漆总台/木作（P2：0xb05540+rough0.8 读成赤陶砖——美术圣经要的是「红漆」：
+  // 深枣红 + 打磨过的漆面反光，木纹从漆底下隐约透出来）
+  M.veneerRed = std(T.veneer, { color: 0x7e1f16, normalScale: 0.5, envInt: 1.5, roughness: 0.42 });
   M.curtain = std(T.curtain, { normalScale: 1.4, envInt: 0.7 });
   M.brass = new THREE.MeshStandardMaterial({ color: 0xc9a24e, roughness: 0.3, metalness: 0.9, envMapIntensity: 1.6 }); // 金不锈钢包边
   M.steel = new THREE.MeshStandardMaterial({ color: 0x9aa0a4, roughness: 0.35, metalness: 0.85, envMapIntensity: 1.3 });

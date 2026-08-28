@@ -143,13 +143,24 @@ export function buildHotel(ctx) {
     const dx = lx1 - lx0, dz = lz1 - lz0;
     const run = Math.hypot(dx, dz);
     const ang = Math.atan2(dx, dz); // 朝向
+    const ux = dx / run, uz = dz / run; // 上行方向
     const steps = Math.max(2, Math.round((y1 - y0) / 0.17));
+    const dep = run / steps;
     for (let i = 0; i < steps; i++) {
       const t = (i + 0.5) / steps;
       const sx = lx0 + dx * t, sz = lz0 + dz * t;
       const sy = y0 + (y1 - y0) * (i + 1) / steps;
-      box(mat, sx, sy - 0.09, sz, width, 0.18, run / steps + 0.06, ang);
-      if (carpet) box(carpet, sx, sy + 0.005, sz, width * 0.7, 0.012, run / steps + 0.02, ang);
+      box(mat, sx, sy - 0.09, sz, width, 0.18, dep + 0.06, ang);
+      if (carpet) {
+        // 红毯大楼梯（美术圣经视觉主轴）：毯要「铺下来」——踏面之外踢面也包毯
+        // （侧视/仰视角里楼梯才读成红的，不是灰石台阶上一线红），
+        // 踏口一根铜压毯杆——2001 面子工程的签名件
+        box(carpet, sx, sy + 0.005, sz, width * 0.8, 0.012, dep + 0.02, ang);
+        box(carpet, sx - ux * (dep / 2 + 0.034), sy - 0.088, sz - uz * (dep / 2 + 0.034),
+          width * 0.8, 0.168, 0.014, ang);
+        box(M.brass, sx - ux * (dep / 2 - 0.004), sy + 0.014, sz - uz * (dep / 2 - 0.004),
+          width * 0.74, 0.02, 0.02, ang);
+      }
     }
     // 行走坡（起点略前伸，保证上/下沿连续）
     addPatch(hx + (lx0 + lx1) / 2, hz + (lz0 + lz1) / 2, Math.atan2(dz, dx), run + 0.5, width, hb + y0, hb + y1);
