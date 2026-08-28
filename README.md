@@ -228,12 +228,27 @@ npx gltfpack -i blender/export/emcee.glb -o src/assets/models/emcee.glb -cc -kn
 ```
 
 多轮迭代对照图在 `verify/blender/`（r1 过曝胶囊 → r2 眼球出窝 → r3 四人成形 →
-r4 鞋裤衔接/湿客头身比 → r5 神像），`.blend` 工程在 `blender/out/`（可打开续雕）。
+r4 鞋裤衔接/湿客头身比 → r5 神像 → … → r21 工位件），`.blend` 工程在
+`blender/out/`（可打开续雕）。
 游戏内运行时装配在 `src/world/heroModels.js`：HeadPivot 转头三读法
 （守夜人慢转头 / 湿客极慢 creep / 橱窗立像「被注视即冻结」）、
 呼吸微动画（活人才有）、首见字幕、人形碰撞柱、灯光预算接入。
 `node scripts/verify.mjs blenderglb` 对五件断言：装配齐 / 细模面数门槛 /
 HeadPivot / 转头积分 / 首见字幕 / 湿客返潮点火才到岗。
+
+**工位 GLB（r21·双轨归一）**：宴会厅**舞台报数员**（`emcee_stage.glb` 持麦变体——
+与橱窗立像同一张脸）、**三名巡场侍应**（`waiter.glb`）、**理册婆**（`matron.glb`
+绾髻/拢手/眉心矿物孔板第三眼）等 gameplay 近景工位不再用程序化 Humanoid，
+直接装配 Blender 细模。bpy 导出内嵌关节 pivot 空节点
+（TorsoPivot/ArmPivotL/R/LegPivotL/R/HeadPivot——旋转≈基姿、位置即关节点）
+与 EyeAnchorL/R 眼锚点；运行时 `src/entities/stationBody.js` 实现与 Humanoid
+相同的最小接口（`animate`/`setEyeIntensity`/`headWorldPos`/`neck`/`torso`），
+每帧「基姿四元数 × 摆动欧拉」合成步态：侍应传送带碎步+托盘臂锁死、
+报数员持麦臂焊死+左臂周期「宣布」、理册婆拢手对等角 X 摆（手对不散）+
+倒退步头锁死；眼点冷光挂眼锚点，警戒才亮；键光/轮廓光进灯光预算随人走。
+`node scripts/verify.mjs station` 断言：五具身体细模门槛(>9000 tris)/六 pivot 齐/
+道具在场(麦头/托盘/第三眼)/**工位禁止胶囊 Humanoid**/步态摆动/托盘锁定/
+眼点门控/视奸口径，并落盘 `verify/station/r21_*` 与 `verify/keep/station/` 取证。
 
 ## 项目结构
 
