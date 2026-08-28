@@ -654,6 +654,8 @@ def build_hair_cards(field, spec, mats, count=1100):
     if style == 'none':
         return build_nape_wisps(field, spec, mats)
     wet = spec.get('anomaly') == 'drowned'
+    if wet:
+        count = int(count * 1.5)   # 湿绺卡宽但贴伏，顶区盖秃需要更多根数
     rng = np.random.default_rng(field.seed + 63)
     bm = bmesh.new()
 

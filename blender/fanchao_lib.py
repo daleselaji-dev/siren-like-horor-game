@@ -661,7 +661,7 @@ def build_hand(side, wrist, hand_frame, spec, mats, curl=0.55, spread=0.0):
         off = sidev * ((i - 1.5) * 0.0205 * S)
         r0 = frads[i] * S
         base = wrist + d * (Lp * 0.92) + off - palm_n * 0.0012
-        L = 0.088 * fl[i] * S
+        L = 0.082 * fl[i] * S
         # 基础微张 0.06：并拢成坨读不出 5 指（full 机位铁律）
         d0 = (d + sidev * ((spread + 0.06) * (i - 1.5) * 0.15) - palm_n * curl * 0.38).normalized()
         d1 = (d0 - palm_n * curl * 0.80).normalized()
@@ -754,13 +754,15 @@ def build_legs(spec, m, mats):
             if outfit in ('zhongshan', 'waiter'):
                 # 前中烫迹线
                 r += 0.011 * math.exp(-((abs(a - TAU / 4)) / 0.075) ** 2)
-            # 大腿前布面松垂
-            r += 0.020 * math.exp(-((i - 1.2) / 0.9) ** 2) * max(0.0, fr) * math.sin(a * 3 + wrk[(i + 5) % 8] * 5) * 0.5
+            # 大腿前布面松垂（r17c 加幅：直筒管读法要打掉）
+            r += 0.030 * math.exp(-((i - 1.2) / 0.9) ** 2) * max(0.0, fr) * math.sin(a * 3 + wrk[(i + 5) % 8] * 5) * 0.5
             # 膝后横褶
-            r += 0.045 * math.exp(-((i - 3.4) / 0.9) ** 2) * max(0.0, -fr) * math.sin(a * 5 + wrk[i % 8] * 6) * 0.6
+            r += 0.065 * math.exp(-((i - 3.4) / 0.9) ** 2) * max(0.0, -fr) * math.sin(a * 5 + wrk[i % 8] * 6) * 0.6
+            # 膝前微鼓（骨点顶布）
+            r += 0.020 * math.exp(-((i - 3.0) / 0.6) ** 2) * max(0.0, fr)
             # 裤脚断褶（堆在鞋面）
-            r += 0.062 * math.exp(-((i - 6.5) / 0.7) ** 2) * math.sin(a * 6 + wrk[(i + 3) % 8] * 7) * 0.5
-            r += 0.018 * (wrk[int(a / TAU * 12) % 12] - 0.5)
+            r += 0.080 * math.exp(-((i - 6.5) / 0.7) ** 2) * math.sin(a * 6 + wrk[(i + 3) % 8] * 7) * 0.5
+            r += 0.022 * (wrk[int(a / TAU * 12) % 12] - 0.5)
             return r
         bm = bmesh.new()
         tube(bm, path, rads, rads, ring_n=20, cap_start=True, cap_end=True, bulge=bulge)
@@ -1158,7 +1160,9 @@ def assemble_seagod(spec):
     name = spec['name']
     mats = {
         'stone': flat_mat(name + '_stone', (0.16, 0.16, 0.17), rough=0.92),
-        'gilt': flat_mat(name + '_gilt', (0.50, 0.38, 0.16), rough=0.5, metal=0.7),
+        'gilt': flat_mat(name + '_gilt', (0.50, 0.38, 0.16), rough=0.58, metal=0.7),
+        # 旧珠：金层磨秃的哑铜色（r16 复盘：满串亮金圆珠=塑料玩具项链）
+        'gilt_worn': flat_mat(name + '_giltw', (0.36, 0.26, 0.12), rough=0.70, metal=0.55),
         'cord': flat_mat(name + '_cord', (0.030, 0.017, 0.008), rough=0.9),
         'ash': flat_mat(name + '_ash', (0.20, 0.19, 0.18), rough=0.95),
         'ember': flat_mat(name + '_ember', (0.9, 0.35, 0.12), rough=0.4),
@@ -1260,13 +1264,17 @@ def assemble_seagod(spec):
     for v, l, zz in zip(vs, lon, D[:, 2]):
         uv_map[v] = (0.5 + l / TAU, 0.5 + math.asin(max(-1, min(1, zz))) / math.pi)
     P = field.unit_pos(D)
-    # 抹平：五官幅度衰到 58%（往单位球回退），只在脸区——「曾经是脸」要读得出
+    # 抹平：五官幅度衰到 66%（往单位球回退），只在脸区——「曾经是脸」要读得出
+    # r17：58% 在 face 机位读成「融化的蜡」，眉/鼻/唇要再多留一点刀工
     frontm = np.clip(np.cos(lon), 0, 1) ** 1.2 * (D[:, 2] < 0.55) * (D[:, 2] > -0.9)
-    P = P + (D - P) * (0.42 * frontm)[:, None]
+    P = P + (D - P) * (0.34 * frontm)[:, None]
     # 指痕：五道竖槽（手掌顺着脸往下抹的方向）
     for k, xg in enumerate((-0.30, -0.15, 0.0, 0.15, 0.30)):
         gm = np.exp(-((lon - xg) / 0.050) ** 2) * frontm * np.clip((0.38 - np.abs(D[:, 2] + 0.05)) / 0.38, 0, 1)
-        P[:, 1] += gm * 0.026
+        P[:, 1] += gm * 0.030
+    # 木胎陈化微形：漆区（掌摸不到处）加干缩起伏——光滑黏土壳是玩具感的根
+    aged = HF.fbm3(D * 9.0, seed + 51, octaves=3) - 0.5
+    P += D * (aged * 0.012 * (1 - frontm * 0.85))[:, None]
     # 闭目丘（眼睑鼓包，闭着）+ 睑缝横线
     for sgn in (-1, 1):
         E = np.array(field.eye_dirs[sgn])
@@ -1320,6 +1328,10 @@ def assemble_seagod(spec):
         canvas_h *= 1 - 0.30 * gm[:, :, None]
     # 颌下积垢渐暗：手掌摸不到的下半球积灰返潮——不许亮木楔顶在领口上
     canvas_h *= (1 - 0.60 * np.clip((-z_t - 0.32) / 0.42, 0, 1))[:, :, None]
+    # 漆区龟裂纹：细线网（|noise-0.5| 窄带），掌摸区不裂——玩具壳→老漆胎
+    crk = HF._fbm2(rngh, Ht, Wt, 22, 2)
+    crack_m = np.exp(-((np.abs(crk - 0.5) / 0.016) ** 2)) * (1 - touch)
+    canvas_h *= 1 - 0.30 * crack_m[:, :, None]
     img_h = np_to_image(name + '_head', np.clip(canvas_h, 0, 1))
     me.materials.append(tex_mat(name + '_headm', img_h, rough=0.46))
     shade_smooth(head)
@@ -1336,9 +1348,11 @@ def assemble_seagod(spec):
     crown_z = 1.229
     bm = bmesh.new()
     r = bmesh.ops.create_cube(bm, size=1)
+    tilt = Matrix.Rotation(0.022, 4, 'Y') @ Matrix.Rotation(0.014, 4, 'X')
     for v in r['verts']:
         # 冕板必须罩住全部旒绳挂点（x±0.052 / y±0.100），且窄长（非学位帽）
         v.co = Vector((v.co.x * 0.125, v.co.y * 0.225, v.co.z * 0.009))
+        v.co = tilt @ v.co          # 微斜：机器水平=玩具；老像的冕板歪了一点
         v.co += Vector((0, -0.048, crown_z))
     parts.append(finish_mesh('Crown', bm, [mats['gilt']], subsurf=0))
     # 冠束带：贴颅顶的一圈金箍（冕板不再是悬浮 UFO）
@@ -1347,22 +1361,34 @@ def assemble_seagod(spec):
          [0.0655, 0.0605, 0.050], [0.0725, 0.0685, 0.058], ring_n=20)
     parts.append(finish_mesh('CrownBand', bm, [mats['gilt']], subsurf=1))
     bm = bmesh.new()
+    bm_worn = bmesh.new()
     bm_cord = bmesh.new()
+    rng_t = rng_stream(seed + 77)
     for sy in (-1, 1):   # 前后垂旒
         yq = -0.048 - 0.100 if sy > 0 else -0.048 + 0.100
         for k in range(5):
             x0 = (k - 2) * 0.026
+            sway_x = (rng_t.random() - 0.5) * 0.004     # 串整体歪一点（不是机器排的）
+            sway_y = (rng_t.random() - 0.5) * 0.003
             # 串绳
             rc = bmesh.ops.create_cube(bm_cord, size=1)
             for v in rc['verts']:
                 v.co = Vector((v.co.x * 0.0012, v.co.y * 0.0012, v.co.z * 0.070))
-                v.co += Vector((x0, yq, crown_z - 0.040))
+                v.co += Vector((x0 + sway_x * 0.5, yq + sway_y * 0.5, crown_z - 0.040))
             for j in range(6):
-                ret = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=0.0036)
-                off = Vector((x0, yq, crown_z - 0.012 - j * 0.0122))
+                if rng_t.random() < 0.12:
+                    continue          # 缺珠：老像的旒串掉过珠子
+                rr = 0.0036 * (0.82 + rng_t.random() * 0.38)   # 粒径抖动
+                tgt = bm_worn if rng_t.random() < 0.55 else bm  # 过半是磨秃的旧珠
+                ret = bmesh.ops.create_icosphere(tgt, subdivisions=2, radius=rr)  # subdiv1=六角螺母
+                tj = j / 5.0
+                off = Vector((x0 + sway_x * tj + (rng_t.random() - 0.5) * 0.0012,
+                              yq + sway_y * tj + (rng_t.random() - 0.5) * 0.0012,
+                              crown_z - 0.012 - j * 0.0122 + (rng_t.random() - 0.5) * 0.0016))
                 for v in ret['verts']:
                     v.co += off
     parts.append(finish_mesh('Tassels', bm, [mats['gilt']], subsurf=0))
+    parts.append(finish_mesh('TasselsWorn', bm_worn, [mats['gilt_worn']], subsurf=0))
     parts.append(finish_mesh('TasselCords', bm_cord, [mats['cord']], subsurf=0))
 
     # —— 三足香炉 + 香灰丘 + 三炷香（中间一炷还红着）——
