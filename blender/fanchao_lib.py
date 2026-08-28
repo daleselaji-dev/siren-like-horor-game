@@ -544,6 +544,15 @@ def build_arm(side, spec, m, mats, pose, seed=1):
         el = sh + Vector((side * 0.030, 0.008, -0.150 * m['H']))
         wr = el + Vector((side * 0.030, -0.030, -0.148 * m['H']))
         hand = {'dir': Vector((side * 0.10, -0.06, -1)).normalized(), 'palm': Vector((-side, -0.3, 0)).normalized()}
+    elif pose == 'mic':
+        # 持麦臂（舞台报数员）：肘沉在体侧、前臂上折——麦头停在钙化口缝前一拳。
+        # 口缝世界位 ≈ (0, -0.086, neck_top+0.038)；麦头悬在它前下方 6cm
+        nt = m['neck_top']
+        el = sh + Vector((side * 0.001, -0.100, -0.170))
+        wr = Vector((side * 0.060, -0.175, nt - 0.085))
+        mic_head = Vector((side * 0.012, -0.168, nt + 0.018))
+        hand = {'dir': (mic_head - wr).normalized(),
+                'palm': (mic_head - wr).normalized().cross(Vector((0, 0, 1))).normalized()}
     else:  # sides：垂手贴缝（肘微屈、腕略前——死直管是玩具站姿）
         el = sh + Vector((side * 0.012, -0.006, -0.148 * m['H']))
         wr = el + Vector((side * 0.006, -0.034, -0.150 * m['H']))
@@ -915,6 +924,38 @@ def build_armband(spec, m, mats):
     return finish_mesh('Armband', bm, [mats['band']], subsurf=1)
 
 
+def build_mic(spec, m, wr, hand, mats):
+    """手持麦克风（舞台报数员）：海绵麦头 + 锥柄 + 垂到台面没入的麦线。
+    柄轴沿手的握向（hand['dir']），麦头压在钙化口缝前一拳。"""
+    d = Vector(hand['dir']).normalized()
+    objs = []
+    # 柄：从掌心穿出的锥管
+    p0 = wr + d * 0.010
+    p1 = wr + d * 0.108
+    bm = bmesh.new()
+    tube(bm, [p0, p0.lerp(p1, 0.55), p1], [0.0128, 0.0118, 0.0100],
+         [0.0128, 0.0118, 0.0100], ring_n=12, cap_start=True, cap_end=True)
+    objs.append(finish_mesh('MicHandle', bm, [mats['micbody']], subsurf=1))
+    # 麦头：略压扁的海绵球
+    bm = bmesh.new()
+    ret = bmesh.ops.create_icosphere(bm, subdivisions=2, radius=0.0235)
+    c = p1 + d * 0.017
+    for v in ret['verts']:
+        v.co = Vector((v.co.x, v.co.y, v.co.z * 0.94)) + c
+    objs.append(finish_mesh('MicHead', bm, [mats['micfoam']], subsurf=0))
+    # 麦线：柄尾垂落、荡过身前、没入台面（美术圣经：麦克风线没入舞台）
+    tail = wr - d * 0.012
+    pts = [tail,
+           tail + Vector((0.012, -0.045, -0.16)),
+           Vector((tail.x + 0.055, tail.y - 0.085, tail.z * 0.42)),
+           Vector((tail.x + 0.030, tail.y - 0.125, tail.z * 0.14)),
+           Vector((tail.x - 0.045, tail.y - 0.055, 0.010))]
+    bm = bmesh.new()
+    tube(bm, pts, [0.0038] * 5, [0.0038] * 5, ring_n=6, cap_start=True, cap_end=True)
+    objs.append(finish_mesh('MicCable', bm, [mats['micbody']], subsurf=1))
+    return objs
+
+
 # ============================= 装配与导出 =============================
 
 def assemble_character(spec):
@@ -950,7 +991,8 @@ def assemble_character(spec):
                                                     for c in spec.get('hair_rgb', (0.09, 0.08, 0.07))), rough=0.8),
         'brow': flat_mat(name + '_brow', spec.get('brow_rgb', tuple(c * 0.7 for c in spec.get('hair_rgb', (0.09, 0.08, 0.07)))), rough=0.9),
         'coat': flat_mat(name + '_coat', spec.get('coat_rgb', (0.30, 0.32, 0.34)),
-                         rough=0.64 if wet else 0.88, bump=0.10 if wet else 0.16, bump_scale=230.0),
+                         rough=spec.get('coat_rough', 0.64 if wet else 0.88),
+                         bump=0.10 if wet else 0.16, bump_scale=230.0),
         'trouser': flat_mat(name + '_trouser', spec.get('trouser_rgb', (0.16, 0.17, 0.19)),
                             rough=0.5 if wet else 0.9, bump=0.09 if wet else 0.14, bump_scale=280.0),
         'shoe': flat_mat(name + '_shoe', spec.get('shoe_rgb', (0.06, 0.055, 0.05)), rough=0.45),
@@ -969,34 +1011,50 @@ def assemble_character(spec):
         # 侧影里过亮的粒环仍读成「露齿」）
         'pearl': flat_mat(name + '_pearl', (0.43, 0.41, 0.36), rough=0.80),
         'salt': flat_mat(name + '_salt', (0.92, 0.94, 0.94), rough=0.55),
+        # 理册婆第三眼：矿盘青灰哑光 + 孔缝近黑
+        'mineral': flat_mat(name + '_mineral', (0.185, 0.20, 0.175), rough=0.62),
+        'poredark': flat_mat(name + '_poredark', (0.045, 0.05, 0.045), rough=0.85),
+        # 舞台麦克风：漆壳柄 + 海绵头
+        'micbody': flat_mat(name + '_micbody', (0.13, 0.13, 0.145), rough=0.42, metal=0.35),
+        'micfoam': flat_mat(name + '_micfoam', (0.16, 0.155, 0.15), rough=0.96),
     }
 
     root = bpy.data.objects.new(name + '_root', None)
     bpy.context.collection.objects.link(root)
-    parts = []
+
+    # —— 分组装配（r21 工位管线）：躯干/双臂/双腿各归一个恒等旋转 pivot ——
+    # GLB 工位替换（宴会厅报数员/侍应/理册婆）需要运行时步态：pivot 旋转恒等、
+    # 位置即关节点，游戏内直接写 rotation 摆动；heroModels 静态摆位不受影响
+    # （HeadPivot 名字与行为不变）。
+    g_torso, g_armL, g_armR, g_legL, g_legR = [], [], [], [], []
 
     torso, extras = build_clothed_torso(spec, m, mats, seed)
-    parts += [torso] + extras
-    parts += build_legs(spec, m, mats)
-    parts += build_feet(spec, m, mats)
-    parts.append(build_neck(spec, m, mats))
+    g_torso += [torso] + extras
+    legs = build_legs(spec, m, mats)          # [LegL, LegR]
+    feet = build_feet(spec, m, mats)          # [FootL, FootR]
+    g_legL += [legs[0], feet[0]]
+    g_legR += [legs[1], feet[1]]
+    g_torso.append(build_neck(spec, m, mats))
 
     poseL = spec.get('pose_l', 'sides')
     poseR = spec.get('pose_r', 'sides')
     slv_l, wr_l, hf_l = build_arm(-1, spec, m, mats, poseL, seed)
     slv_r, wr_r, hf_r = build_arm(1, spec, m, mats, poseR, seed)
-    parts += slv_l + slv_r
-    parts += build_hand(-1, wr_l, hf_l, spec, mats,
-                        curl=spec.get('curl', 0.55), spread=spec.get('spread', 0.0))
-    parts += build_hand(1, wr_r, hf_r, spec, mats,
-                        curl=spec.get('curl', 0.55), spread=spec.get('spread', 0.0))
+    g_armL += slv_l
+    g_armR += slv_r
+    g_armL += build_hand(-1, wr_l, hf_l, spec, mats,
+                         curl=spec.get('curl', 0.55), spread=spec.get('spread', 0.0))
+    g_armR += build_hand(1, wr_r, hf_r, spec, mats,
+                         curl=spec.get('curl', 0.55), spread=spec.get('spread', 0.0))
 
     if spec.get('armband'):
-        parts.append(build_armband(spec, m, mats))
+        g_armL.append(build_armband(spec, m, mats))
     if poseL == 'tray':
         tray = build_tray(mats)
         tray.location = wr_l + Vector((0.02, -0.05, 0.035))
-        parts.append(tray)
+        g_armL.append(tray)
+    if poseR == 'mic':
+        g_armR += build_mic(spec, m, wr_r, hf_r, mats)
     if spec.get('kelp'):
         # 海藻：从肩缝里垂下来贴胸的湿扁带（r14 的锥管上端露出肩面读成绿刺）
         rng = rng_stream(seed + 99)
@@ -1010,7 +1068,38 @@ def assemble_character(spec):
             tube(bm, pth, [0.018, 0.020, 0.017, 0.013, 0.009, 0.004],
                  [0.0035, 0.0032, 0.0028, 0.0024, 0.0018, 0.0010], ring_n=8,
                  cap_start=True, cap_end=True)
-            parts.append(finish_mesh('Kelp%d' % i, bm, [mats['kelp']], subsurf=1))
+            g_torso.append(finish_mesh('Kelp%d' % i, bm, [mats['kelp']], subsurf=1))
+
+    # —— 关节 pivot 树（旋转恒等 → glTF 局部轴 = 世界轴，运行时直接摆动）——
+    def mk_pivot(pname, loc, parent, parent_base):
+        pv = bpy.data.objects.new(pname, None)
+        bpy.context.collection.objects.link(pv)
+        pv.location = Vector(loc) - Vector(parent_base)
+        pv.parent = parent
+        return pv
+
+    def attach(objs, pivot, base):
+        # base = pivot 的累计世界位移；恒等旋转下 location 相减即可保位
+        for o in objs:
+            o.parent = pivot
+            o.location = Vector(o.location) - Vector(base)
+
+    hip_base = Vector((0, 0, m['hip']))
+    torso_pv = mk_pivot('TorsoPivot', hip_base, root, Vector((0, 0, 0)))
+    attach(g_torso, torso_pv, hip_base)
+
+    padded0 = spec.get('outfit') not in ('zhongshan', 'waiter')
+    yo_sh = stoop_off(spec, m, m['shoulder'])
+    sh_z = m['shoulder'] - (0.066 if padded0 else 0.048)
+    sh_x = m['sw'] * (0.84 if padded0 else 0.86)
+    for side, grp, pname in ((-1, g_armL, 'ArmPivotL'), (1, g_armR, 'ArmPivotR')):
+        base = Vector((side * sh_x, yo_sh, sh_z))
+        pv = mk_pivot(pname, base, torso_pv, hip_base)
+        attach(grp, pv, base)
+    for side, grp, pname in ((-1, g_legL, 'LegPivotL'), (1, g_legR, 'LegPivotR')):
+        base = Vector((side * m['hipw'] * 0.56, 0, m['hip']))
+        pv = mk_pivot(pname, base, root, Vector((0, 0, 0)))
+        attach(grp, pv, base)
 
     # —— 头组（HeadPivot 供运行时转头）——
     pitch = spec.get('head_pitch', 0.0)
@@ -1018,9 +1107,9 @@ def assemble_character(spec):
     yo = stoop_off(spec, m, m['neck_top'])
     pivot = bpy.data.objects.new('HeadPivot', None)
     bpy.context.collection.objects.link(pivot)
-    pivot.location = Vector((0, yo - math.sin(pitch) * 0.02, m['neck_top']))
+    pivot.location = Vector((0, yo - math.sin(pitch) * 0.02, m['neck_top'])) - hip_base
     pivot.rotation_euler = Euler((pitch, 0, yaw), 'XYZ')
-    pivot.parent = root
+    pivot.parent = torso_pv
 
     field, head_objs = HF.forge_head(spec, seed, mats)
     # 头抬升：vstretch(0.07) 后颏底 ~-0.63 单位（r20 下脸回收 0.12→0.07，
@@ -1032,12 +1121,47 @@ def assemble_character(spec):
         crown = field.pos(Vector((0, -0.12, 1.0)))
         hat.location = Vector((0, 0.008, crown.z - 0.009))
         head_objs.append(hat)
+    if spec.get('bun'):
+        # 绾髻（理册婆）：后顶扁球髻 + 髻根束带
+        bun_d = Vector((0, 0.78, 0.58)).normalized()
+        bp_ = field.pos(bun_d)
+        bn = Vector(field.normal(bun_d))
+        bm = bmesh.new()
+        ret = bmesh.ops.create_icosphere(bm, subdivisions=2, radius=0.033)
+        c = bp_ + bn * 0.010
+        for v in ret['verts']:
+            v.co = Vector((v.co.x * 1.04, v.co.y, v.co.z * 0.80)) + c
+        head_objs.append(finish_mesh('HairBun', bm, [mats['hair_dk']], subsurf=1))
+        # 束发圈：贴髻根的一圈窄环
+        bm = bmesh.new()
+        rotb = Vector((0, 0, 1)).rotation_difference(bn).to_matrix()
+        n_maj, n_min = 16, 6
+        ringsB = []
+        for i in range(n_maj):
+            a = i / n_maj * TAU
+            ring = []
+            for j in range(n_min):
+                b = j / n_min * TAU
+                rr = 0.0245 + 0.0035 * math.cos(b)
+                local = Vector((math.cos(a) * rr, math.sin(a) * rr, 0.0032 * math.sin(b)))
+                ring.append(bm.verts.new(rotb @ local + bp_ + bn * 0.0035))
+            ringsB.append(ring)
+        for i in range(n_maj):
+            r0, r1 = ringsB[i], ringsB[(i + 1) % n_maj]
+            for j in range(n_min):
+                j2 = (j + 1) % n_min
+                bm.faces.new((r0[j], r0[j2], r1[j2], r1[j]))
+        head_objs.append(finish_mesh('BunBand', bm, [mats['band']], subsurf=1))
     for o in head_objs:
         o.location = Vector(o.location) + Vector((0, 0, head_lift))
         o.parent = pivot
 
-    for o in parts:
-        o.parent = root
+    # —— 眼锚点（运行时眼点光挂位：EyeAnchorL/R 空物体随 HeadPivot 转头）——
+    for sgn, aname in ((-1, 'EyeAnchorL'), (1, 'EyeAnchorR')):
+        anchor = bpy.data.objects.new(aname, None)
+        bpy.context.collection.objects.link(anchor)
+        anchor.location = HF.eye_anchor(field, sgn) + Vector((0, 0, head_lift))
+        anchor.parent = pivot
     return root
 
 

@@ -53,6 +53,40 @@ SPECS = {
         'shoe_rgb': (0.10, 0.09, 0.08),
         'anomaly': 'salt_frost',
     },
+    # 舞台报数员（宴会厅工位·gameplay 件）：与橱窗立像同一张脸（seed 同源）——
+    # 「橱窗里那张脸，你会在宴会厅的台上再见到一次」。右手持麦贴near钙化口缝，
+    # 麦线垂落没入舞台；左臂垂侧（运行时 ArmPivotL 周期抬起「宣布」）
+    'emcee_stage': {
+        'name': 'emcee_stage', 'seed': 4101, 'H': 1.72,
+        'outfit': 'zhongshan', 'coat_rgb': (0.21, 0.225, 0.25), 'trouser_rgb': (0.115, 0.12, 0.135),
+        'skin': (0.70, 0.53, 0.42), 'hair_rgb': (0.07, 0.065, 0.06), 'hair': 'short',
+        'armband': True, 'belly': 0.12,
+        'pose_l': 'sides', 'pose_r': 'mic', 'curl': 0.72,
+        'head_pitch': -0.06,
+        'head': {'age': 0.55, 'brow_k': 1.10, 'nose_k': 1.05, 'cheek_k': 1.18, 'hollow': 0.015,
+                 'jaw_k': 1.06, 'chin_k': 1.05, 'lid': 0.40, 'socket_k': 1.05,
+                 'rx': 0.076, 'ry': 0.090, 'rz': 0.104},
+        'stubble': 0.5, 'forehead_lines': 2,
+        'anomaly': 'calcified_mouth',
+    },
+    # 理册婆（3F 工位·gameplay 件）：枣红缎袄、绾髻、拢手——眉心矿物孔板第三眼。
+    # 6m 外是个普通的老太太；2m 内读出眉间那块矿是「长在皮里的」
+    'matron': {
+        'name': 'matron', 'seed': 4505, 'H': 1.58,
+        'outfit': 'padded', 'coat_rgb': (0.24, 0.048, 0.045), 'coat_rough': 0.52,
+        'trouser_rgb': (0.085, 0.082, 0.09),
+        'skin': (0.66, 0.51, 0.42), 'hair_rgb': (0.36, 0.355, 0.34),
+        'brow_rgb': (0.30, 0.29, 0.27), 'hair': 'slick', 'bun': True,
+        'shoulder_k': 0.88, 'belly': 0.16, 'stoop': 0.10,
+        'pose_l': 'clasped', 'pose_r': 'clasped', 'curl': 0.7,
+        'head_pitch': 0.06,
+        'head': {'age': 0.85, 'brow_k': 1.05, 'nose_k': 0.95, 'cheek_k': 1.22, 'hollow': 0.045,
+                 'jaw_k': 0.88, 'chin_k': 0.88, 'lid': 0.56, 'naso_k': 1.4, 'socket_k': 1.12,
+                 'rx': 0.073, 'ry': 0.086, 'rz': 0.100},
+        'forehead_lines': 3, 'age_spots': 10,
+        'shoe_rgb': (0.09, 0.085, 0.08),
+        'anomaly': 'third_eye',
+    },
     # 湿客（人形主怪）：泡胀的镇民——衣沉色、皮青灰、眼蒙翳、赤足、肩挂海藻
     'wetguest': {
         'name': 'wetguest', 'seed': 4404, 'H': 1.78,

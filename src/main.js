@@ -106,22 +106,26 @@ const enemyDefs = [
   // —— 南方大酒店（核册工位） ——
   {
     // 报数员不追人：他的职是念议程。全盲全聋——但他的眼睛看得见整个宴会厅（视奸侦察位）
-    id: 'emcee', label: '报数员', kind: 'worker', role: 'emcee',
+    // P0：舞台上站的是 Blender 细模（emcee_stage.glb 持麦变体）——与橱窗立像同一张脸
+    id: 'emcee', label: '报数员', kind: 'worker', role: 'emcee', glbStation: 'emcee',
     workPos: P.emceeStage, workMode: 'mc', workYaw: 0, floorY: HFY.f1,
     fov: 1, sightRange: 0, hearRange: 0,
   },
   {
     id: 'waiterBanquet', label: '侍应', kind: 'patrol', role: 'waiter', fxKind: 'waiter', mute: true,
+    glbStation: 'waiter',
     waypoints: P.waiterBanquet, floorY: HFY.f1,
     fov: 88, sightRange: 13, hearRange: 11, walkSpeed: 0.85, chaseSpeed: 2.55,
   },
   {
     id: 'waiterLobby', label: '侍应', kind: 'patrol', role: 'waiter', fxKind: 'waiter', mute: true,
+    glbStation: 'waiter',
     waypoints: P.waiterLobby, floorY: HFY.f1,
     fov: 88, sightRange: 13, hearRange: 11, walkSpeed: 0.85, chaseSpeed: 2.55,
   },
   {
     id: 'waiterEast', label: '侍应', kind: 'patrol', role: 'waiter', fxKind: 'waiter', mute: true,
+    glbStation: 'waiter',
     waypoints: P.waiterEast, floorY: HFY.f1,
     fov: 86, sightRange: 12, hearRange: 11, walkSpeed: 0.8, chaseSpeed: 2.5,
   },
@@ -131,7 +135,7 @@ const enemyDefs = [
     fov: 92, sightRange: 14, hearRange: 12, walkSpeed: 0.95, chaseSpeed: 2.7,
   },
   {
-    id: 'matron', label: '理册婆', kind: 'patrol', role: 'matron',
+    id: 'matron', label: '理册婆', kind: 'patrol', role: 'matron', glbStation: 'matron',
     waypoints: P.matron3F, floorY: HFY.f3, enabled: false,
     fov: 104, sightRange: 15, hearRange: 13, walkSpeed: 0.78, chaseSpeed: 2.35,
   },

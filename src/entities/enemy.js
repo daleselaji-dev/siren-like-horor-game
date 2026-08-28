@@ -4,6 +4,7 @@
 // 特殊实体：浮客(非敌对漂浮宾客)、回眸客(非敌对指针)、上宾(房间尺度前肢，感知振动)
 import * as THREE from 'three';
 import { Humanoid } from './humanoid.js';
+import { StationBody } from './stationBody.js';
 import { slideMove, hasLineOfSight } from '../world/collision.js';
 
 const _v1 = new THREE.Vector3();
@@ -42,10 +43,14 @@ export class Enemy {
     this.fxKind = def.fxKind;  // 视奸滤镜风格（waiter 等）
     this.enabled = def.enabled !== false;
 
-    this.body = new Humanoid(M, {
-      role: def.role, cloth: def.cloth, hat: def.hat, lantern: def.lantern, tool: def.tool,
-      light: def.lanternLight, seed: (def.id ?? '').split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0,
-    });
+    // P0 双轨归一：关键 gameplay 工位（报数员/侍应/理册婆）直接装配 Blender GLB
+    // 细模（StationBody 实现 Humanoid 同款最小接口）；其余角色仍走程序化 Humanoid
+    this.body = def.glbStation
+      ? new StationBody(scene, world, def.glbStation, def.role)
+      : new Humanoid(M, {
+        role: def.role, cloth: def.cloth, hat: def.hat, lantern: def.lantern, tool: def.tool,
+        light: def.lanternLight, seed: (def.id ?? '').split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0,
+      });
     scene.add(this.body.group);
     this.body.group.visible = this.enabled;
     this.floorY = def.floorY; // 多层建筑内的所在楼层（高度解析参照）

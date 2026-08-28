@@ -1041,6 +1041,70 @@ def build_salt_crystals(field, mats):
     return _new_obj('Salt', me, [mats['salt']])
 
 
+def build_third_eye(field, mats):
+    """理册婆：眉心矿物孔板（第三眼）——椭圆矿盘半没进皮，盘心一道横向孔缝，
+    盘缘一圈皮色滚边（皮是「包着它长上来的」，不是钉上去的道具）。
+    死魂曲读法：6m 外只是眉间一粒暗痣；2m 内读出那是一块长在骨相里的矿。"""
+    zz = 0.365                      # 额心：眉弓(0.295)之上、发际(~0.44)之下
+    cl = math.sqrt(1 - zz * zz)
+    d = Vector((0.0, -cl, zz))
+    p = field.pos(d)
+    nrm = Vector(field.normal(d))
+    rot = Vector((0, 0, 1)).rotation_difference(nrm).to_matrix()
+    objs = []
+    # 矿盘：浅锥台（盘面向外微凸），横向略宽（椭圆读法）
+    bm = bmesh.new()
+    ret = bmesh.ops.create_cone(bm, cap_ends=True, segments=18,
+                                radius1=0.0128, radius2=0.0095, depth=0.0062)
+    for v in ret['verts']:
+        v.co = rot @ Vector((v.co.x * 1.12, v.co.y * 0.92, v.co.z)) + p + nrm * 0.0004
+    me = bpy.data.meshes.new('ThirdEye')
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    objs.append(_new_obj('ThirdEye', me, [mats['mineral']]))
+    # 盘心孔缝：一道横向暗缝（孔板的「瞳」——它不睁，只是通着）
+    bm = bmesh.new()
+    ret = bmesh.ops.create_cube(bm, size=1)
+    for v in ret['verts']:
+        v.co = rot @ Vector((v.co.x * 0.0135, v.co.y * 0.0028, v.co.z * 0.0028)) \
+            + p + nrm * 0.0038
+    me = bpy.data.meshes.new('ThirdEyePore')
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    objs.append(_new_obj('ThirdEyePore', me, [mats['poredark']]))
+    # 皮缘滚边：皮色窄环压住盘缘（缝隙非法——r25 孔板黑洞否决项的 bpy 版）
+    bm = bmesh.new()
+    n_maj, n_min = 20, 8
+    rings = []
+    for i in range(n_maj):
+        a = i / n_maj * TAU
+        ring = []
+        for j in range(n_min):
+            b = j / n_min * TAU
+            rr = 0.0134 + 0.0034 * math.cos(b)
+            local = Vector((math.cos(a) * rr * 1.12, math.sin(a) * rr * 0.92,
+                            0.0026 * math.sin(b)))
+            ring.append(bm.verts.new(rot @ local + p + nrm * 0.0008))
+        rings.append(ring)
+    for i in range(n_maj):
+        r0, r1 = rings[i], rings[(i + 1) % n_maj]
+        for j in range(n_min):
+            j2 = (j + 1) % n_min
+            bm.faces.new((r0[j], r0[j2], r1[j2], r1[j]))
+    me = bpy.data.meshes.new('ThirdEyeRim')
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    rim = _new_obj('ThirdEyeRim', me, [mats['skin_flat']])
+    md = rim.modifiers.new('Subsurf', 'SUBSURF')
+    md.levels = 1
+    md.render_levels = 1
+    objs.append(rim)
+    return objs
+
+
 # ------------------------- 装配入口 -------------------------
 
 def forge_head(spec, seed, mats):
@@ -1060,6 +1124,8 @@ def forge_head(spec, seed, mats):
         objs.append(build_calcified_nodules(field, mats))
     elif spec.get('anomaly') == 'salt_frost':
         objs.append(build_salt_crystals(field, mats))
+    elif spec.get('anomaly') == 'third_eye':
+        objs += build_third_eye(field, mats)
     return field, objs
 
 
@@ -1244,6 +1310,16 @@ def paint_face(spec, seed):
         grow = np.clip(sf * (0.30 + 0.70 * cry) - 0.05, 0, 1)
         L(grow, np.array((0.88, 0.90, 0.90)), 0.62)
         L(np.clip(sf - 0.45, 0, 1) * cry, np.array((0.96, 0.97, 0.97)), 0.9)
+    elif spec.get('anomaly') == 'third_eye':
+        # 眉心矿晕：孔板周围一圈皮色压暗 + 青灰矿渍向外洇（皮在包着矿长——
+        # 板下的皮长年吃矿色，边缘是渐变不是贴纸圆）
+        u3, v3 = uv_of(0, 0.365)
+        halo = np.clip(_blob(U, V, u3, v3, 0.030, 0.026) - _blob(U, V, u3, v3, 0.011, 0.009), 0, 1)
+        gr = _vnoise2(rng, H, W, 150)
+        L(halo * (0.4 + 0.6 * gr), np.array((0.34, 0.36, 0.33)), 0.34)
+        L(_blob(U, V, u3, v3, 0.013, 0.011), np.array((0.30, 0.31, 0.28)), 0.5)
+        # 板缘下的一线阴影（有厚度的东西才压得出影）
+        L(_blob(U, V, u3, v3 - 0.014, 0.014, 0.004, 2.0), dark * 0.7, 0.5)
     elif spec.get('anomaly') == 'drowned':
         cold = np.array((0.44, 0.52, 0.53))
         canvas[:, :] = canvas * 0.34 + cold * 0.66
