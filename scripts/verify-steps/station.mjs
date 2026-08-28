@@ -230,9 +230,10 @@ export async function run(page, h) {
   };
 
   // 麦头贴钙化口缝 / 侍应垂头领结 / 第三眼矿盘（2m 内读法）
-  await closeup('station/r21_emcee_mic', 'emcee', { dist: 0.5, up: -0.05, fov: 30 });
-  await closeup('station/r21_waiter_face', 'waiterBanquet', { dist: 0.62, up: -0.06, rise: -0.1 });
-  await closeup('station/r21_matron_thirdeye', 'matron', { dist: 0.45, up: 0.01, fov: 28 });
+  // 灯档按 FULLSPEC 胶片辉光标定：白中山装/浅肤近摄逢 keyI>10 直接曝飞
+  await closeup('station/r21_emcee_mic', 'emcee', { dist: 0.5, up: -0.05, fov: 30, keyI: 7, fillI: 3, ambI: 0.35 });
+  await closeup('station/r21_waiter_face', 'waiterBanquet', { dist: 0.55, up: 0.02, rise: 0.04, keyI: 4, fillI: 1.5, ambI: 0.2 });
+  await closeup('station/r21_matron_thirdeye', 'matron', { dist: 0.45, up: 0.05, fov: 28, keyI: 6, fillI: 2.5, ambI: 0.3 });
   await page.evaluate(() => window.__game.byId.matron.setEnabled(false));
 
   // ---------- 5. keep 交付图（审计指定路径） ----------
